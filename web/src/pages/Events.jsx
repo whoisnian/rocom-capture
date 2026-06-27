@@ -9,6 +9,7 @@ const FIELDS = [
   { k: 'medal', label: '奖牌' },
   { k: 'type', label: '系别' },
   { k: 'shiny', label: '异色', fixed: '1' },
+  { k: 'colorful', label: '炫彩', fixed: '1' },
 ]
 
 function loadRules() {
@@ -19,6 +20,7 @@ function matchRule(pet, rule) {
   if (!pet) return false
   if (rule.field === 'type') return (pet.types || []).includes(rule.value)
   if (rule.field === 'shiny') return !!pet.shiny
+  if (rule.field === 'colorful') return !!pet.colorful
   return String(pet[rule.field] || '') === rule.value
 }
 // 任一规则命中即高亮(规则内部为精确匹配)。

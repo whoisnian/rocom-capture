@@ -40,6 +40,17 @@ export function Six({ p }) {
   )
 }
 
+// Marks 渲染异色/炫彩标记。
+export function Marks({ p }) {
+  if (!p) return null
+  return (
+    <>
+      {p.shiny && <span className="mark mark-shiny" title="异色">异</span>}
+      {p.colorful && <span className="mark mark-colorful" title="炫彩">彩</span>}
+    </>
+  )
+}
+
 // fmtTime 把 unix 秒格式化为本地时间。
 export function fmtTime(ts) {
   if (!ts) return '-'

@@ -108,6 +108,9 @@ table.pets tr { cursor: pointer; }
 .six b { color: var(--gold); }
 .up { color: var(--green); } .down { color: var(--red); }
 .talent { color: var(--gold); font-size: 11px; margin-left: 3px; font-weight: 600; }
+.mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; }
+.mark-shiny { background: #3a2f6b; color: #c9b6ff; }
+.mark-colorful { background: #6b2f50; color: #ffb6e0; }
 
 /* 移动卡片(默认隐藏) */
 .cards { display: none; }

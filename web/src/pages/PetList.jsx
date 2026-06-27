@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, fmtTime } from '../components/bits'
+import { Types, Six, Marks, fmtTime } from '../components/bits'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
@@ -106,9 +106,15 @@ export default function PetList() {
           </select>
         </div>
         <div className="filter-group">
-          <label>异色/炫彩</label>
+          <label>异色</label>
           <select className="select" onChange={(e) => set({ shiny: e.target.value })}>
             <option value="">全部</option><option value="1">仅异色</option><option value="0">非异色</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>炫彩</label>
+          <select className="select" onChange={(e) => set({ colorful: e.target.value })}>
+            <option value="">全部</option><option value="1">仅炫彩</option><option value="0">非炫彩</option>
           </select>
         </div>
       </aside>
@@ -146,7 +152,7 @@ export default function PetList() {
                     <div className="pet-cell">
                       <div className="pet-avatar">{p.shiny ? '✨' : '🐾'}</div>
                       <div>
-                        <div className="pet-name">{p.name || p.species} {p.gender}</div>
+                        <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
                         <div className="pet-sub">{p.species} · Lv.{p.level}</div>
                       </div>
                     </div>
@@ -173,7 +179,7 @@ export default function PetList() {
               <div className="card-head">
                 <div className="pet-avatar">{p.shiny ? '✨' : '🐾'}</div>
                 <div style={{ flex: 1 }}>
-                  <div className="pet-name">{p.name || p.species} {p.gender}</div>
+                  <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
                   <div className="pet-sub">{p.species} · Lv.{p.level}</div>
                 </div>
                 <Types types={p.types} />
