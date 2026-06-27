@@ -16,10 +16,12 @@ world-data 主包 `pakchunk4-WindowsNoEditor/` 下：
 
 关键表：
 
-- `PET_CONF.json` — 宠物种类名(`conf_id → name`)
+- `MONSTER_CONF.json` + `PET_CONF.json` — 宠物种类名(`conf_id → name`)。
+  常规宠物在 MONSTER_CONF，彩蛋/特殊宠物在 PET_CONF，两表 id 不重叠，合并取用。
 - `AUDIO_NATURE_CONF.json` — 性格名(`nature_id → name`)
 - `MEDAL_CONF.json` — 奖牌名与描述
-- `PET_FILTER_CONF.json` — 一站式筛选维度配置：系别/天分/标记/特长的
+- `PET_TALENT_CONF.json` — 特长名(`speciality_id → name`)
+- `PET_FILTER_CONF.json` — 一站式筛选维度配置：系别/天分/标记的
   `filter_enum_value → filter_desc`(中文)
 - `c2s_cmd.proto` 的 `enum ZoneSvrCmd` — opcode → 名称(供调试页)
 - `xls_enum.proto` 的 `enum SkillDamType / PetTalentRate / ...` — 枚举值名 → 整数
@@ -49,11 +51,11 @@ world-data 主包 `pakchunk4-WindowsNoEditor/` 下：
 | 身高/体重 | `height`/100 米、`weight`/1000 千克 |
 | 天分 | `talent_rank` → PetTalentRate |
 | 奖牌 | `wear_medal_conf_id` → MEDAL_CONF |
-| 特长 | `speciality_id` |
+| 特长 | `speciality_id` → PET_TALENT_CONF.name |
 | 标记 | `partner_mark` |
 | 声音 | `voice` |
 | 捕捉时间 | `add_time`(unix 秒) |
-| 六维 | `attribute_info`(hp/attack/special_attack/defense/special_defense/speed) |
+| 六维 | `attribute_new_info`(最终面板值，按 AttributeType 1-6 取) |
 
 ## 3. 名称表 → JSON(`scripts/gen_gamedata.py`)
 
@@ -65,8 +67,9 @@ species  nature  skill_dam_type  talent_rate
 partner_mark  speciality  medal  opcodes
 ```
 
-系别/天分/标记/特长的整数值，通过解析 `xls_enum.proto` 枚举(名→整数)再 join
-`PET_FILTER_CONF` 的(枚举名→中文)得到。性别为硬编码。
+系别/天分/标记的整数值，通过解析 `xls_enum.proto` 枚举(名→整数)再 join
+`PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+PET_CONF，
+特长直接取 PET_TALENT_CONF，性别为硬编码。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
@@ -80,8 +83,17 @@ s2c 0x1346 DATA 明文 body
 `ToPet` 完成单位换算(身高/体重)、枚举翻译(系别/性格/天分/奖牌/标记/特长)、
 六维提取。离线回放 `sample.pcap` 实测解出 **543 只**宠物，与游戏内宠物总数一致。
 
-## 5. 待校准
+## 5. 已修复 / 待校准
 
-- **六维**展示 `base_value`(基础面板值)，与游戏最终面板值有差(缺努力/奖牌加成公式)；
-- **咕噜球/蛋组/技能名**本地化尚未完全梳理；
-- **性格** `nature_id` 用 `AUDIO_NATURE_CONF` 映射，个别可能与游戏显示略有偏差。
+已修复(实测对齐截图)：
+- **种类名**：合并 MONSTER_CONF+PET_CONF 后覆盖率 ~94%(剩余少量冷门 conf_id)；
+- **六维**：改用 `attribute_new_info` 最终面板值，火神 410/277/163/229/119/139 与截图完全一致；
+- **特长**：改用 PET_TALENT_CONF，覆盖率 100%；
+- **放生事件**：接入 `ZONE_PET_FREE_RSP(453)`，解析 `pet_gid` 列表 → 移除并推 lose 事件。
+
+待校准(多数需含相应事件/宠物的新样本)：
+- **异色/炫彩**：原 `mutation_type!=0` 误判严重，已暂置 false；正确字段(`glass_info`/`hide_shine` 等)需含异色宠物的样本确认；
+- **获得事件细分**：`catch_way`(捕捉/孵蛋/赠送)取值需事件样本校准；
+- **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入(需确认 c2s body 偏移);
+- **咕噜球/蛋组/技能名**本地化尚未梳理；**盒子位置**字段待定位；
+- **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。
