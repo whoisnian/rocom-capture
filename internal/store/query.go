@@ -9,9 +9,10 @@ import (
 
 // Filter 是宠物列表的筛选/排序/分页参数。
 type Filter struct {
-	Search     string   // 名称/种类模糊
-	Types      []string // 系别(任一匹配)
-	Nature     string
+	Search        string   // 名称/种类模糊
+	Types         []string // 系别(任一匹配)
+	Nature        string
+	NatureExclude []string // 性格"其他":排除这些热门性格
 	Gender     string
 	TalentRank string
 	Medal      string
@@ -50,6 +51,14 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 		}
 	}
 	addEq("nature", f.Nature)
+	if len(f.NatureExclude) > 0 {
+		ph := make([]string, len(f.NatureExclude))
+		for i, n := range f.NatureExclude {
+			ph[i] = "?"
+			args = append(args, n)
+		}
+		where = append(where, "nature NOT IN ("+strings.Join(ph, ",")+")")
+	}
 	addEq("gender", f.Gender)
 	addEq("talent_rank", f.TalentRank)
 	addEq("medal", f.Medal)

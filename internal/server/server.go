@@ -83,6 +83,9 @@ func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
 	if t := q.Get("types"); t != "" {
 		f.Types = strings.Split(t, ",")
 	}
+	if ne := q.Get("natureExclude"); ne != "" {
+		f.NatureExclude = strings.Split(ne, ",")
+	}
 	pets, total, err := s.store.ListPets(f)
 	if err != nil {
 		http.Error(w, err.Error(), 500)

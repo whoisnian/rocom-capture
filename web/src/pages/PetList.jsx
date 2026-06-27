@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
 import { Types, Six, fmtTime } from '../components/bits'
 
+// 热门性格(筛选用)及其影响。其余归入"其他"。
+const HOT_NATURES = [
+  ['开朗', '速↑魔攻↓'],
+  ['胆小', '速↑物攻↓'],
+  ['固执', '物攻↑魔攻↓'],
+  ['聪明', '魔攻↑物攻↓'],
+  ['平和', '生↑魔攻↓'],
+  ['踏实', '生↑速↓'],
+  ['沉默', '生↑物攻↓'],
+  ['急躁', '速↑物防↓'],
+]
+const HOT_NAMES = HOT_NATURES.map((n) => n[0])
+
 const SORTS = [
   { key: 'gid', label: '编号' },
   { key: 'level', label: '等级' },
@@ -65,7 +78,24 @@ export default function PetList() {
             <input className="input" type="number" placeholder="最大" onChange={(e) => set({ levelMax: e.target.value })} />
           </div>
         </div>
-        <Select label="性格" opts={options.nature} onChange={(v) => set({ nature: v })} />
+        <div className="filter-group">
+          <label>性格</label>
+          <select
+            className="select"
+            value={filter.natureExclude ? '__other__' : filter.nature || ''}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === '__other__') set({ nature: '', natureExclude: HOT_NAMES.join(',') })
+              else set({ nature: v, natureExclude: '' })
+            }}
+          >
+            <option value="">全部</option>
+            {HOT_NATURES.map(([n, eff]) => (
+              <option key={n} value={n}>{n}（{eff}）</option>
+            ))}
+            <option value="__other__">其他</option>
+          </select>
+        </div>
         <Select label="天分" opts={options.talentRank} onChange={(v) => set({ talentRank: v })} />
         <Select label="特长" opts={options.speciality} onChange={(v) => set({ speciality: v })} />
         <Select label="奖牌" opts={options.medal} onChange={(v) => set({ medal: v })} />
