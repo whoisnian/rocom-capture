@@ -53,13 +53,18 @@ def enum_dim(enum_name):
     return out
 
 
+# 种类名：常规宠物在 MONSTER_CONF，彩蛋/特殊宠物在 PET_CONF，两表 id 不重叠，合并取用。
+species = {k: v["name"] for k, v in rows("MONSTER_CONF.json").items() if v.get("name")}
+species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get("name")})
+
 data = {
-    "species": {k: v.get("name", "") for k, v in rows("PET_CONF.json").items() if v.get("name")},
+    "species": species,
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),
-    "speciality": enum_dim("PetTalentFilterName"),
+    # 特长：speciality_id 直接对应 PET_TALENT_CONF 的 id
+    "speciality": {k: v["name"] for k, v in rows("PET_TALENT_CONF.json").items() if v.get("name")},
     "medal": {k: {"name": v.get("name", ""), "desc": v.get("desc", "")}
               for k, v in rows("MEDAL_CONF.json").items() if v.get("name")},
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)
