@@ -91,7 +91,9 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		Speciality:      db.Speciality(p.GetSpecialityId()),
 
 		CatchTime: int64(p.GetAddTime()),
-		Shiny:     p.GetMutationType() != 0,
+		// 异色/炫彩判定待用含异色宠物的样本确认正确字段
+		// (mutation_type!=0 会大量误判，glass_info/hide_shine 等候选需实测)。
+		Shiny: false,
 	}
 
 	if m, ok := db.Medal(p.GetWearMedalConfId()); ok {
@@ -106,6 +108,26 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		out.SpAttack = toStat(attr.GetSpecialAttack())
 		out.SpDefense = toStat(attr.GetSpecialDefense())
 		out.Speed = toStat(attr.GetSpeed())
+	}
+
+	// attribute_new_info 直接给出最终面板值(已含等级/努力/奖牌加成)，
+	// 若存在则覆盖 base_value。type 为 AttributeType: 1生命 2物攻 3魔攻 4物防 5魔防 6速度。
+	if newAttr := p.GetAttributeNewInfo(); newAttr != nil {
+		finals := make(map[int32]int32)
+		for _, a := range newAttr.GetAddiAttrData() {
+			finals[a.GetType()] += a.GetAddiAttr()
+		}
+		setFinal := func(s *Stat, t int32) {
+			if v, ok := finals[t]; ok {
+				s.Value = v
+			}
+		}
+		setFinal(&out.HP, 1)
+		setFinal(&out.Attack, 2)
+		setFinal(&out.SpAttack, 3)
+		setFinal(&out.Defense, 4)
+		setFinal(&out.SpDefense, 5)
+		setFinal(&out.Speed, 6)
 	}
 
 	if sk := p.GetSkill(); sk != nil {
