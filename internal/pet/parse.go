@@ -10,9 +10,49 @@ import (
 
 // 宠物相关 opcode(来自 c2s_cmd.proto 的 ZoneSvrCmd enum)。
 const (
-	OpGetPetInfoByPageRsp = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP, 分页宠物列表
-	OpPetDeleteRsp        = 0x018e // ZONE_PET_DELETE_RSP, 删除/放生
+	OpGetPetInfoByPageRsp = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
+	OpPetFreeRsp          = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
 )
+
+// ParseFreeRsp 解析 ZonePetFreeRsp(放生)的 body，返回被放生的 gid 列表。
+// 消息结构: { RetInfo ret_info=1; repeated uint32 pet_gid=2; }
+func ParseFreeRsp(body []byte) []uint32 {
+	var gids []uint32
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		var m int
+		if num == 2 && typ == protowire.VarintType { // 非 packed
+			var v uint64
+			v, m = protowire.ConsumeVarint(b)
+			if m >= 0 {
+				gids = append(gids, uint32(v))
+			}
+		} else if num == 2 && typ == protowire.BytesType { // packed repeated
+			var v []byte
+			v, m = protowire.ConsumeBytes(b)
+			for len(v) > 0 {
+				x, k := protowire.ConsumeVarint(v)
+				if k < 0 {
+					break
+				}
+				gids = append(gids, uint32(x))
+				v = v[k:]
+			}
+		} else {
+			m = protowire.ConsumeFieldValue(num, typ, b)
+		}
+		if m < 0 {
+			break
+		}
+		b = b[m:]
+	}
+	return gids
+}
 
 // PageResult 是一页宠物列表的解析结果。
 type PageResult struct {

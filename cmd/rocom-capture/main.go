@@ -79,6 +79,21 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
+		// 放生：服务器下行确认被放生的 gid 列表
+		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetFreeRsp {
+			for _, gid := range pet.ParseFreeRsp(m.AppBody) {
+				old, err := st.RemovePet(gid)
+				if err != nil || old == nil {
+					continue
+				}
+				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "放生", Gid: gid, Pet: old}
+				if st.AddEvent(ev) == nil {
+					srv.Hub().Broadcast("event", ev)
+				}
+			}
+			continue
+		}
+
 		if m.Direction != gcp.S2C || m.Opcode != pet.OpGetPetInfoByPageRsp {
 			continue
 		}
