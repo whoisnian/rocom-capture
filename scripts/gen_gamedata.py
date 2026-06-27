@@ -57,15 +57,26 @@ def enum_dim(enum_name):
 species = {k: v["name"] for k, v in rows("MONSTER_CONF.json").items() if v.get("name")}
 species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get("name")})
 
+# 性格增减维度(权威表，按性格名匹配；维度编号 1生命 2物攻 3魔攻 4物防 5魔防 6速度)。
+# NATURE_CONF 推导对个别性格(如平和)的 id 错位，故以名为准。
+NATURE_TABLE = {
+    "胆小": (6, 2), "急躁": (6, 4), "开朗": (6, 3), "莽撞": (6, 5), "热情": (6, 1),  # 速度增益
+    "沉默": (1, 2), "忧郁": (1, 4), "平和": (1, 3), "粗心": (1, 5), "踏实": (1, 6),  # 生命增益
+    "大胆": (2, 4), "固执": (2, 3), "调皮": (2, 5), "勇敢": (2, 6), "逞强": (2, 1),  # 物攻增益
+    "稳重": (4, 2), "天真": (4, 3), "懒散": (4, 5), "悠闲": (4, 6), "坦率": (4, 1),  # 物防增益
+    "聪明": (3, 2), "专注": (3, 4), "偏执": (3, 5), "冷静": (3, 6), "理性": (3, 1),  # 魔攻增益
+    "警惕": (5, 2), "温顺": (5, 4), "害羞": (5, 3), "慎重": (5, 6), "焦虑": (5, 1),  # 魔防增益
+}
+nature_effect = {}
+for k, v in rows("AUDIO_NATURE_CONF.json").items():
+    if v.get("name") in NATURE_TABLE:
+        pos, neg = NATURE_TABLE[v["name"]]
+        nature_effect[k] = {"pos": pos, "neg": neg}
+
 data = {
     "species": species,
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
-    # 性格增减维度: positive/negative_effect 用 79-84 编码(79生命..84速度),减 78 得六维 1-6。
-    "nature_effect": {
-        k: {"pos": v["positive_effect"] - 78, "neg": v["negative_effect"] - 78}
-        for k, v in rows("NATURE_CONF.json").items()
-        if 79 <= (v.get("positive_effect") or 0) <= 84 and 79 <= (v.get("negative_effect") or 0) <= 84
-    },
+    "nature_effect": nature_effect,
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),

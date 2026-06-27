@@ -90,9 +90,10 @@ s2c 0x1346 DATA 明文 body
 - **最终面板值**(`value`)：取自 `attribute_new_info`(已含等级/努力/奖牌加成)。
 - **天分等级**(`talentLv`)：取自 `attribute_info.*.talent_add_value`，即该维度的个体值 1–10
   (无天分则为 0)。宠物在 1–3 个维度上有天分。
-- **性格影响**(`nature`)：性格使一维 +10%、一维 −10%。增减维度来自 `NATURE_CONF`
-  的 `positive/negative_effect`(79–84 编码减 78 得六维 1–6);若用道具改过性格，
-  则以 `changed_nature_pos/neg_attr_type` 为准。
+- **性格影响**(`nature`)：性格使一维 +10%、一维 −10%。增减维度由权威性格表(30 种，
+  按性格名匹配，见 `gen_gamedata.py` 的 `NATURE_TABLE`)生成 `nature_effect`;若用道具
+  改过性格，则以 `changed_nature_pos/neg_attr_type` 为准。
+  (注:`NATURE_CONF` 推导对个别性格如"平和"的 id 错位，故改用权威表。)
 
 `talent_rank`(天分评级)由天分项数与是否和性格增益维度重合决定，实测吻合：
 一般般=1项、还不错=2项、了不起=3项(1项与性格增益重合)、相当好=3项(不重合)。
