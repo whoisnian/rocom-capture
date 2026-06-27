@@ -109,12 +109,15 @@ s2c 0x1346 DATA 明文 body
 - **特长**：取 PET_TALENT_CONF 中 `filter_enum_value=PTFN_TALENT_*` 的 11 种固定特长
   (无/奇袭/亲密/灵巧/疾行/同乘/无畏/爱分享/家里蹲/热心教/慈悲为怀),id=502 按游戏
   显示为"无畏"(表内 name 为"勇敢"),覆盖率 100%；
-- **放生事件**：接入 `ZONE_PET_FREE_RSP(453)`，解析 `pet_gid` 列表 → 移除并推 lose 事件;
+- **放生事件**：接入 `ZONE_PET_FREE_RSP(453)`，解析 `pet_gid`(field2)→ 移除并推 lose 事件;
+- **孵蛋事件**：`ZONE_CRACK_EGG_RSP(780)` 用 `FindNewPet` 递归提取奖励
+  (`ret_info.goods_reward.rewards[].pet`)中的新宠物 → 入库 + obtain(孵蛋)事件;
 - **异色/炫彩**：`mutation_type` 为位标志,bit0=异色、bit3=炫彩(9 样本实测验证);
   炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
 
 待校准(多数需含相应事件/宠物的新样本)：
-- **获得事件细分**：`catch_way`(捕捉/孵蛋/赠送)取值需事件样本校准；
-- **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入(需确认 c2s body 偏移);
+- **捕捉事件**：战斗外(赛季球/高级球)与战斗内捕捉的新宠物入库待接入
+  (放生这些刚捕捉的宠物时，库中暂无快照,仅记录 gid);
+- **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入;
 - **咕噜球/蛋组/技能名**本地化尚未梳理；**盒子位置**字段待定位；
 - **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。

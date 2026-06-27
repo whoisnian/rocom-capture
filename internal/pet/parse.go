@@ -12,7 +12,45 @@ import (
 const (
 	OpGetPetInfoByPageRsp = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
 	OpPetFreeRsp          = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
+	OpCrackEggRsp         = 0x030c // ZONE_CRACK_EGG_RSP(780), 孵蛋(新宠物嵌在 goods_reward)
 )
+
+// FindNewPet 在响应 body 中递归查找新宠物 PetData。
+// 孵蛋/捕捉获得的宠物作为奖励嵌套在 ret_info.goods_reward.rewards[].pet 里，
+// 逐层路径随消息而异，这里递归尝试把每个 LEN 子字段反序列化为 PetData，
+// 以 gid/conf_id/name 均有效作为命中判据。
+func FindNewPet(body []byte) *pb.PetData {
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			var pd pb.PetData
+			if proto.Unmarshal(v, &pd) == nil &&
+				pd.GetGid() > 0 && pd.GetConfId() > 0 && len(pd.GetName()) > 0 {
+				return &pd
+			}
+			if r := FindNewPet(v); r != nil {
+				return r
+			}
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+	return nil
+}
 
 // ParseFreeRsp 解析 ZonePetFreeRsp(放生)的 body，返回被放生的 gid 列表。
 // 消息结构: { RetInfo ret_info=1; repeated uint32 pet_gid=2; }

@@ -79,13 +79,24 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
-		// 放生：服务器下行确认被放生的 gid 列表
+		// 孵蛋：服务器下行的孵蛋结果含新宠物
+		if m.Direction == gcp.S2C && m.Opcode == pet.OpCrackEggRsp {
+			if pd := pet.FindNewPet(m.AppBody); pd != nil {
+				p := pet.ToPet(pd, db)
+				st.UpsertPet(p)
+				srv.Hub().Broadcast("pet", p)
+				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: "孵蛋", Gid: p.Gid, Pet: p}
+				if st.AddEvent(ev) == nil {
+					srv.Hub().Broadcast("event", ev)
+				}
+			}
+			continue
+		}
+
+		// 放生：服务器下行确认被放生的 gid 列表(库中无快照时仍记录 gid)
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetFreeRsp {
 			for _, gid := range pet.ParseFreeRsp(m.AppBody) {
-				old, err := st.RemovePet(gid)
-				if err != nil || old == nil {
-					continue
-				}
+				old, _ := st.RemovePet(gid)
 				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "放生", Gid: gid, Pet: old}
 				if st.AddEvent(ev) == nil {
 					srv.Hub().Broadcast("event", ev)
