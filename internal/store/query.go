@@ -19,6 +19,7 @@ type Filter struct {
 	Speciality string
 	PartnerMark string
 	Shiny      string // "", "1", "0"
+	Colorful   string // "", "1", "0"
 	LevelMin   int
 	LevelMax   int
 	Sort       string
@@ -68,6 +69,11 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 		where = append(where, "shiny=1")
 	} else if f.Shiny == "0" {
 		where = append(where, "shiny=0")
+	}
+	if f.Colorful == "1" {
+		where = append(where, "colorful=1")
+	} else if f.Colorful == "0" {
+		where = append(where, "colorful=0")
 	}
 	if f.LevelMin > 0 {
 		where = append(where, "level>=?")

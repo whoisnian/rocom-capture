@@ -38,7 +38,8 @@ type Pet struct {
 	SpecialityID    uint32 `json:"specialityId"`
 
 	CatchTime int64 `json:"catchTime"` // 捕捉时间(unix 秒)
-	Shiny     bool  `json:"shiny"`     // 异色/变异
+	Shiny     bool  `json:"shiny"`     // 异色(mutation_type bit0)
+	Colorful  bool  `json:"colorful"`  // 炫彩(mutation_type bit3)
 
 	HP        Stat `json:"hp"`
 	Attack    Stat `json:"attack"`     // 物攻
@@ -80,9 +81,9 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		Speciality:      db.Speciality(p.GetSpecialityId()),
 
 		CatchTime: int64(p.GetAddTime()),
-		// 异色/炫彩判定待用含异色宠物的样本确认正确字段
-		// (mutation_type!=0 会大量误判，glass_info/hide_shine 等候选需实测)。
-		Shiny: false,
+		// mutation_type 为位标志: bit0=异色, bit3=炫彩(实测样本验证)。
+		Shiny:    p.GetMutationType()&1 != 0,
+		Colorful: p.GetMutationType()&8 != 0,
 	}
 
 	if m, ok := db.Medal(p.GetWearMedalConfId()); ok {

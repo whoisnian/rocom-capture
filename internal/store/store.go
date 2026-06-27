@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS pets (
   height REAL, weight REAL, voice INTEGER,
   talent_rank TEXT, medal TEXT, medal_id INTEGER, partner_mark TEXT,
   speciality TEXT, speciality_id INTEGER,
-  catch_time INTEGER, shiny INTEGER,
+  catch_time INTEGER, shiny INTEGER, colorful INTEGER,
   hp INTEGER, attack INTEGER, defense INTEGER,
   sp_attack INTEGER, sp_defense INTEGER, speed INTEGER,
   data TEXT, updated_at INTEGER
@@ -87,20 +87,20 @@ func (s *Store) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 	_, err = s.db.Exec(`
 INSERT INTO pets(gid,conf_id,species,name,level,nature_id,nature,gender,types,
   height,weight,voice,talent_rank,medal,medal_id,partner_mark,speciality,speciality_id,
-  catch_time,shiny,hp,attack,defense,sp_attack,sp_defense,speed,data,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,data,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(gid) DO UPDATE SET
   conf_id=excluded.conf_id,species=excluded.species,name=excluded.name,level=excluded.level,
   nature_id=excluded.nature_id,nature=excluded.nature,gender=excluded.gender,types=excluded.types,
   height=excluded.height,weight=excluded.weight,voice=excluded.voice,talent_rank=excluded.talent_rank,
   medal=excluded.medal,medal_id=excluded.medal_id,partner_mark=excluded.partner_mark,
   speciality=excluded.speciality,speciality_id=excluded.speciality_id,catch_time=excluded.catch_time,
-  shiny=excluded.shiny,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
+  shiny=excluded.shiny,colorful=excluded.colorful,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
   sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,
   data=excluded.data,updated_at=excluded.updated_at`,
 		p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
 		p.HeightM, p.WeightKg, p.Voice, p.TalentRank, p.Medal, p.WearMedalConfID, p.PartnerMark,
-		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny),
+		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny), b2i(p.Colorful),
 		p.HP.Value, p.Attack.Value, p.Defense.Value, p.SpAttack.Value, p.SpDefense.Value, p.Speed.Value,
 		string(data), time.Now().Unix())
 	return isNew, err
