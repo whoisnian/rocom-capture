@@ -67,10 +67,13 @@ export default function PetDetail() {
                 <div className="stat" key={key}>
                   <div className="n">
                     {s.value ?? 0}
-                    {s.natureAdd > 0 && <span className="up"> ↑</span>}
-                    {s.natureAdd < 0 && <span className="down"> ↓</span>}
+                    {s.nature === 1 && <span className="up"> ↑</span>}
+                    {s.nature === -1 && <span className="down"> ↓</span>}
                   </div>
-                  <div className="l">{label}</div>
+                  <div className="l">
+                    {label}
+                    {s.talentLv > 0 && <span className="talent"> +{s.talentLv}</span>}
+                  </div>
                 </div>
               )
             })}

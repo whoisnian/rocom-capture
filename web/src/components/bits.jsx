@@ -21,7 +21,7 @@ const SIX = [
   ['魔防', 'spDefense'],
 ]
 
-// Six 渲染六维(含性格升降箭头)。
+// Six 渲染六维(性格 ±10% 升降箭头 + 天分等级 +N)。
 export function Six({ p }) {
   return (
     <div className="six">
@@ -30,8 +30,9 @@ export function Six({ p }) {
         return (
           <div key={key}>
             {label} <b>{s.value ?? 0}</b>
-            {s.natureAdd > 0 && <span className="up"> ↑</span>}
-            {s.natureAdd < 0 && <span className="down"> ↓</span>}
+            {s.nature === 1 && <span className="up" title="性格 +10%"> ↑</span>}
+            {s.nature === -1 && <span className="down" title="性格 -10%"> ↓</span>}
+            {s.talentLv > 0 && <span className="talent" title="天分等级">+{s.talentLv}</span>}
           </div>
         )
       })}

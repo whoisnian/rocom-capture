@@ -107,6 +107,7 @@ table.pets tr { cursor: pointer; }
 .six { display: grid; grid-template-columns: repeat(3, auto); gap: 1px 10px; font-size: 12px; }
 .six b { color: var(--gold); }
 .up { color: var(--green); } .down { color: var(--red); }
+.talent { color: var(--gold); font-size: 11px; margin-left: 3px; font-weight: 600; }
 
 /* 移动卡片(默认隐藏) */
 .cards { display: none; }
