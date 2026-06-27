@@ -80,8 +80,13 @@ data = {
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),
-    # 特长：speciality_id 直接对应 PET_TALENT_CONF 的 id
-    "speciality": {k: v["name"] for k, v in rows("PET_TALENT_CONF.json").items() if v.get("name")},
+    # 特长：仅取 PET_TALENT_CONF 里 filter_enum_value=PTFN_TALENT_* 的固定特长(11 种)，
+    # 避免误用非特长条目;id=502 的 name 为"勇敢"，游戏内显示为"无畏"。
+    "speciality": {
+        k: ("无畏" if int(k) == 502 else v["name"])
+        for k, v in rows("PET_TALENT_CONF.json").items()
+        if str(v.get("filter_enum_value", "")).startswith("PTFN_TALENT") and v.get("name")
+    },
     "medal": {k: {"name": v.get("name", ""), "desc": v.get("desc", "")}
               for k, v in rows("MEDAL_CONF.json").items() if v.get("name")},
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)
