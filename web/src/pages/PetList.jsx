@@ -5,14 +5,14 @@ import { Types, Six, Marks, Avatar, boxLabel, fmtTime } from '../components/bits
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
-  ['开朗', '速↑魔攻↓'],
-  ['胆小', '速↑物攻↓'],
+  ['开朗', '速度↑魔攻↓'],
+  ['胆小', '速度↑物攻↓'],
   ['固执', '物攻↑魔攻↓'],
   ['聪明', '魔攻↑物攻↓'],
-  ['平和', '生↑魔攻↓'],
-  ['踏实', '生↑速↓'],
-  ['沉默', '生↑物攻↓'],
-  ['急躁', '速↑物防↓'],
+  ['平和', '生命↑魔攻↓'],
+  ['踏实', '生命↑速度↓'],
+  ['沉默', '生命↑物攻↓'],
+  ['急躁', '速度↑物防↓'],
 ]
 const HOT_NAMES = HOT_NATURES.map((n) => n[0])
 
@@ -80,6 +80,8 @@ export default function PetList() {
     setFilter((f) => ({ ...f, sort: key, order: f.sort === key && f.order === 'asc' ? 'desc' : 'asc', page: 1 }))
   // 进详情前记录滚动位置
   const goDetail = (gid) => { sessionStorage.setItem('petListScroll', String(window.scrollY)); nav('/pets/' + gid) }
+  // 重置:清空所有过滤条件,保留排序与每页档位
+  const reset = () => setFilter((f) => ({ page: 1, pageSize: f.pageSize, sort: f.sort, order: f.order }))
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
@@ -88,6 +90,9 @@ export default function PetList() {
   return (
     <div className="list-layout">
       <aside className={'filters' + (collapsed ? ' collapsed' : '')}>
+        <div className="filter-group">
+          <button className="btn" onClick={reset}>重置筛选</button>
+        </div>
         <div className="filter-group">
           <label>系别</label>
           <div className="chips">

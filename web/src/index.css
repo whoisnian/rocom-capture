@@ -58,6 +58,10 @@ button, input, select { font: inherit; color: inherit; }
 .input, .select {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%;
 }
+/* 屏蔽 number 输入的原生上下箭头 */
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
   background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim);
