@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# capture.sh — 在 Linux 网关上抓取手机游戏 tsf4g/GCP 流量
+# capture.sh — 在 Linux 网关上抓取手机游戏 tsf4g/GCP 流量(协议见 docs/protocol.md)
 #
-# GCP 包结构为 HEAD(明文) + BODY(密文),变长协议,因此抓包必须用全长 snaplen(-s 0),
-# 否则后续无法按 HEAD.base 里的 head_length/body_length 正确分帧。
-# 本脚本只负责把 8195/TCP 双向流量完整存成 pcap,解析交给后处理脚本。
+# GCP 是变长协议:每包 = HEAD.base(定长 21 字节,明文,magic 0x3366)+ HEAD.extend(变长)
+# + BODY(变长),DATA 包的 BODY 为 AES 密文。整包长度 = hdr_len + body_len(都在 HEAD.base 里),
+# 故抓包必须用全长 snaplen(-s 0),否则后续无法按长度正确分帧。
+# 本脚本只负责把 8195/TCP 双向流量完整存成 pcap,解析交给后处理。
+#
+# 密钥不走 DH 交换:服务器在 0x1002 ACK 包里明文下发 16 字节 AES 会话密钥(每连接不同)。
+# 因此务必【进游戏前先启动抓包】,抓到该连接的 ACK 才能解密其后的 DATA;中途开抓则无密钥。
 #
 # 用法:
 #   sudo ./capture.sh                      # 自动选网卡,抓默认 8195 端口
@@ -24,7 +28,7 @@ KEEP_FILES=50          # 环形保留文件数,防止爆盘
 ENABLE_FORWARD=0
 
 usage() {
-    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -79,7 +83,7 @@ echo " 网卡     : $IFACE"
 echo " 端口     : $PORT/tcp (双向)"
 echo " 输出     : $PATTERN"
 echo " 轮转     : 每 ${ROTATE_SECONDS}s 或 ${ROTATE_SIZE_MB}MB,环形保留 ${KEEP_FILES} 个"
-echo " 提醒     : BODY 为密文(DH 密钥交换),抓包只能拿到密文与明文 HEAD"
+echo " 提醒     : DATA 的 BODY 为 AES 密文,密钥由 0x1002 ACK 明文下发——须从连接建立起抓"
 echo "=========================================="
 echo " 按 Ctrl-C 停止抓包"
 echo

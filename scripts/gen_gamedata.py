@@ -1,79 +1,43 @@
-"""从 pak-public-kit 导出数据提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
+"""提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
 
-数据来源(pak-public-kit 的 output 目录，见 AGENTS.md reference)：
-- 种类:   data/BinData/MONSTER_CONF.json + PET_CONF.json  id -> name
-- 性格:   data/BinData/AUDIO_NATURE_CONF.json              nature_id -> name
-- 奖牌:   data/BinData/MEDAL_CONF.json                     id -> {name, desc}
-- 系别/天分/标记/特长: data/BinData/PET_FILTER_CONF.json 的 filter_enum_value -> filter_desc，
-          再用反编译 Lua 的 Data/PB/ProtoEnum.lua 把 enum 值名解析为整数。
-- opcode: 游戏描述符 proto/all.pb 里的 ZoneSvrCmd 枚举(完整全集，含 6531 等)。
+数据全部来自随仓库提交的游戏解包产物(FModel 从 Windows 客户端提取),不依赖任何外部仓库:
+- 名称表: nrc/bin/ 下游戏自有二进制配置(`.bytes` 数据 + `.non` schema + dev_CN 本地化),
+          用 vendored 的 scripts/decode_bin.py 解码(参考 CUE4Parse FRocoBinData.cs):
+  - 种类:   MONSTER_CONF + PET_CONF      id -> name
+  - 性格:   AUDIO_NATURE_CONF            nature_id -> name
+  - 奖牌:   MEDAL_CONF                   id -> {name, desc}
+  - 系别/天分/标记/特长: PET_FILTER_CONF 的 filter_enum_value -> filter_desc / PET_TALENT_CONF
+- 枚举/opcode: 游戏描述符 nrc/all.pb(ZoneSvrCmd、SkillDamType 等),经 scripts/pbdesc.py 读取。
 
-opcode 与字段号(internal/pb)同出 proto/all.pb(见 gen_proto.sh),与 internal/pb 天然同版本;
-all.pb 为追加式,几乎不变,故无需随版本跟新(原因见 docs/data.md)。
+opcode/枚举与字段号(internal/pb)同出 nrc/all.pb(见 gen_proto.py),与 internal/pb 天然同版本。
+运行(需 uv 管理的 protobuf 依赖):  uv run python scripts/gen_gamedata.py
+更新到新版本游戏:用 FModel 重新提取覆盖 nrc/bin/ 与 nrc/all.pb 再跑本脚本(原因见 docs/data.md)。
 """
 import json
 import os
-import re
-import subprocess
 import sys
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
-    "~/Git/gh/pak-public-kit/output")
-BIN = os.path.join(ROOT, "data", "BinData")
-LUA = os.path.join(ROOT, "scripts", "lua", "Data", "PB")
-PROTOENUM_LUA = os.path.join(LUA, "ProtoEnum.lua")
-# opcode 取自游戏描述符 all.pb 的 ZoneSvrCmd 枚举(与 internal/pb 同源)。
-ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "proto"), "all.pb")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import decode_bin  # vendored 解码器(scripts/decode_bin.py,纯标准库)
+import pbdesc      # 读 all.pb 描述符(依赖 protobuf,uv 管理)
+
+# 名称表:vendored 的游戏二进制配置(nrc/bin);opcode/枚举:游戏描述符 nrc/all.pb。
+BIN_DIR = os.environ.get("NRC_BIN_DIR", "nrc/bin")
+ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "nrc"), "all.pb")
 OUT = "internal/gamedata/data"
 
-
-def rows(name):
-    return json.load(open(os.path.join(BIN, name), encoding="utf-8"))["RocoDataRows"]
+_FDS = pbdesc.load(ALL_PB)  # 描述符只读一次,enum_dim/opcodes 共用
 
 
-def parse_lua_enum(lua_file, qualified_name):
-    """解析反编译 Lua 中形如 `Prefix.EnumName = { KEY = n, ... }` 的枚举，返回 {KEY: int}。
-
-    枚举体内只有 `名 = 数字` 项、无嵌套花括号，故非贪婪匹配到首个 `}` 即枚举结束。
-    """
-    out = {}
-    text = open(lua_file, encoding="utf-8", errors="ignore").read()
-    m = re.search(re.escape(qualified_name) + r"\s*=\s*\{(.*?)\}", text, re.S)
-    if not m:
-        return out
-    for vm in re.finditer(r"(\w+)\s*=\s*(-?\d+)", m.group(1)):
-        out.setdefault(vm.group(1), int(vm.group(2)))
-    return out
-
-
-def parse_pb_enum(all_pb, enum_name):
-    """从描述符 all.pb 里解析名为 enum_name 的顶层枚举，返回 {VALUE_NAME: int}。
-
-    用 protoc 把 all.pb 解成 FileDescriptorSet 文本(无需 python-protobuf),其层级缩进:
-    文件名 2 空格、enum_type.name 4 空格、value.name/number 6 空格。定位目标枚举后,
-    收集其 value 直到遇到同级(4 空格)的下一个 name 或下一个文件(2 空格 *.proto)。
-    """
-    text = subprocess.run(
-        ["protoc", "--decode=google.protobuf.FileDescriptorSet",
-         "google/protobuf/descriptor.proto", "-I/usr/include"],
-        stdin=open(all_pb, "rb"), capture_output=True, text=True, check=True).stdout
-    lines = text.splitlines()
-    start = next((i for i, l in enumerate(lines)
-                  if re.match(r'^    name: "' + re.escape(enum_name) + r'"$', l)), None)
-    if start is None:
-        return {}
-    out, cur = {}, None
-    for l in lines[start + 1:]:
-        if re.match(r'^    name: "', l) or re.match(r'^  name: "[^"]+\.proto"$', l):
-            break  # 进入同级下一个 enum_type 或下一个文件,本枚举结束
-        m = re.match(r'^      name: "([^"]+)"$', l)
-        n = re.match(r'^      number: (-?\d+)$', l)
-        if m:
-            cur = m.group(1)
-        elif n and cur is not None:
-            out.setdefault(cur, int(n.group(1)))
-            cur = None
-    return out
+def rows(table):
+    """解码 nrc/bin 下一张表(.bytes + .non + dev_CN 本地化)为 {id字符串: 行}。"""
+    base = table[:-5] if table.endswith(".json") else table
+    loc = os.path.join(BIN_DIR, "BinLocalize", "dev_CN", base + ".bytes")
+    return decode_bin.decode_file(
+        os.path.join(BIN_DIR, "BinDataCompressed", base + ".bytes"),
+        schema_path=os.path.join(BIN_DIR, "BinConf", base + ".non"),
+        loc_path=loc if os.path.exists(loc) else None,
+    )["RocoDataRows"]
 
 
 # PET_FILTER 按 enum 名分组: {enum_name: {value_name: desc}}
@@ -85,8 +49,8 @@ for r in rows("PET_FILTER_CONF.json").values():
 
 
 def enum_dim(enum_name):
-    """组合 ProtoEnum.lua(名->int) 与 filter(名->中文) 得到 {int: 中文}。"""
-    name2int = parse_lua_enum(PROTOENUM_LUA, "ProtoEnum." + enum_name)
+    """组合 all.pb 枚举(名->int)与 filter(名->中文)得到 {int: 中文}。"""
+    name2int = pbdesc.enum(_FDS, enum_name)
     out = {}
     for vname, desc in filter_groups.get(enum_name, {}).items():
         if vname in name2int:
@@ -133,7 +97,7 @@ data = {
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
     # 与 internal/pb 同源同版本,无需手工补充。
-    "opcodes": {str(v): k for k, v in parse_pb_enum(ALL_PB, "ZoneSvrCmd").items()},
+    "opcodes": {str(v): k for k, v in pbdesc.enum(_FDS, "ZoneSvrCmd").items()},
 }
 
 os.makedirs(OUT, exist_ok=True)

@@ -1,0 +1,162 @@
+{
+    "Name": "PET_TALENT_CONF",
+    "Type": "EStruct",
+    "UniqueKey": "id",
+    "Properties": [
+        {
+            "Name": "id",
+            "Type": "EUint32",
+            "Offset": 0,
+            "Size": 4
+        },
+        {
+            "Name": "editor_name1",
+            "Type": "EString",
+            "Offset": 4,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "editor_name2",
+            "Type": "EString",
+            "Offset": 8,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "name",
+            "Type": "ELocalizedString",
+            "Offset": 12,
+            "Size": 4
+        },
+        {
+            "Name": "spec_desc",
+            "Type": "ELocalizedString",
+            "Offset": 16,
+            "Size": 4
+        },
+        {
+            "Name": "desc",
+            "Type": "ELocalizedString",
+            "Offset": 20,
+            "Size": 4
+        },
+        {
+            "Name": "active_type",
+            "Type": "EUint32",
+            "Offset": 24,
+            "Size": 4
+        },
+        {
+            "Name": "type",
+            "Type": "EUint32",
+            "Offset": 28,
+            "Size": 4
+        },
+        {
+            "Name": "filter_enum_value",
+            "Type": "EString",
+            "Offset": 32,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "priority",
+            "Type": "EUint32",
+            "Offset": 36,
+            "Size": 4
+        },
+        {
+            "Name": "condition_group",
+            "Type": "EStruct",
+            "Offset": 40,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 3,
+            "Struct": {
+                "Name": "PET_TALENT_CONF.condition_group",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "talent_condition",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4
+                    },
+                    {
+                        "Name": "talent_condition_param",
+                        "Type": "EInt32",
+                        "Offset": 4,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "DynamicArray": true
+                    }
+                ]
+            }
+        },
+        {
+            "Name": "can_add",
+            "Type": "EUint32",
+            "Offset": 44,
+            "Size": 4
+        },
+        {
+            "Name": "effect_group",
+            "Type": "EStruct",
+            "Offset": 48,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 10,
+            "Struct": {
+                "Name": "PET_TALENT_CONF.effect_group",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "effect",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4
+                    },
+                    {
+                        "Name": "effect_param",
+                        "Type": "EInt32",
+                        "Offset": 4,
+                        "Size": 4
+                    }
+                ]
+            }
+        },
+        {
+            "Name": "remove",
+            "Type": "EBool",
+            "Offset": 52,
+            "Size": 1
+        },
+        {
+            "Name": "new_talent_id",
+            "Type": "EUint32",
+            "Offset": 53,
+            "Size": 4
+        },
+        {
+            "Name": "icon",
+            "Type": "EString",
+            "Offset": 57,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "talent_color",
+            "Type": "EString",
+            "Offset": 61,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_visible_switch",
+            "Type": "EBool",
+            "Offset": 65,
+            "Size": 1
+        }
+    ]
+}

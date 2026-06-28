@@ -1,44 +1,43 @@
 # 数据来源与解析
 
-本项目用到两个解包数据源(见 [AGENTS.md](../AGENTS.md) reference)，各负责一半，编译期
-`embed` 进二进制，运行时不依赖原始解包目录：
+本项目的解包数据**全部随仓库提交**(均为 FModel 从 Windows 客户端提取),不依赖任何外部仓库;
+编译期 `embed` 进二进制，运行时也不依赖原始解包目录。两份 vendored 源:
 
-- **pak-public-kit**(下称 *kit*)：当前 NRC 版本解包，`output/` 已提交、`git pull` 即跟新。
-  提供**中文名称表与 opcode 表**(高频变动，正好随上游更新)。
-- **游戏描述符 `proto/all.pb`**：游戏自带的 protobuf 描述符(`FileDescriptorSet`)，提供
-  `internal/pb` 所需的 **protobuf 字段号/类型**。该文件用 FModel 从 Windows 客户端
-  `Content/ScriptC/Data/PB/all.pb` 提取(即游戏运行时 `pb.loadufsfile` 加载的同一份)，
-  **已随仓库提交在 `proto/all.pb`**，含字段号,可直接喂给 protoc 生成 Go，无需 .proto 文本。
-  字段号是**追加式**的(新版本只加不改号)，故此项几乎无需跟版本更新；要更新时用 FModel
-  重新提取 `all.pb` 覆盖 `proto/all.pb` 再跑 `gen_proto.sh` 即可。
-  (历史上此项曾取自 world-data 的 `.proto`，现已被 `all.pb` 完全替代，且更新更全。)
+- **游戏二进制配置 `nrc/bin/`**:提供**中文名称表**。游戏自有的 `.bytes`(数据)+ `.non`
+  (schema)+ `BinLocalize/dev_CN`(本地化),用 vendored 的 `scripts/decode_bin.py` 解码。
+- **游戏描述符 `nrc/all.pb`**:游戏自带的 protobuf 描述符(`FileDescriptorSet`,即运行时
+  `pb.loadufsfile` 加载的同一份),提供 `internal/pb` 的**字段号/类型**与 **opcode/枚举**。
+  含字段号,可直接喂给 protoc 生成 Go,无需 .proto 文本。
 
-## 1. 名称表数据来源(kit)
+字段号/枚举是**追加式**的(新版本只加不改号),故几乎无需跟版本更新;名称表随游戏内容变动。
+要更新到新版本游戏:用 FModel 重新提取覆盖 `nrc/bin/` 与 `nrc/all.pb`,再跑两个生成脚本。
+(历史上名称/opcode 曾取自 pak-public-kit、字段号曾取自 world-data;现都被自有提取替代,
+且修正了 pak-public-kit 的 PET_CONF 名整体错位 bug,见第 5 节。)
 
-kit `output/` 下：
+## 1. 名称表数据来源(`nrc/bin/`)
 
-| 路径 | 内容 | 本项目用途 |
-| --- | --- | --- |
-| `data/BinData/*.json` | 配置表(`{"RocoDataRows":{id:{...}}}`) | 提取 id→中文名 |
-| `scripts/lua/Data/PB/ProtoEnum.lua` | 反编译 Lua 的全部 protobuf 枚举 | 枚举值名 → 整数 |
+`nrc/bin/` 下(只收录需要的 6 张表):
 
-opcode(`ZoneSvrCmd`)不取自 kit，而是取自游戏描述符 `proto/all.pb`(与 `internal/pb` 同源，
-见第 2 节),保证 opcode 名与字段号天然同版本。
+| 路径 | 内容 |
+| --- | --- |
+| `BinConf/*.non` | 表结构 schema(JSON,字段名/类型/偏移) |
+| `BinDataCompressed/*.bytes` | 表数据(游戏自有压缩二进制) |
+| `BinLocalize/dev_CN/*.bytes` | 本地化字符串(`ELocalizedString` 字段经此解析) |
+
+`scripts/gen_gamedata.py` 调 vendored 的 `scripts/decode_bin.py` 把上述解码成
+`{"RocoDataRows":{id:{...}}}`。opcode/枚举不在 Bin 里,取自 `nrc/all.pb`(见第 2、3 节)。
 
 关键表：
 
-- `MONSTER_CONF.json` + `PET_CONF.json` — 宠物种类名(`conf_id → name`)。
+- `MONSTER_CONF` + `PET_CONF` — 宠物种类名(`conf_id → name`)。
   常规宠物在 MONSTER_CONF，彩蛋/特殊宠物在 PET_CONF，两表 id 不重叠，合并取用。
-- `AUDIO_NATURE_CONF.json` — 性格名(`nature_id → name`)
-- `MEDAL_CONF.json` — 奖牌名与描述
-- `PET_TALENT_CONF.json` — 特长名(`speciality_id → name`)
-- `PET_FILTER_CONF.json` — 一站式筛选维度配置：系别/天分/标记的
-  `filter_enum_value → filter_desc`(中文)
-- (opcode `ZoneSvrCmd` 改取自 `proto/all.pb`，见第 2 节，原生含 6531=
-  `ZONE_SCENE_THROW_CATCH_FINISH_RSP`，无需再手工补丁)
-- `ProtoEnum.lua` 的 `SkillDamType / PetTalentRate / PetPartnerMarkType` — 枚举值名 → 整数
+- `AUDIO_NATURE_CONF` — 性格名(`nature_id → name`，内联 `EString`，无需本地化)
+- `MEDAL_CONF` — 奖牌名(`ELocalizedString`)与描述
+- `PET_TALENT_CONF` — 特长名(`speciality_id → name`)
+- `PET_FILTER_CONF` — 系别/天分/标记的 `filter_enum_value → filter_desc`(中文)
+- opcode/系别/天分/标记的整数枚举取自 `nrc/all.pb`(`ZoneSvrCmd`/`SkillDamType` 等)
 
-## 2. 描述符 → Go(`scripts/gen_proto.sh`，数据源:all.pb)
+## 2. 描述符 → Go(`scripts/gen_proto.py`，数据源:all.pb)
 
 `all.pb` 已是合法的 `FileDescriptorSet`(含字段号/类型)，直接喂给
 `protoc --descriptor_set_in` 即可生成 Go，**无需 .proto 文本，也无需 fix_proto 修补
@@ -47,8 +46,8 @@ syntax/enum**(那是旧 world-data `.proto` 才有的坑，已随数据源切换
 只生成 `com_pet.proto` 的**依赖闭包**(由脚本从描述符**动态求取**,随 all.pb 版本而变,
 当前约 8 个文件:com_pet/com_base_types/com_battle_enum/com_monster/com_pet_skill/
 com_season/rpc_options/xls_enum),用 `--go_opt=M...` 映射到单一 Go 包 `internal/pb`。
-`all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options 依赖),脚本单独导出其描述符
-并拼接进描述符集。产物为 `internal/pb/*.pb.go`(已提交)。
+`all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options 依赖),脚本用 protobuf 运行时
+自带的描述符在内存里补进描述符集(见 `scripts/pbdesc.py`)。产物为 `internal/pb/*.pb.go`(已提交)。
 
 核心结构 `PetData`(`com_pet.proto`)字段对应展示项：
 
@@ -80,10 +79,10 @@ species  nature  nature_effect  skill_dam_type  talent_rate
 partner_mark  speciality  medal  opcodes
 ```
 
-系别/天分/标记的整数值，通过解析 `ProtoEnum.lua` 枚举(名→整数)再 join
-`PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+PET_CONF，
-特长直接取 PET_TALENT_CONF，opcode 取自 `proto/all.pb` 的 `ZoneSvrCmd` 全集
-(经 `protoc --decode` 解析,与 `internal/pb` 同源),性别为硬编码。
+名称表由 `decode_bin.py` 解 `nrc/bin/` 得到;系别/天分/标记的整数值通过解析 `nrc/all.pb`
+枚举(名→整数)再 join `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+
+PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `ZoneSvrCmd` 全集
+(枚举/opcode 均经 `scripts/pbdesc.py` 读描述符,与 `internal/pb` 同源),性别为硬编码。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
@@ -116,7 +115,10 @@ s2c 0x1346 DATA 明文 body
 ## 5. 已修复 / 待校准
 
 已修复(实测对齐截图)：
-- **种类名**：合并 MONSTER_CONF+PET_CONF 后覆盖率 ~94%(剩余少量冷门 conf_id)；
+- **种类名**：合并 MONSTER_CONF+PET_CONF,自有 FModel 提取 + `decode_bin.py` 解码,全量
+  543 只 0 空种类。**修正了 pak-public-kit 的 PET_CONF 名整体错位**:其 `ELocalizedString`
+  本地化对彩蛋宠(PET_CONF)整体偏移一位(3011001 误为"恶魔叮",应为"恶魔狼"),
+  累计 4787 个彩蛋宠名错误;经 FModel + 两个独立 world-data 源三方比对确认后改用自有解码;
 - **六维**：改用 `attribute_new_info` 最终面板值，火神 410/277/163/229/119/139 与截图完全一致；
 - **天分/性格**：`talent_add_value` 修正为天分等级(1–10)而非性格修正；性格 ±10% 维度
   改由 `NATURE_CONF` 推导(火神固执=+物攻−魔攻),天分评级逻辑实测吻合；

@@ -11,21 +11,24 @@
 
 ## 约定
 
-- Go：`go build ./...`；proto/名称表生成见 `scripts/gen_proto.sh`、`scripts/gen_gamedata.py`。
-- 数据来源:中文名称表用 pak-public-kit(当前 NRC 版本,持续更新);`internal/pb` 结构与
-  opcode(ZoneSvrCmd)同出游戏描述符 `proto/all.pb`(已随仓库提交):前者经
-  `--descriptor_set_in` 生成 Go,后者 `gen_gamedata.py` 用 `protoc --decode` 取枚举。
-  (含字段号,无需 .proto 文本;字段号追加式稳定,见 docs/data.md)。
+- Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(→ internal/pb)、
+  `uv run python scripts/gen_gamedata.py`(→ names.json);抓包脚本 `scripts/capture.sh`(bash)。
+- 数据来源**全部随仓库提交、均为 FModel 自行提取**,不依赖外部仓库:中文名称表来自
+  `nrc/bin/`(游戏二进制配置,用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb`
+  结构、opcode、枚举同出游戏描述符 `nrc/all.pb`(前者经 protoc `--descriptor_set_in` 生成 Go,
+  后者经 `scripts/pbdesc.py` 读描述符)。更新游戏版本:FModel 重新提取覆盖
+  `nrc/bin/` 与 `nrc/all.pb` 再跑两个生成脚本(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
 - `internal/pb/*.pb.go` 与 `internal/gamedata/data/names.json` 为生成物，改动应改生成脚本而非手改。
 
 ## reference
-| source                                                       | directory                                   | description                          |
-| ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------ |
-| https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | **中文名称表主数据源**(当前 NRC 解包,output 已提交,git pull 跟新) |
-| FModel 提取(已 vendored)                                    | `proto/all.pb`(源:~/Downloads/.../ScriptC/Data/PB) | `internal/pb` 字段号来源(`all.pb` 描述符;已取代 world-data) |
-| https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 旧 `.proto` 来源,已被 all.pb 取代(仅留作历史参考) |
-| https://github.com/h3110w0r1d-y/rocom-helper                 | ~/Git/gh/rocom-helper                       | 闭源洛克王国世界助手，本项目受其启发 |
-| https://github.com/lsj9383/blog                              | ~/Git/gh/blog                               | tsf4g 通信协议说明                   |
-| https://github.com/yuzeis/Roco-Kingdom-Protocol-Parser       | ~/Git/gh/Roco-Kingdom-Protocol-Parser       | 开源洛克王国协议解析器，简称 RKPP    |
+| source                                                       | directory                                   | description                                                           |
+| ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------- |
+| FModel 自行提取数据                                          | `./nrc/all.pb` + `./nrc/bin/`           | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
+| https://github.com/MIXUULS/Roco-Kingdom-World-Data           | `./scripts/decode_bin.py`                   | 解 `nrc/bin/` 的 `.bytes`                                           |
+| https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | 已弃用(曾为名称表源,其 PET_CONF 本地化错位;仅留作对照)                |
+| https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 已弃用(曾为 `.proto` 源;其 Bin JSON 可作名称表三方对照)               |
+| https://github.com/h3110w0r1d-y/rocom-helper                 | ~/Git/gh/rocom-helper                       | 闭源洛克王国世界助手，本项目受其启发                                  |
+| https://github.com/lsj9383/blog                              | ~/Git/gh/blog                               | tsf4g 通信协议说明                                                    |
+| https://github.com/yuzeis/Roco-Kingdom-Protocol-Parser       | ~/Git/gh/Roco-Kingdom-Protocol-Parser       | 开源洛克王国协议解析器，简称 RKPP                                     |

@@ -34,7 +34,7 @@
 | --- | --- |
 | `gcp` | GCP 分帧(`Deframe`)、密钥提取(`ExtractKey`)、AES 解密(`DecryptData`)、opcode 提取 |
 | `capture` | 数据源(`afpacket` 实时 / `pcapgo` 离线)+ `reassembly` TCP 重组 + 会话密钥管理，输出 `Message` |
-| `pb` | 游戏描述符 `proto/all.pb` 生成的宠物消息结构(生成物) |
+| `pb` | 游戏描述符 `nrc/all.pb` 生成的宠物消息结构(生成物) |
 | `pet` | `ParsePetListRsp` 解析宠物列表；`ToPet` 转中文化业务模型 |
 | `gamedata` | embed 的 id→中文名 查找库 |
 | `store` | SQLite 持久化(宠物当前状态表 + 事件历史表)与多维筛选查询 |
