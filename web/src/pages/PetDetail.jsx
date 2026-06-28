@@ -83,8 +83,8 @@ export default function PetDetail() {
           <div className="kv">
             <Item k="性格" v={pet.nature} />
             <Item k="特长" v={pet.speciality || '无'} />
-            <Item k="身高" v={pet.heightM.toFixed(2) + ' m'} />
-            <Item k="体重" v={pet.weightKg.toFixed(2) + ' kg'} />
+            <Item k="身高" v={pet.heightM + ' m'} />
+            <Item k="体重" v={pet.weightKg + ' kg'} />
             <Item k="声音" v={pet.voice} />
             <Item k="标记" v={pet.partnerMark || '无'} />
             <Item k="盒子位置" v={boxLabel(pet.box)} />

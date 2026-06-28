@@ -189,8 +189,8 @@ export default function PetList() {
                   <td>{p.speciality || '无'}</td>
                   <td>{p.medal || '-'}</td>
                   <td>{p.voice}</td>
-                  <td>{p.weightKg.toFixed(2)} kg</td>
-                  <td>{p.heightM.toFixed(2)} m</td>
+                  <td>{p.weightKg} kg</td>
+                  <td>{p.heightM} m</td>
                   <td><Six p={p} /></td>
                   <td className="muted">{fmtTime(p.catchTime)}</td>
                 </tr>
@@ -215,8 +215,8 @@ export default function PetList() {
                 <div>性格：{p.nature || '-'}</div>
                 <div>特长：{p.speciality || '无'}</div>
                 <div>奖牌：{p.medal || '-'}</div>
-                <div>体重：{p.weightKg.toFixed(2)}kg</div>
-                <div>身高：{p.heightM.toFixed(2)}m</div>
+                <div>体重：{p.weightKg}kg</div>
+                <div>身高：{p.heightM}m</div>
                 <div>声音：{p.voice}</div>
               </div>
               <Six p={p} />
