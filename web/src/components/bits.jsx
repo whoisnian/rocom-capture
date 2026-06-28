@@ -1,5 +1,31 @@
 import React from 'react'
 
+const imgURL = (path) => '/img/' + path
+
+// Avatar 渲染宠物小头像(列表/事件用);无图(未上线/缺源)或无 pet 回退 emoji。
+export function Avatar({ p, className = 'pet-avatar' }) {
+  const [bad, setBad] = React.useState(false)
+  const src = p && p.image && p.image.head
+  if (src && !bad) {
+    return <img className={className} src={imgURL(src)} alt={p.species} loading="lazy" onError={() => setBad(true)} />
+  }
+  return <div className={className}>{p && p.shiny ? '✨' : '🐾'}</div>
+}
+
+// Portrait 渲染宠物全身图(详情用,优先 Pet256 全身缩略,退大头像);无图回退 emoji。
+export function Portrait({ p }) {
+  const src = (p.image && (p.image.portraitSmall || p.image.bigHead)) || ''
+  const [bad, setBad] = React.useState(false)
+  React.useEffect(() => setBad(false), [src])
+  return (
+    <div className="detail-hero">
+      {src && !bad
+        ? <img src={imgURL(src)} alt={p.species} onError={() => setBad(true)} />
+        : <span>{p.shiny ? '✨' : '🐾'}</span>}
+    </div>
+  )
+}
+
 // Types 渲染系别色块。
 export function Types({ types }) {
   return (

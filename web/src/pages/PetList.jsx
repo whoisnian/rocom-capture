@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, Marks, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Avatar, fmtTime } from '../components/bits'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
@@ -150,7 +150,7 @@ export default function PetList() {
                 <tr key={p.gid} onClick={() => nav('/pets/' + p.gid)}>
                   <td>
                     <div className="pet-cell">
-                      <div className="pet-avatar">{p.shiny ? '✨' : '🐾'}</div>
+                      <Avatar p={p} />
                       <div>
                         <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
                         <div className="pet-sub">{p.species} · Lv.{p.level}</div>
@@ -177,7 +177,7 @@ export default function PetList() {
           {data.pets.map((p) => (
             <div className="card" key={p.gid} onClick={() => nav('/pets/' + p.gid)}>
               <div className="card-head">
-                <div className="pet-avatar">{p.shiny ? '✨' : '🐾'}</div>
+                <Avatar p={p} />
                 <div style={{ flex: 1 }}>
                   <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
                   <div className="pet-sub">{p.species} · Lv.{p.level}</div>

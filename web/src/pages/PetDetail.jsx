@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet } from '../api'
-import { Types, Marks, fmtTime } from '../components/bits'
+import { Types, Marks, Portrait, fmtTime } from '../components/bits'
 
 const SIX = [
   ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
@@ -48,7 +48,7 @@ export default function PetDetail() {
           <span className="detail-no">No.{pet.gid}</span>
           <span>{pet.species} {pet.gender}</span>
         </div>
-        <div className="detail-hero">{pet.shiny ? '✨' : '🐾'}</div>
+        <Portrait p={pet} />
         <div className="detail-title">
           <h2>{pet.name || pet.species}</h2>
           <span className="lv">Lv.{pet.level}</span>

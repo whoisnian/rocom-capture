@@ -102,6 +102,7 @@ table.pets tr:hover td { background: var(--bg-2); }
 table.pets tr { cursor: pointer; }
 .pet-cell { display: flex; align-items: center; gap: 8px; }
 .pet-avatar { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-size: 16px; }
+img.pet-avatar { object-fit: cover; }
 .pet-name { font-weight: 600; }
 .pet-sub { font-size: 12px; color: var(--fg-dim); }
 .six { display: grid; grid-template-columns: repeat(3, auto); gap: 1px 10px; font-size: 12px; }
@@ -140,6 +141,7 @@ table.pets tr { cursor: pointer; }
 .detail-head { padding: 16px; display: flex; justify-content: space-between; align-items: baseline; }
 .detail-no { color: var(--fg-dim); }
 .detail-hero { height: 180px; display: grid; place-items: center; font-size: 72px; background: radial-gradient(circle at 50% 30%, #38415a, transparent 70%); }
+.detail-hero img { height: 168px; object-fit: contain; }
 .detail-title { display: flex; align-items: center; gap: 10px; padding: 0 16px; }
 .detail-title h2 { margin: 0; }
 .lv { background: var(--bg-3); padding: 2px 10px; border-radius: 999px; font-size: 13px; }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getEvents, subscribe } from '../api'
-import { Types, fmtTime } from '../components/bits'
+import { Types, Avatar, fmtTime } from '../components/bits'
 
 const FIELDS = [
   { k: 'species', label: '种类' },
@@ -83,7 +83,7 @@ export default function Events() {
           <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules) ? ' hl' : '')}
             onClick={() => ev.gid && nav('/pets/' + ev.gid)}>
             <span className={'badge ' + ev.kind}>{ev.subKind || (ev.kind === 'obtain' ? '获得' : '失去')}</span>
-            <div className="pet-avatar">{ev.pet?.shiny ? '✨' : '🐾'}</div>
+            <Avatar p={ev.pet} />
             <div style={{ flex: 1 }}>
               <div className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} /></div>
               <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'}</div>
