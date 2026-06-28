@@ -13,7 +13,7 @@
 
 - Go：`go build ./...`；proto/名称表生成见 `scripts/gen_proto.sh`、`scripts/gen_gamedata.py`。
 - 数据来源:名称表/opcode 用 pak-public-kit(当前 NRC 版本,持续更新);`internal/pb`
-  的 protobuf 结构由 FModel 提取的描述符 `all.pb` 经 `--descriptor_set_in` 生成
+  的 protobuf 结构由游戏描述符 `proto/all.pb`(已随仓库提交)经 `--descriptor_set_in` 生成
   (含字段号,无需 .proto 文本;字段号追加式稳定,见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
@@ -23,7 +23,7 @@
 | source                                                       | directory                                   | description                          |
 | ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------ |
 | https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | **名称表/opcode 主数据源**(当前 NRC 解包,output 已提交,git pull 跟新) |
-| (FModel 提取)                                                | ~/Downloads/NRC/Content/ScriptC/Data/PB/    | `internal/pb` 字段号来源(`all.pb` 描述符;已取代 world-data) |
+| FModel 提取(已 vendored)                                    | `proto/all.pb`(源:~/Downloads/.../ScriptC/Data/PB) | `internal/pb` 字段号来源(`all.pb` 描述符;已取代 world-data) |
 | https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 旧 `.proto` 来源,已被 all.pb 取代(仅留作历史参考) |
 | https://github.com/h3110w0r1d-y/rocom-helper                 | ~/Git/gh/rocom-helper                       | 闭源洛克王国世界助手，本项目受其启发 |
 | https://github.com/lsj9383/blog                              | ~/Git/gh/blog                               | tsf4g 通信协议说明                   |

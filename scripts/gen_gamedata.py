@@ -6,9 +6,9 @@
 - 奖牌:   data/BinData/MEDAL_CONF.json                     id -> {name, desc}
 - 系别/天分/标记/特长: data/BinData/PET_FILTER_CONF.json 的 filter_enum_value -> filter_desc，
           再用反编译 Lua 的 Data/PB/ProtoEnum.lua 把 enum 值名解析为整数。
-- opcode: Data/PB/ProtoCMD.lua 的 ZoneSvrCmd 表(完整 1476 条，含 6531 等)。
+- opcode: Data/PB/ProtoCMD.lua 的 ZoneSvrCmd 表(完整全集 1211 条，含 6531 等)。
 
-字段号(internal/pb)不在本数据源内，仍由 world-data 的 .proto 经 scripts/gen_proto.sh 生成；
+字段号(internal/pb)不在本数据源内，由游戏描述符 proto/all.pb 经 scripts/gen_proto.sh 生成；
 原因见 docs/data.md(字段号为追加式，几乎不变，故无需随版本跟新)。
 """
 import json

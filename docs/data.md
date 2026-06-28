@@ -5,11 +5,12 @@
 
 - **pak-public-kit**(下称 *kit*)：当前 NRC 版本解包，`output/` 已提交、`git pull` 即跟新。
   提供**中文名称表与 opcode 表**(高频变动，正好随上游更新)。
-- **FModel 提取的 `all.pb`**：游戏自带的 protobuf 描述符(`FileDescriptorSet`)，提供
-  `internal/pb` 所需的 **protobuf 字段号/类型**。用 FModel 从 Windows 客户端
-  `Content/ScriptC/Data/PB/` 直接提取(即游戏运行时 `pb.loadufsfile` 加载的同一份)，
-  含字段号,可直接喂给 protoc 生成 Go，无需 .proto 文本。字段号是**追加式**的(新版本只加
-  不改号)，故此项几乎无需跟版本更新；要更新时重新 FModel 提取 `all.pb` 覆盖即可。
+- **游戏描述符 `proto/all.pb`**：游戏自带的 protobuf 描述符(`FileDescriptorSet`)，提供
+  `internal/pb` 所需的 **protobuf 字段号/类型**。该文件用 FModel 从 Windows 客户端
+  `Content/ScriptC/Data/PB/all.pb` 提取(即游戏运行时 `pb.loadufsfile` 加载的同一份)，
+  **已随仓库提交在 `proto/all.pb`**，含字段号,可直接喂给 protoc 生成 Go，无需 .proto 文本。
+  字段号是**追加式**的(新版本只加不改号)，故此项几乎无需跟版本更新；要更新时用 FModel
+  重新提取 `all.pb` 覆盖 `proto/all.pb` 再跑 `gen_proto.sh` 即可。
   (历史上此项曾取自 world-data 的 `.proto`，现已被 `all.pb` 完全替代，且更新更全。)
 
 ## 1. 名称表数据来源(kit)
@@ -41,10 +42,11 @@ kit `output/` 下：
 `protoc --descriptor_set_in` 即可生成 Go，**无需 .proto 文本，也无需 fix_proto 修补
 syntax/enum**(那是旧 world-data `.proto` 才有的坑，已随数据源切换一并去除)。
 
-只生成 `com_pet.proto` 的依赖闭包(8 个文件:com_pet/com_base_types/com_battle_enum/
-com_monster/com_pet_skill/com_season/rpc_options/xls_enum)，用 `--go_opt=M...` 映射到
-单一 Go 包 `internal/pb`。`all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options
-依赖)，脚本单独导出其描述符并拼接进描述符集。产物为 `internal/pb/*.pb.go`(已提交)。
+只生成 `com_pet.proto` 的**依赖闭包**(由脚本从描述符**动态求取**,随 all.pb 版本而变,
+当前约 8 个文件:com_pet/com_base_types/com_battle_enum/com_monster/com_pet_skill/
+com_season/rpc_options/xls_enum),用 `--go_opt=M...` 映射到单一 Go 包 `internal/pb`。
+`all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options 依赖),脚本单独导出其描述符
+并拼接进描述符集。产物为 `internal/pb/*.pb.go`(已提交)。
 
 核心结构 `PetData`(`com_pet.proto`)字段对应展示项：
 

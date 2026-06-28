@@ -7,7 +7,7 @@
 # proto/all.pb(默认数据源);要更新到新版本游戏,用 FModel 重新提取 all.pb 覆盖 proto/all.pb
 # 再跑本脚本即可(或设 NRC_PB_DIR 指向别处的 all.pb 所在目录)。
 #
-# 描述符里游戏文件无 go_package,用 M 映射把 com_pet.proto 的依赖闭包(8 个文件)
+# 描述符里游戏文件无 go_package,用 M 映射把 com_pet.proto 的依赖闭包(下面动态求取)
 # 全部指向同一 Go 包 internal/pb;well-known 的 descriptor.proto 映射到 descriptorpb。
 set -euo pipefail
 

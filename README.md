@@ -22,7 +22,7 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 | --- | --- |
 | `internal/gcp` | GCP 分帧、密钥提取、AES 解密 |
 | `internal/capture` | afpacket 实时抓包 / pcap 离线回放 + TCP 重组 |
-| `internal/pb` | 由 world-data 的 .proto 生成的宠物消息结构(`scripts/gen_proto.sh`) |
+| `internal/pb` | 由游戏描述符 `proto/all.pb` 生成的宠物消息结构(`scripts/gen_proto.sh`) |
 | `internal/pet` | PetData 解析与业务模型 |
 | `internal/gamedata` | id→中文名 查找表(`scripts/gen_gamedata.py` 生成，embed) |
 | `internal/store` | SQLite 存储与筛选查询 |
@@ -33,13 +33,14 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 ## 文档
 
 - [协议说明](docs/protocol.md) — tsf4g/GCP 字节布局、分帧、密钥与解密、opcode
-- [数据来源与解析](docs/data.md) — world-data 来源、proto/名称表生成、宠物字段映射
+- [数据来源与解析](docs/data.md) — all.pb / pak-public-kit 数据源、proto/名称表生成、宠物字段映射
 - [服务架构](docs/architecture.md) — 数据流、模块、HTTP 接口、前端、部署
 
 ## 构建
 
 ```bash
-# 1. (可选)重新生成 proto 与名称表，需 world-data，见 AGENTS.md
+# 1. (可选)重新生成 proto 与名称表，见 AGENTS.md / docs/data.md
+#    proto 默认读仓库内 proto/all.pb;名称表需 pak-public-kit
 bash scripts/gen_proto.sh
 python3 scripts/gen_gamedata.py
 

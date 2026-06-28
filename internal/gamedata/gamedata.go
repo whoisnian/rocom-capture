@@ -1,4 +1,4 @@
-// Package gamedata 提供从 world-data 提取的 id->中文名 查找表(编译期 embed)。
+// Package gamedata 提供从 pak-public-kit 提取的 id->中文名 查找表(编译期 embed)。
 package gamedata
 
 import (
