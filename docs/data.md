@@ -102,6 +102,12 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `Zon
 `internal/gamedata/data/img/`(`//go:embed all:data/img`),`internal/server` 经 `/img/` 提供。
 35MB 的 `Pet1024` 全身大图暂不 embed(体积考量),需要时把 `Pet1024` 加进 `gen_images.py` 的 `DIRS`。
 
+**可复现 / 防 git 噪音**:同一 libwebp 版本下 PNG→webp 转码是确定性的(webp 无时间戳,
+实测同源字节一致)。为此 `pyproject.toml` 把 pillow **钉死精确版本**且 `requires-python>=3.10`
+(避免 3.9/3.10 解析到不同 pillow → 不同 libwebp → 全量图片 diff)。`gen_images.py` 还**默认跳过
+已存在的 webp**:常规重跑零改动,游戏更新只为新增宠编码,libwebp 万一漂移也不动老文件;
+换了 quality 等需整体重编时用 `--force`。
+
 ## 4. 宠物列表解析流程(`internal/pet`)
 
 ```
