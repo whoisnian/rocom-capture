@@ -13,19 +13,19 @@ type Filter struct {
 	Types         []string // 系别(任一匹配)
 	Nature        string
 	NatureExclude []string // 性格"其他":排除这些热门性格
-	Gender     string
-	TalentRank string
-	Medal      string
-	Speciality string
-	PartnerMark string
-	Shiny      string // "", "1", "0"
-	Colorful   string // "", "1", "0"
-	LevelMin   int
-	LevelMax   int
-	Sort       string
-	Order      string
-	Page       int
-	PageSize   int
+	Gender        string
+	TalentRank    string
+	Medal         string
+	Speciality    string
+	PartnerMark   string
+	Shiny         string // "", "1", "0"
+	Colorful      string // "", "1", "0"
+	LevelMin      int
+	LevelMax      int
+	Sort          string
+	Order         string
+	Page          int
+	PageSize      int
 }
 
 var sortColumns = map[string]string{

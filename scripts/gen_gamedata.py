@@ -6,14 +6,15 @@
 - 奖牌:   data/BinData/MEDAL_CONF.json                     id -> {name, desc}
 - 系别/天分/标记/特长: data/BinData/PET_FILTER_CONF.json 的 filter_enum_value -> filter_desc，
           再用反编译 Lua 的 Data/PB/ProtoEnum.lua 把 enum 值名解析为整数。
-- opcode: Data/PB/ProtoCMD.lua 的 ZoneSvrCmd 表(完整全集 1211 条，含 6531 等)。
+- opcode: 游戏描述符 proto/all.pb 里的 ZoneSvrCmd 枚举(完整全集，含 6531 等)。
 
-字段号(internal/pb)不在本数据源内，由游戏描述符 proto/all.pb 经 scripts/gen_proto.sh 生成；
-原因见 docs/data.md(字段号为追加式，几乎不变，故无需随版本跟新)。
+opcode 与字段号(internal/pb)同出 proto/all.pb(见 gen_proto.sh),与 internal/pb 天然同版本;
+all.pb 为追加式,几乎不变,故无需随版本跟新(原因见 docs/data.md)。
 """
 import json
 import os
 import re
+import subprocess
 import sys
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
@@ -21,7 +22,8 @@ ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
 BIN = os.path.join(ROOT, "data", "BinData")
 LUA = os.path.join(ROOT, "scripts", "lua", "Data", "PB")
 PROTOENUM_LUA = os.path.join(LUA, "ProtoEnum.lua")
-PROTOCMD_LUA = os.path.join(LUA, "ProtoCMD.lua")
+# opcode 取自游戏描述符 all.pb 的 ZoneSvrCmd 枚举(与 internal/pb 同源)。
+ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "proto"), "all.pb")
 OUT = "internal/gamedata/data"
 
 
@@ -41,6 +43,36 @@ def parse_lua_enum(lua_file, qualified_name):
         return out
     for vm in re.finditer(r"(\w+)\s*=\s*(-?\d+)", m.group(1)):
         out.setdefault(vm.group(1), int(vm.group(2)))
+    return out
+
+
+def parse_pb_enum(all_pb, enum_name):
+    """从描述符 all.pb 里解析名为 enum_name 的顶层枚举，返回 {VALUE_NAME: int}。
+
+    用 protoc 把 all.pb 解成 FileDescriptorSet 文本(无需 python-protobuf),其层级缩进:
+    文件名 2 空格、enum_type.name 4 空格、value.name/number 6 空格。定位目标枚举后,
+    收集其 value 直到遇到同级(4 空格)的下一个 name 或下一个文件(2 空格 *.proto)。
+    """
+    text = subprocess.run(
+        ["protoc", "--decode=google.protobuf.FileDescriptorSet",
+         "google/protobuf/descriptor.proto", "-I/usr/include"],
+        stdin=open(all_pb, "rb"), capture_output=True, text=True, check=True).stdout
+    lines = text.splitlines()
+    start = next((i for i, l in enumerate(lines)
+                  if re.match(r'^    name: "' + re.escape(enum_name) + r'"$', l)), None)
+    if start is None:
+        return {}
+    out, cur = {}, None
+    for l in lines[start + 1:]:
+        if re.match(r'^    name: "', l) or re.match(r'^  name: "[^"]+\.proto"$', l):
+            break  # 进入同级下一个 enum_type 或下一个文件,本枚举结束
+        m = re.match(r'^      name: "([^"]+)"$', l)
+        n = re.match(r'^      number: (-?\d+)$', l)
+        if m:
+            cur = m.group(1)
+        elif n and cur is not None:
+            out.setdefault(cur, int(n.group(1)))
+            cur = None
     return out
 
 
@@ -99,8 +131,9 @@ data = {
     "medal": {k: {"name": v.get("name", ""), "desc": v.get("desc", "")}
               for k, v in rows("MEDAL_CONF.json").items() if v.get("name")},
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
-    # ProtoCMD.lua 为完整表(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等)，无需手工补充。
-    "opcodes": {str(v): k for k, v in parse_lua_enum(PROTOCMD_LUA, "ProtoCMD.ZoneSvrCmd").items()},
+    # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
+    # 与 internal/pb 同源同版本,无需手工补充。
+    "opcodes": {str(v): k for k, v in parse_pb_enum(ALL_PB, "ZoneSvrCmd").items()},
 }
 
 os.makedirs(OUT, exist_ok=True)

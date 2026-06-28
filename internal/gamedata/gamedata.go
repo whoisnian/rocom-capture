@@ -38,12 +38,12 @@ type NatureEffect struct {
 // Load 加载 embed 的名称表。
 func Load() (*DB, error) {
 	var raw struct {
-		Species      map[string]string `json:"species"`
-		Nature       map[string]string `json:"nature"`
-		SkillDamType map[string]string `json:"skill_dam_type"`
-		TalentRate   map[string]string `json:"talent_rate"`
-		PartnerMark  map[string]string `json:"partner_mark"`
-		Speciality   map[string]string `json:"speciality"`
+		Species      map[string]string       `json:"species"`
+		Nature       map[string]string       `json:"nature"`
+		SkillDamType map[string]string       `json:"skill_dam_type"`
+		TalentRate   map[string]string       `json:"talent_rate"`
+		PartnerMark  map[string]string       `json:"partner_mark"`
+		Speciality   map[string]string       `json:"speciality"`
 		Medal        map[string]Medal        `json:"medal"`
 		Opcodes      map[string]string       `json:"opcodes"`
 		NatureEffect map[string]NatureEffect `json:"nature_effect"`

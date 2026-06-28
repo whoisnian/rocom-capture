@@ -33,8 +33,8 @@ type Pet struct {
 	Medal           string `json:"medal"`      // 佩戴奖牌名
 	MedalDesc       string `json:"medalDesc"`
 	WearMedalConfID uint32 `json:"wearMedalConfId"`
-	PartnerMark     string `json:"partnerMark"`  // 标记
-	Speciality      string `json:"speciality"`   // 特长
+	PartnerMark     string `json:"partnerMark"` // 标记
+	Speciality      string `json:"speciality"`  // 特长
 	SpecialityID    uint32 `json:"specialityId"`
 
 	CatchTime int64 `json:"catchTime"` // 捕捉时间(unix 秒)
@@ -42,10 +42,10 @@ type Pet struct {
 	Colorful  bool  `json:"colorful"`  // 炫彩(mutation_type bit3)
 
 	HP        Stat `json:"hp"`
-	Attack    Stat `json:"attack"`     // 物攻
-	Defense   Stat `json:"defense"`    // 物防
-	SpAttack  Stat `json:"spAttack"`   // 魔攻
-	SpDefense Stat `json:"spDefense"`  // 魔防
+	Attack    Stat `json:"attack"`    // 物攻
+	Defense   Stat `json:"defense"`   // 物防
+	SpAttack  Stat `json:"spAttack"`  // 魔攻
+	SpDefense Stat `json:"spDefense"` // 魔防
 	Speed     Stat `json:"speed"`
 
 	SkillIDs []uint32 `json:"skillIds"`

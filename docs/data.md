@@ -20,8 +20,10 @@ kit `output/` 下：
 | 路径 | 内容 | 本项目用途 |
 | --- | --- | --- |
 | `data/BinData/*.json` | 配置表(`{"RocoDataRows":{id:{...}}}`) | 提取 id→中文名 |
-| `scripts/lua/Data/PB/ProtoCMD.lua` | `ZoneSvrCmd` 完整命令枚举(1211 条) | opcode → 名称(供调试页) |
 | `scripts/lua/Data/PB/ProtoEnum.lua` | 反编译 Lua 的全部 protobuf 枚举 | 枚举值名 → 整数 |
+
+opcode(`ZoneSvrCmd`)不取自 kit，而是取自游戏描述符 `proto/all.pb`(与 `internal/pb` 同源，
+见第 2 节),保证 opcode 名与字段号天然同版本。
 
 关键表：
 
@@ -32,7 +34,7 @@ kit `output/` 下：
 - `PET_TALENT_CONF.json` — 特长名(`speciality_id → name`)
 - `PET_FILTER_CONF.json` — 一站式筛选维度配置：系别/天分/标记的
   `filter_enum_value → filter_desc`(中文)
-- `ProtoCMD.lua` 的 `ZoneSvrCmd` — opcode → 名称(完整表，原生含 6531=
+- (opcode `ZoneSvrCmd` 改取自 `proto/all.pb`，见第 2 节，原生含 6531=
   `ZONE_SCENE_THROW_CATCH_FINISH_RSP`，无需再手工补丁)
 - `ProtoEnum.lua` 的 `SkillDamType / PetTalentRate / PetPartnerMarkType` — 枚举值名 → 整数
 
@@ -80,7 +82,8 @@ partner_mark  speciality  medal  opcodes
 
 系别/天分/标记的整数值，通过解析 `ProtoEnum.lua` 枚举(名→整数)再 join
 `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+PET_CONF，
-特长直接取 PET_TALENT_CONF，opcode 取自 `ProtoCMD.lua` 的 `ZoneSvrCmd` 全集，性别为硬编码。
+特长直接取 PET_TALENT_CONF，opcode 取自 `proto/all.pb` 的 `ZoneSvrCmd` 全集
+(经 `protoc --decode` 解析,与 `internal/pb` 同源),性别为硬编码。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
