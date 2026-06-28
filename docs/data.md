@@ -1,18 +1,24 @@
 # 数据来源与解析
 
-宠物字段的 protobuf 定义与中文名称均来自游戏解包数据 **Roco-Kingdom-World-Data**
-(见 [AGENTS.md](../AGENTS.md) reference，下称 *world-data*)。本项目把其中需要的部分
-预处理成 Go 代码与精简 JSON，编译期 `embed` 进二进制，运行时不依赖原始解包目录。
+本项目用到两个解包数据源(见 [AGENTS.md](../AGENTS.md) reference)，各负责一半，编译期
+`embed` 进二进制，运行时不依赖原始解包目录：
 
-## 1. 数据来源
+- **pak-public-kit**(下称 *kit*)：当前 NRC 版本解包，`output/` 已提交、`git pull` 即跟新。
+  提供**中文名称表与 opcode 表**(高频变动，正好随上游更新)。
+- **world-data**：提供 `internal/pb` 所需的 **protobuf 字段号**(`.proto`)。kit 不导出
+  protobuf 描述符(其网络协议字段号只在不被提交的二进制 `FileDescriptorSet` 里)，故此项
+  仍取自 world-data。好在字段号是**追加式**的(新版本只加不改号)，旧 `.proto` 解码始终有效，
+  几乎无需跟版本更新——这也是不强行把 `internal/pb` 也切到 kit 的原因。
 
-world-data 主包 `pakchunk4-WindowsNoEditor/` 下：
+## 1. 名称表数据来源(kit)
+
+kit `output/` 下：
 
 | 路径 | 内容 | 本项目用途 |
 | --- | --- | --- |
-| `PB/proto_out/*.proto` | 210 个游戏原版 protobuf 定义 | 生成宠物消息 Go 结构体 |
-| `Bin/BinDataCompressed/*.json` | 配置表(`{"RocoDataRows":{id:{...}}}`) | 提取 id→中文名 |
-| `Bin/BinLocalize/zh_CN/*.json` | 中文本地化文本 | 补充部分名称 |
+| `data/BinData/*.json` | 配置表(`{"RocoDataRows":{id:{...}}}`) | 提取 id→中文名 |
+| `scripts/lua/Data/PB/ProtoCMD.lua` | `ZoneSvrCmd` 完整命令枚举(1211 条) | opcode → 名称(供调试页) |
+| `scripts/lua/Data/PB/ProtoEnum.lua` | 反编译 Lua 的全部 protobuf 枚举 | 枚举值名 → 整数 |
 
 关键表：
 
@@ -23,10 +29,11 @@ world-data 主包 `pakchunk4-WindowsNoEditor/` 下：
 - `PET_TALENT_CONF.json` — 特长名(`speciality_id → name`)
 - `PET_FILTER_CONF.json` — 一站式筛选维度配置：系别/天分/标记的
   `filter_enum_value → filter_desc`(中文)
-- `c2s_cmd.proto` 的 `enum ZoneSvrCmd` — opcode → 名称(供调试页)
-- `xls_enum.proto` 的 `enum SkillDamType / PetTalentRate / ...` — 枚举值名 → 整数
+- `ProtoCMD.lua` 的 `ZoneSvrCmd` — opcode → 名称(完整表，原生含 6531=
+  `ZONE_SCENE_THROW_CATCH_FINISH_RSP`，无需再手工补丁)
+- `ProtoEnum.lua` 的 `SkillDamType / PetTalentRate / PetPartnerMarkType` — 枚举值名 → 整数
 
-## 2. proto → Go(`scripts/gen_proto.sh`)
+## 2. proto → Go(`scripts/gen_proto.sh`，数据源:world-data)
 
 游戏 `.proto` 有两个坑，脚本 `scripts/fix_proto.py` 自动修复：
 
@@ -67,9 +74,9 @@ species  nature  nature_effect  skill_dam_type  talent_rate
 partner_mark  speciality  medal  opcodes
 ```
 
-系别/天分/标记的整数值，通过解析 `xls_enum.proto` 枚举(名→整数)再 join
+系别/天分/标记的整数值，通过解析 `ProtoEnum.lua` 枚举(名→整数)再 join
 `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+PET_CONF，
-特长直接取 PET_TALENT_CONF，性别为硬编码。
+特长直接取 PET_TALENT_CONF，opcode 取自 `ProtoCMD.lua` 的 `ZoneSvrCmd` 全集，性别为硬编码。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 

@@ -1,11 +1,15 @@
-"""从 world-data 提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
+"""从 pak-public-kit 导出数据提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
 
-数据来源(Bin/BinDataCompressed 与 PB/proto_out)：
-- 种类:   PET_CONF.json            conf_id -> name
-- 性格:   AUDIO_NATURE_CONF.json   nature_id -> name
-- 奖牌:   MEDAL_CONF.json          id -> {name, desc}
-- 系别/天分/标记/特长: PET_FILTER_CONF.json 的 filter_enum_value -> filter_desc，
-          再用 xls_enum.proto 把 enum 值名解析为整数。
+数据来源(pak-public-kit 的 output 目录，见 AGENTS.md reference)：
+- 种类:   data/BinData/MONSTER_CONF.json + PET_CONF.json  id -> name
+- 性格:   data/BinData/AUDIO_NATURE_CONF.json              nature_id -> name
+- 奖牌:   data/BinData/MEDAL_CONF.json                     id -> {name, desc}
+- 系别/天分/标记/特长: data/BinData/PET_FILTER_CONF.json 的 filter_enum_value -> filter_desc，
+          再用反编译 Lua 的 Data/PB/ProtoEnum.lua 把 enum 值名解析为整数。
+- opcode: Data/PB/ProtoCMD.lua 的 ZoneSvrCmd 表(完整 1476 条，含 6531 等)。
+
+字段号(internal/pb)不在本数据源内，仍由 world-data 的 .proto 经 scripts/gen_proto.sh 生成；
+原因见 docs/data.md(字段号为追加式，几乎不变，故无需随版本跟新)。
 """
 import json
 import os
@@ -13,9 +17,11 @@ import re
 import sys
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
-    "~/Git/gh/Roco-Kingdom-World-Data-2026-05-21/pakchunk4-WindowsNoEditor")
-BIN = os.path.join(ROOT, "Bin", "BinDataCompressed")
-PROTO = os.path.join(ROOT, "PB", "proto_out")
+    "~/Git/gh/pak-public-kit/output")
+BIN = os.path.join(ROOT, "data", "BinData")
+LUA = os.path.join(ROOT, "scripts", "lua", "Data", "PB")
+PROTOENUM_LUA = os.path.join(LUA, "ProtoEnum.lua")
+PROTOCMD_LUA = os.path.join(LUA, "ProtoCMD.lua")
 OUT = "internal/gamedata/data"
 
 
@@ -23,14 +29,17 @@ def rows(name):
     return json.load(open(os.path.join(BIN, name), encoding="utf-8"))["RocoDataRows"]
 
 
-def parse_enum(proto_file, enum_name):
-    """返回 {VALUE_NAME: int}。"""
+def parse_lua_enum(lua_file, qualified_name):
+    """解析反编译 Lua 中形如 `Prefix.EnumName = { KEY = n, ... }` 的枚举，返回 {KEY: int}。
+
+    枚举体内只有 `名 = 数字` 项、无嵌套花括号，故非贪婪匹配到首个 `}` 即枚举结束。
+    """
     out = {}
-    text = open(os.path.join(PROTO, proto_file), encoding="utf-8", errors="ignore").read()
-    m = re.search(r"enum\s+" + re.escape(enum_name) + r"\s*\{(.*?)\}", text, re.S)
+    text = open(lua_file, encoding="utf-8", errors="ignore").read()
+    m = re.search(re.escape(qualified_name) + r"\s*=\s*\{(.*?)\}", text, re.S)
     if not m:
         return out
-    for vm in re.finditer(r"(\w+)\s*=\s*(-?\d+)\s*;", m.group(1)):
+    for vm in re.finditer(r"(\w+)\s*=\s*(-?\d+)", m.group(1)):
         out.setdefault(vm.group(1), int(vm.group(2)))
     return out
 
@@ -44,8 +53,8 @@ for r in rows("PET_FILTER_CONF.json").values():
 
 
 def enum_dim(enum_name):
-    """组合 proto enum(名->int) 与 filter(名->中文) 得到 {int: 中文}。"""
-    name2int = parse_enum("xls_enum.proto", enum_name)
+    """组合 ProtoEnum.lua(名->int) 与 filter(名->中文) 得到 {int: 中文}。"""
+    name2int = parse_lua_enum(PROTOENUM_LUA, "ProtoEnum." + enum_name)
     out = {}
     for vname, desc in filter_groups.get(enum_name, {}).items():
         if vname in name2int:
@@ -80,7 +89,7 @@ data = {
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),
-    # 特长：仅取 PET_TALENT_CONF 里 filter_enum_value=PTFN_TALENT_* 的固定特长(11 种)，
+    # 特长：仅取 PET_TALENT_CONF 里 filter_enum_value=PTFN_TALENT_* 的固定特长，
     # 避免误用非特长条目;id=502 的 name 为"勇敢"，游戏内显示为"无畏"。
     "speciality": {
         k: ("无畏" if int(k) == 502 else v["name"])
@@ -89,12 +98,10 @@ data = {
     },
     "medal": {k: {"name": v.get("name", ""), "desc": v.get("desc", "")}
               for k, v in rows("MEDAL_CONF.json").items() if v.get("name")},
-    # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)
-    "opcodes": {str(v): k for k, v in parse_enum("c2s_cmd.proto", "ZoneSvrCmd").items()},
+    # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
+    # ProtoCMD.lua 为完整表(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等)，无需手工补充。
+    "opcodes": {str(v): k for k, v in parse_lua_enum(PROTOCMD_LUA, "ProtoCMD.ZoneSvrCmd").items()},
 }
-
-# 实测补充: 不在 ZoneSvrCmd enum 但已逆向确认的 opcode
-data["opcodes"]["6531"] = "PET_CATCH_OUTSIDE_RSP"  # 0x1983 战斗外捕捉(赛季球/高级球)
 
 os.makedirs(OUT, exist_ok=True)
 with open(os.path.join(OUT, "names.json"), "w", encoding="utf-8") as f:

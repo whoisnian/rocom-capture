@@ -13,7 +13,7 @@ const (
 	OpGetPetInfoByPageRsp = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
 	OpPetFreeRsp          = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
 	OpCrackEggRsp         = 0x030c // ZONE_CRACK_EGG_RSP(780), 孵蛋(新宠物嵌在 goods_reward)
-	OpPetCatchRsp         = 0x1983 // 战斗外捕捉(赛季球/高级球)新宠物下发(实测;不在 ZoneSvrCmd enum)
+	OpPetCatchRsp         = 0x1983 // ZONE_SCENE_THROW_CATCH_FINISH_RSP(6531), 战斗外捕捉(赛季球/高级球)
 	OpGoodsRewardNotify   = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
 	OpPlayerSyncNotify    = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
 )
