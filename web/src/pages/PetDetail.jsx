@@ -37,8 +37,16 @@ export default function PetDetail() {
   if (err) return <div className="empty">未找到该宠物</div>
   if (!pet) return <div className="empty">加载中…</div>
 
+  // 点击卡片与工具栏之外的区域 → 返回
+  const onBackdrop = (e) => {
+    if (cardRef.current && cardRef.current.contains(e.target)) return
+    if (e.target.closest && e.target.closest('.toolbar')) return
+    nav(-1)
+  }
+
   return (
-    <div className="detail-wrap">
+    <div className="detail-backdrop" onClick={onBackdrop}>
+      <div className="detail-wrap">
       <div className="toolbar">
         <button className="btn" onClick={() => nav(-1)}>← 返回</button>
         <div className="spacer" />
@@ -121,6 +129,7 @@ export default function PetDetail() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

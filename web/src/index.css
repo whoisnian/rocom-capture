@@ -104,6 +104,8 @@ table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(-
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
 table.pets tr:hover td { background: var(--bg-2); }
 table.pets tr { cursor: pointer; }
+table.pets tr.selected td { background: #1c2740; }
+table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .pet-cell { display: flex; align-items: center; gap: 8px; }
 .pet-avatar { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-size: 16px; }
 img.pet-avatar { object-fit: cover; }
@@ -137,6 +139,20 @@ img.pet-avatar { object-fit: cover; }
 .rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* ---- 详情页 ---- */
+/* 列表选中(移动卡片) */
+.card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+/* 右键/长按上下文菜单 */
+.ctx-menu {
+  position: fixed; z-index: 100; min-width: 120px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 4px; user-select: none;
+}
+.ctx-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.ctx-item:hover { background: var(--bg-3); }
+
+/* 详情页:卡片外区域可点击返回 */
+.detail-backdrop { min-height: calc(100vh - 120px); }
 .detail-wrap { max-width: 460px; margin: 0 auto; }
 .detail-card {
   background: linear-gradient(180deg, #2b3346, #161b22); border: 1px solid var(--line);

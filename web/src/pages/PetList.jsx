@@ -41,8 +41,13 @@ export default function PetList() {
   const [data, setData] = useState({ total: 0, pets: [] })
   const [options, setOptions] = useState({})
   const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
+  const [selected, setSelected] = useState(null) // 单击选中的 gid
+  const [menu, setMenu] = useState(null)          // 右键/长按菜单 {gid,x,y}
   const reloadRef = useRef(null)
   const restoredRef = useRef(false)
+  const lpRef = useRef(null)        // 长按定时器
+  const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
+  const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
 
   const load = useCallback(() => { getPets(filter).then(setData).catch(() => {}) }, [filter])
   useEffect(() => { load() }, [load])
@@ -82,6 +87,44 @@ export default function PetList() {
   const goDetail = (gid) => { sessionStorage.setItem('petListScroll', String(window.scrollY)); nav('/pets/' + gid) }
   // 重置:清空所有过滤条件,保留排序与每页档位
   const reset = () => setFilter((f) => ({ page: 1, pageSize: f.pageSize, sort: f.sort, order: f.order }))
+
+  // 右键/长按菜单:选中并在 (x,y) 弹出(限制不溢出视口)
+  const openMenu = (gid, x, y) => {
+    setSelected(gid)
+    menuAtRef.current = Date.now()
+    setMenu({ gid, x: Math.min(x, window.innerWidth - 140), y: Math.min(y, window.innerHeight - 60) })
+  }
+  // 菜单打开后:点击空白/滚动/Esc 关闭(忽略打开瞬间紧随的合成 click)
+  useEffect(() => {
+    if (!menu) return
+    const close = (e) => {
+      if (e && e.target && e.target.closest && e.target.closest('.ctx-menu')) return
+      if (Date.now() - menuAtRef.current < 350) return
+      setMenu(null)
+    }
+    const onKey = (e) => { if (e.key === 'Escape') setMenu(null) }
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu])
+
+  // 列表项交互:单击选中、右键(桌面)/长按(移动)弹菜单
+  const itemProps = (gid) => ({
+    onClick: () => { if (lpFiredRef.current) { lpFiredRef.current = false; return } setSelected(gid) },
+    onContextMenu: (e) => { e.preventDefault(); openMenu(gid, e.clientX, e.clientY) },
+    onTouchStart: (e) => {
+      lpFiredRef.current = false
+      const t = e.touches[0]
+      lpRef.current = setTimeout(() => { lpFiredRef.current = true; openMenu(gid, t.clientX, t.clientY) }, 450)
+    },
+    onTouchMove: () => clearTimeout(lpRef.current),
+    onTouchEnd: () => clearTimeout(lpRef.current),
+  })
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
@@ -179,7 +222,7 @@ export default function PetList() {
             </thead>
             <tbody>
               {data.pets.map((p) => (
-                <tr key={p.gid} onClick={() => goDetail(p.gid)}>
+                <tr key={p.gid} className={p.gid === selected ? 'selected' : ''} {...itemProps(p.gid)}>
                   <td>
                     <div className="pet-cell">
                       <Avatar p={p} />
@@ -207,7 +250,7 @@ export default function PetList() {
         {/* 移动卡片 */}
         <div className="cards">
           {data.pets.map((p) => (
-            <div className="card" key={p.gid} onClick={() => goDetail(p.gid)}>
+            <div className={'card' + (p.gid === selected ? ' selected' : '')} key={p.gid} {...itemProps(p.gid)}>
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
@@ -240,6 +283,12 @@ export default function PetList() {
           </select>
         </div>
       </section>
+
+      {menu && (
+        <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          <div className="ctx-item" onClick={() => { goDetail(menu.gid); setMenu(null) }}>查看详情</div>
+        </div>
+      )}
     </div>
   )
 }
