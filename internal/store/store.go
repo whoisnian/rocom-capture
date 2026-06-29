@@ -104,6 +104,34 @@ func (s *Store) ReplacePetBoxes(entries []pet.BoxEntry) error {
 	return tx.Commit()
 }
 
+// ApplyBoxMoves 增量应用盒位变更(box_pet_change):把每只宠物移到新(盒,格);
+// 盒名/标记沿用该盒既有行(随盒不随宠);宠物入盒即不在队伍,清除其队伍位置。
+func (s *Store) ApplyBoxMoves(entries []pet.BoxEntry) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	up, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer up.Close()
+	for _, e := range entries {
+		var name string
+		var mark int32
+		// 盒名/标记是盒的属性,取该盒任一既有行(增量包不携带)。
+		tx.QueryRow(`SELECT box_name,mark FROM pet_box WHERE box_id=? AND gid<>? LIMIT 1`, e.BoxID, e.Gid).Scan(&name, &mark)
+		if _, err = up.Exec(e.Gid, e.BoxID, e.Slot, name, mark); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(`DELETE FROM pet_team WHERE gid=?`, e.Gid); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // boxLocFor 读取单只宠物的盒子位置(无则 nil),供 GetPet 注入。
 func (s *Store) boxLocFor(gid uint32) *pet.PetBoxLoc {
 	var boxID, slot, mark int32

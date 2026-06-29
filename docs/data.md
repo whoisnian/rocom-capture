@@ -176,10 +176,16 @@ s2c 0x1346 DATA 明文 body
   实测 `PetTeam.team_idx` 恒 0),每队 `pet_infos[]`(6 位)的 `pet_gid`。`ParseTeams`(取宠物数最多的
   大世界候选)→ gid→(队,位)存 `pet_team` 表,JOIN 注入 `Pet.Team`(与 `Box` 互斥);实测 3 队 18 只全命中。
   为此 `gen_proto.py` 把 `com_pet_team.proto` 加为第二根(闭包 +1 文件)。
+- **位置移动增量**(运行期实时刷新):
+  - **盒位**:`ZONE_PET_BOX_CHANGE_PET_RSP(0x1888)` 携带 `GoodsChangeItem.box_pet_change`
+    (`PetBoxPetChange`:`pet_gid`/`is_in_team`/`id`=盒/`pos`=格,**pos 1 起**)。`ParseBoxMoves` 抽出
+    非在队、gid 非 0 的落位项(`slot=pos-1`),`ApplyBoxMoves` 增量 upsert `pet_box`(盒名/标记沿用该盒)
+    并清其队位。**仅在 0x1888 解析**(其他 opcode 的子消息易误判为 PetBoxPetChange)。
+  - **队位**:队伍变更/盒子操作回包(`CarriesTeam`:登录/6272-6292/524-527)常一并刷新完整队伍快照,
+    复用 `ParseTeams` 整体 `ReplacePetTeams`。
+  - 实测 pcap(交换队首两位 + 盒内 1→30 移位 + 盒内 2/3 互换):三处变更均正确落库。
+- **删除/赠送减少事件**:`DELETE_REQ(397)`/赠送相关 opcode 待接入。
 
 待校准(多数需含相应事件/宠物的新样本)：
-- **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入;
-- **盒子位置增量**：现仅按 `0x0102` 全量快照刷新;盒内移动(`ZONE_PET_BOX_CHANGE_PET 6280`
-  的 `PetBoxPetChange`:`id`=盒、`pos`=格位)与 `GoodsChangeItem.box_pet_change` 增量更新待接入;
 - **咕噜球/蛋组/技能名**本地化尚未梳理;
 - **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。

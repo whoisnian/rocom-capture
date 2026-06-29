@@ -17,14 +17,23 @@ const (
 	OpGoodsRewardNotify   = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
 	OpPlayerSyncNotify    = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
 	OpLoginRsp            = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
+	OpPetBoxChangePetRsp  = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
 )
 
 // 盒子操作 opcode 区间(ZoneSvrCmd 十进制 6272-6292,如 TIDY_RSP/SETTING_UP_RSP 携带全量盒子)。
 const boxOpcodeLo, boxOpcodeHi = 6272, 6292
 
+// 队伍变更 opcode 区间(524 TEAM_CHANGE / 526 CHANGE_MAIN_TEAM 的 REQ/RSP,回包带刷新后队伍快照)。
+const teamOpcodeLo, teamOpcodeHi = 524, 527
+
 // CarriesBackpack 判断该 opcode 是否可能携带盒子布局(登录数据或盒子操作回包)。
 func CarriesBackpack(opcode uint16) bool {
 	return opcode == OpLoginRsp || (opcode >= boxOpcodeLo && opcode <= boxOpcodeHi)
+}
+
+// CarriesTeam 判断该 opcode 是否可能携带大世界队伍快照(登录、盒子操作或队伍变更回包)。
+func CarriesTeam(opcode uint16) bool {
+	return CarriesBackpack(opcode) || (opcode >= teamOpcodeLo && opcode <= teamOpcodeHi)
 }
 
 // warehouseMark 是 WarehouseMarkType(盒子分类标记)枚举值 -> 中文。
@@ -164,6 +173,54 @@ func FindNewPet(body []byte) *pb.PetData {
 
 // PTTBigWorld 是 PlayerTeamType.PTT_BIG_WORLD(大世界队伍 team_type)。
 const PTTBigWorld = 1
+
+// ParseBoxMoves 从盒子操作回包(GoodsChangeItem.box_pet_change)抽取盒位增量变更。
+// 每个 PetBoxPetChange = {pet_gid, is_in_team, id=box_id, pos(1 起)};只取非在队、gid 非 0、
+// box/pos 在合理范围的盒位放置,转为 BoxEntry(Slot=pos-1)。空位变更(gid=0)被移走的宠物
+// 必有对应的非 0 落位项,故跳过。
+func ParseBoxMoves(body []byte) []BoxEntry {
+	var cands []*pb.PetBoxPetChange
+	collectBoxChanges(body, &cands)
+	var out []BoxEntry
+	for _, c := range cands {
+		box, pos := c.GetId(), c.GetPos()
+		if c.GetIsInTeam() || c.GetPetGid() == 0 || box < 1 || box > 50 || pos < 1 || pos > 30 {
+			continue
+		}
+		out = append(out, BoxEntry{Gid: c.GetPetGid(), BoxID: box, Slot: pos - 1})
+	}
+	return out
+}
+
+// collectBoxChanges 递归收集 body 里所有可解析为 PetBoxPetChange 的子消息。
+func collectBoxChanges(body []byte, out *[]*pb.PetBoxPetChange) {
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			var c pb.PetBoxPetChange
+			if proto.Unmarshal(v, &c) == nil && c.Id != nil && c.Pos != nil {
+				*out = append(*out, &c)
+			}
+			collectBoxChanges(v, out)
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+}
 
 // TeamEntry 是一只宠物在大世界队伍中的位置(team_idx 第几队,pos 队内位置 0 起,每队 6 位)。
 type TeamEntry struct {

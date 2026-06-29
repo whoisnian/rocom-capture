@@ -81,14 +81,23 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 
 		// 盒子布局：登录数据(0x0102)或盒子操作回包携带完整背包 PetBackpackInfo，
 		// 解出 gid->(盒子,格位) 全量快照存入 pet_box,读取宠物时 JOIN 注入位置。
-		if m.Direction == gcp.S2C && pet.CarriesBackpack(m.Opcode) {
+		if m.Direction == gcp.S2C && pet.CarriesTeam(m.Opcode) {
 			updated := false
-			if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
-				updated = st.ReplacePetBoxes(entries) == nil || updated
+			// 全量背包快照(登录/整理/设置回包):整体替换盒位
+			if pet.CarriesBackpack(m.Opcode) {
+				if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
+					updated = st.ReplacePetBoxes(entries) == nil || updated
+				}
 			}
-			// 登录数据同时携带大世界队伍(在队宠物不在盒子里)
+			// 大世界队伍快照(登录/队伍变更/盒子操作回包常一并刷新):整体替换队位
 			if teams := pet.ParseTeams(m.AppBody); len(teams) > 0 {
 				updated = st.ReplacePetTeams(teams) == nil || updated
+			}
+			// 盒位移动增量(box_pet_change,仅 CHANGE_PET 回包携带,其余 opcode 易误报)
+			if m.Opcode == pet.OpPetBoxChangePetRsp {
+				if moves := pet.ParseBoxMoves(m.AppBody); len(moves) > 0 {
+					updated = st.ApplyBoxMoves(moves) == nil || updated
+				}
 			}
 			if updated {
 				srv.Hub().Broadcast("pet", map[string]any{"locUpdate": true})
