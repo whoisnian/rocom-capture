@@ -93,14 +93,23 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `Zon
 `MODEL_CONF.icon`/`big_icon`(`HeadIcon/BigHeadIcon256/<n>`)。**文件名不能用 id 拼**——728 个
 形态共用他人头像(如 3228 用 3012),全身图是拼音代号而非 id,故必须存表。
 
-`gen_gamedata.py` 输出两张:`images`(petbase_id → `{h,b,p,ps}` 文件名,1041 项)与
+`gen_gamedata.py` 输出两张:`images`(petbase_id → `{h,b,p,ps,…}` 文件名,1041 项)与
 `image_base`(conf_id → petbase_id,仅 base≠自身者,约 1.7 万项;base==自身者 Go 侧回退直查)。
-`gamedata.PetImage(confID)` 据此拼出相对路径(`HeadIcon/3001.webp` 等),挂到 `Pet.Image`,
+`gamedata.PetImage(confID, shiny)` 据此拼出相对路径(`HeadIcon/3001.webp` 等),挂到 `Pet.Image`,
 前端拼到 `/img/` 下。未上线宠(如占位的圣草帝魔)无美术资源,`PetImage` 返回空,前端给占位图。
+> 实际形态以 `PetData.base_conf_id`(当前 petbase)为准:`ToPet` 优先用它取名称/头像/图鉴/形态,
+> 缺失才回退 `conf_id`(进化线一阶 base)——否则已进化宠物会显示成基础形态(详见进化形态一节)。
+
+**异色(shiny)变体**:部分宠物有专属异色美术——头像 `MODEL_CONF.shiny_icon`/`big_shiny_icon`
+(形如 `3010_1`)、全身图 `PETBASE.JL_shiny_res`/`JL_small_shiny_res`(形如 `JL_<拼音>_yise`)。
+`images` 仅在与普通版**不同**时额外存 `{sh,sb,sps}`(本版本 146/123/132 项;多数宠异色复用普通图)。
+`PetImage(confID, true)` 在「索引有该字段**且**对应 webp 确已 embed」时才用异色图,否则回退普通——
+故未导出异色 PNG 时异色宠仍显示普通美术,不会出现空图标。
 
 图片本体(webp)**embed 进二进制**:在 FModel 里把 `Common/Icon` 的 `HeadIcon`/`BigHeadIcon256`/
-`Pet256` 子目录以 **PNG** 导出,`uv run python scripts/gen_images.py <PNG源>` 转成 webp 落到
-`internal/gamedata/data/img/`(`//go:embed all:data/img`),`internal/server` 经 `/img/` 提供。
+`Pet256` 子目录以 **PNG** 导出(异色图 `*_1.png`/`JL_*_yise.png` 在同目录,一并导出即可),
+`uv run python scripts/gen_images.py <PNG源>` 转成 webp 落到 `internal/gamedata/data/img/`
+(`//go:embed all:data/img`),`internal/server` 经 `/img/` 提供。
 35MB 的 `Pet1024` 全身大图暂不 embed(体积考量),需要时把 `Pet1024` 加进 `gen_images.py` 的 `DIRS`。
 
 **可复现 / 防 git 噪音**:同一 libwebp 版本下 PNG→webp 转码是确定性的(webp 无时间戳,

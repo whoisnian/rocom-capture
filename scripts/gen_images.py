@@ -30,11 +30,15 @@ NAMES = "internal/gamedata/data/names.json"
 OUT = "internal/gamedata/data/img"
 QUALITY = 90  # webp 有损质量;UI 图标够用且体积远小于 PNG
 
-# embed 选定的三个尺寸:索引字段 -> (源/目标子目录, 文件名前缀)。
+# embed 选定的尺寸:索引字段 -> (源/目标子目录, 文件名前缀)。
+# 异色变体 sh/sb/sps 与普通版同目录(文件名形如 3010_1 / JL_emoding_yise),仅有专属异色图的宠物才有。
 DIRS = {
     "h": ("HeadIcon", ""),
     "b": ("BigHeadIcon256", ""),
     "ps": ("Pet256", "JL_"),
+    "sh": ("HeadIcon", ""),
+    "sb": ("BigHeadIcon256", ""),
+    "sps": ("Pet256", "JL_"),
 }
 
 

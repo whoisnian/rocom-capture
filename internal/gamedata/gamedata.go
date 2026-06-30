@@ -34,10 +34,13 @@ type Medal struct {
 
 // imageEntry 是 petbase 形态的图片文件名(头像为数字,全身图去掉 JL_ 前缀)。
 type imageEntry struct {
-	H  string `json:"h"`  // 小头像文件名
-	B  string `json:"b"`  // 大头像文件名
-	P  string `json:"p"`  // 全身图拼音键(实际文件名为 JL_<p>)
-	PS string `json:"ps"` // 全身缩略拼音键
+	H   string `json:"h"`   // 小头像文件名
+	B   string `json:"b"`   // 大头像文件名
+	P   string `json:"p"`   // 全身图拼音键(实际文件名为 JL_<p>)
+	PS  string `json:"ps"`  // 全身缩略拼音键
+	SH  string `json:"sh"`  // 异色小头像(形如 3010_1;仅有专属异色图者)
+	SB  string `json:"sb"`  // 异色大头像
+	SPS string `json:"sps"` // 异色全身缩略拼音键(形如 emoding_yise)
 }
 
 // PetImage 是宠物各尺寸图片的相对路径(相对图片根,空串表示缺图)。
@@ -72,6 +75,7 @@ type DB struct {
 	imageBase    map[string]string      // conf_id -> petbase_id(base==自身者不入表)
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
 	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
+	imgFiles     map[string]bool        // 实际 embed 的图片相对路径(异色图缺失时回退普通)
 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
@@ -127,6 +131,14 @@ func Load() (*DB, error) {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
 		}
 	}
+	// embed 的图片清单:异色图未导出时据此回退普通图,避免空图标。
+	imgFiles := map[string]bool{}
+	fs.WalkDir(ImageFS(), ".", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			imgFiles[p] = true
+		}
+		return nil
+	})
 	return &DB{
 		species:      raw.Species,
 		nature:       raw.Nature,
@@ -141,38 +153,55 @@ func Load() (*DB, error) {
 		imageBase:    imageBase,
 		petbase:      petbase,
 		evoIndex:     evoIndex,
+		imgFiles:     imgFiles,
 	}, nil
 }
 
-// PetImage 返回宠物各尺寸图片的相对路径(经 base_id 归并到 petbase 形态;缺图为空串)。
-func (db *DB) PetImage(confID uint32) PetImage {
+// PetImage 返回宠物各尺寸图片的相对路径(经 base_id 归并到 petbase 形态;缺图为空串);
+// shiny=true 时优先取异色图(无专属异色图或未 embed 时回退普通)。
+func (db *DB) PetImage(confID uint32, shiny bool) PetImage {
 	pid, ok := db.imageBase[key(confID)]
 	if !ok {
 		pid = key(confID) // base==自身,直接按 conf_id 查 petbase
 	}
-	return db.imageOf(pid)
+	return db.imageOf(pid, shiny)
 }
 
 // PetImageByBase 按 petbase_id 直接取图片(base_conf_id 本身即 petbase id,给出当前形态)。
-func (db *DB) PetImageByBase(petbaseID uint32) PetImage { return db.imageOf(key(petbaseID)) }
+func (db *DB) PetImageByBase(petbaseID uint32, shiny bool) PetImage {
+	return db.imageOf(key(petbaseID), shiny)
+}
 
-func (db *DB) imageOf(petbaseID string) PetImage {
+func (db *DB) imageOf(petbaseID string, shiny bool) PetImage {
 	e, ok := db.images[petbaseID]
 	if !ok {
 		return PetImage{}
 	}
-	var img PetImage
-	if e.H != "" {
-		img.Head = "HeadIcon/" + e.H + ".webp"
+	head, big, ps := e.H, e.B, e.PS
+	// 异色变体仅在「索引有该字段且对应 webp 确已 embed」时启用,否则回退普通图。
+	if shiny {
+		if e.SH != "" && db.imgFiles["HeadIcon/"+e.SH+".webp"] {
+			head = e.SH
+		}
+		if e.SB != "" && db.imgFiles["BigHeadIcon256/"+e.SB+".webp"] {
+			big = e.SB
+		}
+		if e.SPS != "" && db.imgFiles["Pet256/JL_"+e.SPS+".webp"] {
+			ps = e.SPS
+		}
 	}
-	if e.B != "" {
-		img.BigHead = "BigHeadIcon256/" + e.B + ".webp"
+	var img PetImage
+	if head != "" {
+		img.Head = "HeadIcon/" + head + ".webp"
+	}
+	if big != "" {
+		img.BigHead = "BigHeadIcon256/" + big + ".webp"
 	}
 	if e.P != "" {
 		img.Portrait = "Pet1024/JL_" + e.P + ".webp"
 	}
-	if e.PS != "" {
-		img.PortraitSmall = "Pet256/JL_" + e.PS + ".webp"
+	if ps != "" {
+		img.PortraitSmall = "Pet256/JL_" + ps + ".webp"
 	}
 	return img
 }
@@ -205,7 +234,7 @@ func (db *DB) EvolutionChain(petbaseID uint32) []ChainStep {
 	steps := make([]ChainStep, 0, len(ids))
 	for _, id := range ids {
 		pi := db.petbase[id]
-		steps = append(steps, ChainStep{Petbase: id, Name: pi.Name, Book: pi.Book, Stage: pi.Stage, Image: db.PetImageByBase(id)})
+		steps = append(steps, ChainStep{Petbase: id, Name: pi.Name, Book: pi.Book, Stage: pi.Stage, Image: db.PetImageByBase(id, false)})
 	}
 	sort.Slice(steps, func(i, j int) bool { return steps[i].Stage < steps[j].Stage })
 	return steps

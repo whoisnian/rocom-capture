@@ -81,6 +81,12 @@ _petbase = rows("PETBASE_CONF.json")
 _model = rows("MODEL_CONF.json")
 
 # images: petbase_id -> {h:小头像 b:大头像 p:全身图 ps:全身缩略}(全身图去掉 JL_ 前缀省字节)。
+#   异色变体 sh/sb/sps(头像形如 3010_1,全身图形如 JL_<拼音>_yise)仅在与普通版不同时收录;
+#   多数宠物异色复用普通美术(shiny_icon==icon、无 JL_shiny_res),不会产生 sh/sb/sps。
+def _strip_jl(s):
+    return s[3:] if s and s.startswith("JL_") else s
+
+
 images = {}
 for pid, p in _petbase.items():
     m = _model.get(str(p.get("model_conf"))) or {}
@@ -88,15 +94,25 @@ for pid, p in _petbase.items():
     head = texkey(m.get("icon") or m.get("small_icon") or m.get("ui_icon"))
     big = texkey(m.get("big_icon"))
     portrait = texkey(p.get("JL_res"))
-    portrait_s = texkey(p.get("JL_small_res"))
+    portrait_s = _strip_jl(texkey(p.get("JL_small_res")))
     if head:
         entry["h"] = head
     if big:
         entry["b"] = big
     if portrait:
-        entry["p"] = portrait[3:] if portrait.startswith("JL_") else portrait
+        entry["p"] = _strip_jl(portrait)
     if portrait_s:
-        entry["ps"] = portrait_s[3:] if portrait_s.startswith("JL_") else portrait_s
+        entry["ps"] = portrait_s
+    # 异色变体(仅当与普通版不同):小头像/大头像/全身缩略。
+    sh = texkey(m.get("shiny_icon"))
+    sb = texkey(m.get("big_shiny_icon"))
+    sps = _strip_jl(texkey(p.get("JL_small_shiny_res")))
+    if sh and sh != head:
+        entry["sh"] = sh
+    if sb and sb != big:
+        entry["sb"] = sb
+    if sps and sps != portrait_s:
+        entry["sps"] = sps
     if entry:
         images[pid] = entry
 

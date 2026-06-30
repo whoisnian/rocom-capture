@@ -86,8 +86,10 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 
 	// 当前形态:base_conf_id 直接指向当前 petbase(进化后随之变化),据此取名称/头像/图鉴/形态;
 	// 旧逻辑用 conf_id 只会得到进化线一阶 base(火神显示成火花),故优先用 base_conf_id,缺失再回退。
+	// mutation_type bit0=异色,异色宠物部分有专属头像/全身图(无则回退普通)。
+	shiny := p.GetMutationType()&1 != 0
 	confID, base := p.GetConfId(), p.GetBaseConfId()
-	species, image := db.Species(confID), db.PetImage(confID)
+	species, image := db.Species(confID), db.PetImage(confID, shiny)
 	var book, stage uint32
 	var form string
 	if base != 0 {
@@ -96,7 +98,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 				species = info.Name
 			}
 			book, form, stage = info.Book, info.Form, info.Stage
-			if img := db.PetImageByBase(base); img != (gamedata.PetImage{}) {
+			if img := db.PetImageByBase(base, shiny); img != (gamedata.PetImage{}) {
 				image = img
 			}
 		}
@@ -128,7 +130,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 
 		CatchTime: int64(p.GetAddTime()),
 		// mutation_type 为位标志: bit0=异色, bit3=炫彩(实测样本验证)。
-		Shiny:    p.GetMutationType()&1 != 0,
+		Shiny:    shiny,
 		Colorful: p.GetMutationType()&8 != 0,
 
 		Image: image,
