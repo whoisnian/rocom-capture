@@ -83,6 +83,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		// 解出 gid->(盒子,格位) 全量快照存入 pet_box,读取宠物时 JOIN 注入位置。
 		if m.Direction == gcp.S2C && pet.CarriesTeam(m.Opcode) {
 			updated := false
+			var focusGid uint32 // 手机端刚调整位置的宠物,推给前端自动切页选中
 			// 全量背包快照(登录/整理/设置回包):整体替换盒位
 			if pet.CarriesBackpack(m.Opcode) {
 				if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
@@ -96,7 +97,10 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			// 盒位移动增量(box_pet_change,仅 CHANGE_PET 回包携带,其余 opcode 易误报)
 			if m.Opcode == pet.OpPetBoxChangePetRsp {
 				if moves := pet.ParseBoxMoves(m.AppBody); len(moves) > 0 {
-					updated = st.ApplyBoxMoves(moves) == nil || updated
+					if st.ApplyBoxMoves(moves) == nil {
+						updated = true
+						focusGid = moves[0].Gid // 首项为被拖动的宠物(实测 RSP 顺序)
+					}
 				}
 			}
 			// 宠物拥有的奖牌(仅登录数据携带 pet_medal_info),过滤掉非真实奖牌 id
@@ -113,7 +117,11 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				}
 			}
 			if updated {
-				srv.Hub().Broadcast("pet", map[string]any{"locUpdate": true})
+				payload := map[string]any{"locUpdate": true}
+				if focusGid != 0 {
+					payload["focusGid"] = focusGid
+				}
+				srv.Hub().Broadcast("pet", payload)
 			}
 		}
 

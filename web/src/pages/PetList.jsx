@@ -48,6 +48,7 @@ export default function PetList() {
   const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
   const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
   const reloadRef = useRef(null)
+  const filterRef = useRef(filter)  // 供 SSE 回调读取最新筛选(避免闭包旧值)
   const lpRef = useRef(null)        // 长按定时器
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
@@ -79,13 +80,23 @@ export default function PetList() {
   }, [filter.box, containers])
 
   // 持久化筛选状态与筛选栏折叠态
+  useEffect(() => { filterRef.current = filter }, [filter])
   useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
   useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
 
-  // 实时：收到宠物更新时防抖重载当前页
+  // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(手机端刚调整位置),
+  // 自动切到该宠物所在页并选中,示意图跟随展示其盒子/队伍。
   useEffect(() => {
     return subscribe((m) => {
       if (m.type !== 'pet') return
+      const focus = m.data && m.data.focusGid
+      if (focus) {
+        getPetPage(focus, filterRef.current)
+          .then((r) => setFilter((f) => ({ ...f, page: (r && r.page) || 1 })))
+          .catch(() => {})
+        setSelected(focus)
+        loadBoxes()
+      }
       clearTimeout(reloadRef.current)
       reloadRef.current = setTimeout(() => { if (reloadRef.current) { load(); loadBoxes() } }, 600)
     })
