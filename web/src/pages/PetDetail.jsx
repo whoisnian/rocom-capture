@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
-import { getPet, getMedals } from '../api'
-import { Types, Marks, Gender, Portrait, locText, fmtTime } from '../components/bits'
+import { getPet, getMedals, getEvolution } from '../api'
+import { Types, Marks, Gender, Form, Portrait, ImgAvatar, locText, fmtTime } from '../components/bits'
 
 const SIX = [
   ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
@@ -22,14 +22,20 @@ export function PetDetailModal({ gid, onClose }) {
   const [pet, setPet] = useState(null)
   const [err, setErr] = useState(false)
   const [medals, setMedals] = useState([])
+  const [chain, setChain] = useState([])
   const cardRef = useRef(null)
 
   useEffect(() => {
     setPet(null)
     setErr(false)
+    setChain([])
     getPet(gid).then(setPet).catch(() => setErr(true))
   }, [gid])
   useEffect(() => { getMedals().then(setMedals).catch(() => {}) }, [])
+  // 进化链:按当前形态 petbase(base_conf_id)拉取整条链
+  useEffect(() => {
+    if (pet && pet.baseConfId) getEvolution(pet.baseConfId).then((c) => setChain(c || [])).catch(() => {})
+  }, [pet && pet.baseConfId])
   // Esc 关闭弹窗
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -78,7 +84,7 @@ export function PetDetailModal({ gid, onClose }) {
 
       <div className="detail-card" ref={cardRef}>
         <div className="detail-head">
-          <span className="detail-no">No.{pet.gid}</span>
+          <span className="detail-no">No.{pet.gid}{pet.book ? ` · 图鉴#${pet.book}` : ''}</span>
           <span>{pet.species} <Gender g={pet.gender} /></span>
         </div>
         <Portrait p={pet} />
@@ -86,6 +92,7 @@ export function PetDetailModal({ gid, onClose }) {
           <h2>{pet.name || pet.species}</h2>
           <span className="lv">Lv.{pet.level}</span>
           <Marks p={pet} />
+          <Form form={pet.form} />
         </div>
 
         <div className="detail-body">
@@ -125,6 +132,23 @@ export function PetDetailModal({ gid, onClose }) {
             <Item k="异色" v={pet.shiny ? '是' : '否'} />
             <Item k="炫彩" v={pet.colorful ? '是' : '否'} />
           </div>
+
+          {chain.length > 1 && (
+            <div>
+              <div className="muted" style={{ marginBottom: 6 }}>进化链{pet.form ? `（${pet.form}）` : ''}</div>
+              <div className="evo-chain">
+                {chain.map((s, i) => (
+                  <React.Fragment key={s.petbase}>
+                    {i > 0 && <span className="evo-arrow">→</span>}
+                    <div className={'evo-step' + (s.petbase === pet.baseConfId ? ' on' : '')} title={`图鉴#${s.book}`}>
+                      <ImgAvatar src={s.image && s.image.head} alt={s.name} className="evo-avatar" />
+                      <div className="evo-name">{s.name}</div>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
 
           {(() => {
             const owned = medals.filter((m) => (pet.medalIds || []).includes(m.id))

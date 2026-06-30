@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("打开数据库失败: %v", err)
 	}
 	hub := server.NewHub()
-	srv := server.New(st, hub, db.OpcodeNames(), db.AllMedals())
+	srv := server.New(st, hub, db)
 	eng := capture.NewEngine(*port)
 
 	go consume(eng, st, db, srv)

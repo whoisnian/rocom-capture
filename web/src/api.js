@@ -52,6 +52,12 @@ export async function getTeams() {
   return r.json()
 }
 
+// getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
+export async function getEvolution(base) {
+  const r = await fetch('/api/evolution?base=' + base)
+  return r.json()
+}
+
 // getPetPage 查询某宠物在指定筛选/排序下所处页码。
 export async function getPetPage(gid, params) {
   const q = new URLSearchParams()

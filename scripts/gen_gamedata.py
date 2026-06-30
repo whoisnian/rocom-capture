@@ -108,6 +108,27 @@ for src in ("MONSTER_CONF.json", "PET_CONF.json"):
         if b is not None and str(b) != cid:
             image_base.setdefault(cid, b)
 
+# petbase: petbase_id -> {n:名称 b:图鉴编号 f:形态名 s:进化阶段 e:进化链分组}。
+#   宠物当前形态由 PetData.base_conf_id 直接给出(指向当前 petbase),据此取当前名称/头像/图鉴;
+#   conf_id 只指向该线一阶 base,evolved 宠物若用 conf_id 会显示成基础形态。
+#   同一 pet_evolution_id 分组、按 stage 排序即该形态的完整进化链(雪绒鸟→冬羽雀→岚鸟)。
+petbase = {}
+for pid, p in _petbase.items():
+    name = p.get("name")
+    if not name:
+        continue
+    e = {"n": name}
+    if p.get("pictorial_book_id"):
+        e["b"] = p["pictorial_book_id"]
+    if p.get("form"):
+        e["f"] = p["form"]
+    if p.get("stage"):
+        e["s"] = p["stage"]
+    evo = p.get("pet_evolution_id")
+    if isinstance(evo, list) and evo:
+        e["e"] = evo[0]
+    petbase[pid] = e
+
 # 性格增减维度(权威表，按性格名匹配；维度编号 1生命 2物攻 3魔攻 4物防 5魔防 6速度)。
 # NATURE_CONF 推导对个别性格(如平和)的 id 错位，故以名为准。
 NATURE_TABLE = {
@@ -143,6 +164,8 @@ data = {
     # 图片索引:petbase 形态 -> 文件名;conf_id -> petbase(经 base_id,与自身相同者省略)。
     "images": images,
     "image_base": image_base,
+    # petbase 形态元数据(名称/图鉴号/形态名/阶段/进化链分组),按 base_conf_id 取当前形态。
+    "petbase": petbase,
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
     # 与 internal/pb 同源同版本,无需手工补充。

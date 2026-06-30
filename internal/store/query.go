@@ -22,6 +22,7 @@ type Filter struct {
 	PartnerMark   string
 	Shiny         string // "", "1", "0"
 	Colorful      string // "", "1", "0"
+	Form          string // 地区/季节形态名(精确匹配)
 	Box           string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
 	LevelMin      int
 	LevelMax      int
@@ -67,6 +68,7 @@ func buildWhere(f Filter) (string, []any) {
 	addEq("medal", f.Medal)
 	addEq("speciality", f.Speciality)
 	addEq("partner_mark", f.PartnerMark)
+	addEq("form", f.Form)
 	if f.Shiny == "1" {
 		where = append(where, "shiny=1")
 	} else if f.Shiny == "0" {
@@ -264,6 +266,7 @@ func (s *Store) FilterOptions() map[string][]string {
 	for key, col := range map[string]string{
 		"nature": "nature", "talentRank": "talent_rank",
 		"medal": "medal", "speciality": "speciality", "partnerMark": "partner_mark",
+		"form": "form",
 	} {
 		rows, err := s.db.Query("SELECT DISTINCT " + col + " FROM pets WHERE " + col + "!='' ORDER BY " + col)
 		if err != nil {

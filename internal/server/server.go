@@ -24,13 +24,14 @@ type Server struct {
 	store       *store.Store
 	hub         *Hub
 	mux         *http.ServeMux
+	db          *gamedata.DB
 	opcodeNames map[uint16]string
 	medals      []gamedata.MedalEntry
 }
 
 // New 创建 HTTP 服务。
-func New(st *store.Store, hub *Hub, opcodeNames map[uint16]string, medals []gamedata.MedalEntry) *Server {
-	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), opcodeNames: opcodeNames, medals: medals}
+func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
+	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
 	s.routes()
 	return s
 }
@@ -59,6 +60,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
 	s.mux.HandleFunc("GET /api/boxes", s.handleBoxes)
 	s.mux.HandleFunc("GET /api/teams", s.handleTeams)
+	s.mux.HandleFunc("GET /api/evolution", s.handleEvolution)
 	s.mux.HandleFunc("GET /api/pet-page", s.handlePetPage)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
@@ -103,6 +105,7 @@ func parseFilter(q url.Values) store.Filter {
 		PartnerMark: q.Get("partnerMark"),
 		Shiny:       q.Get("shiny"),
 		Colorful:    q.Get("colorful"),
+		Form:        q.Get("form"),
 		Box:         q.Get("box"),
 		LevelMin:    atoi("levelMin"),
 		LevelMax:    atoi("levelMax"),
@@ -123,6 +126,16 @@ func parseFilter(q url.Values) store.Filter {
 // handleTeams 返回大世界三队的 18 格布局,供盒子示意图。
 func (s *Server) handleTeams(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.store.TeamLayouts())
+}
+
+// handleEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序),供详情页展示。
+func (s *Server) handleEvolution(w http.ResponseWriter, r *http.Request) {
+	base, _ := strconv.ParseUint(r.URL.Query().Get("base"), 10, 32)
+	chain := s.db.EvolutionChain(uint32(base))
+	if chain == nil {
+		chain = []gamedata.ChainStep{}
+	}
+	writeJSON(w, chain)
 }
 
 // handlePetPage 返回某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页。

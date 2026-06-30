@@ -61,10 +61,12 @@ CREATE TABLE IF NOT EXISTS pets (
   catch_time INTEGER, shiny INTEGER, colorful INTEGER,
   hp INTEGER, attack INTEGER, defense INTEGER,
   sp_attack INTEGER, sp_defense INTEGER, speed INTEGER,
+  form TEXT,
   data TEXT, updated_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_pets_species ON pets(species);
 CREATE INDEX IF NOT EXISTS idx_pets_level ON pets(level);
+CREATE INDEX IF NOT EXISTS idx_pets_form ON pets(form);
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   time INTEGER, kind TEXT, sub_kind TEXT, gid INTEGER,
@@ -85,7 +87,12 @@ CREATE TABLE IF NOT EXISTS pet_medal (
   PRIMARY KEY(gid, medal_id)
 );
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	// 老库补列(form 为后加字段);列已存在会报 duplicate column,忽略即可。
+	s.db.Exec(`ALTER TABLE pets ADD COLUMN form TEXT`)
+	return nil
 }
 
 // ReplacePetMedals 用一份登录快照替换所有宠物拥有的奖牌(gid↔medal 多对多)。
@@ -353,8 +360,8 @@ func (s *Store) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 	_, err = s.db.Exec(`
 INSERT INTO pets(gid,conf_id,species,name,level,nature_id,nature,gender,types,
   height,weight,voice,talent_rank,medal,medal_id,partner_mark,speciality,speciality_id,
-  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,data,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,data,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(gid) DO UPDATE SET
   conf_id=excluded.conf_id,species=excluded.species,name=excluded.name,level=excluded.level,
   nature_id=excluded.nature_id,nature=excluded.nature,gender=excluded.gender,types=excluded.types,
@@ -362,13 +369,13 @@ ON CONFLICT(gid) DO UPDATE SET
   medal=excluded.medal,medal_id=excluded.medal_id,partner_mark=excluded.partner_mark,
   speciality=excluded.speciality,speciality_id=excluded.speciality_id,catch_time=excluded.catch_time,
   shiny=excluded.shiny,colorful=excluded.colorful,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
-  sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,
+  sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,form=excluded.form,
   data=excluded.data,updated_at=excluded.updated_at`,
 		p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
 		p.HeightM, p.WeightKg, p.Voice, p.TalentRank, p.Medal, p.WearMedalConfID, p.PartnerMark,
 		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny), b2i(p.Colorful),
 		p.HP.Value, p.Attack.Value, p.Defense.Value, p.SpAttack.Value, p.SpDefense.Value, p.Speed.Value,
-		string(data), time.Now().Unix())
+		p.Form, string(data), time.Now().Unix())
 	return isNew, err
 }
 

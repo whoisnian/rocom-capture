@@ -48,6 +48,15 @@ type PetImage struct {
 	PortraitSmall string `json:"portraitSmall"` // 全身缩略 Pet256/JL_<x>.webp
 }
 
+// PetBaseInfo 是 petbase 形态的元数据(名称/图鉴号/形态名/进化阶段/进化链分组)。
+type PetBaseInfo struct {
+	Name  string // 当前形态名(火神/音速犬/岚鸟…)
+	Book  uint32 // 图鉴编号(pictorial_book_id)
+	Form  string // 地区/季节形态名(春天的样子…),普通宠物为空
+	Stage uint32 // 进化阶段(1 起)
+	Evo   uint32 // 进化链分组 id(同链共享),用于重建进化链
+}
+
 // DB 是只读名称查找库。
 type DB struct {
 	species      map[string]string
@@ -59,8 +68,10 @@ type DB struct {
 	medal        map[string]Medal
 	opcodes      map[uint16]string
 	natureEffect map[string]NatureEffect
-	images       map[string]imageEntry // petbase_id -> 文件名
-	imageBase    map[string]string     // conf_id -> petbase_id(base==自身者不入表)
+	images       map[string]imageEntry  // petbase_id -> 文件名
+	imageBase    map[string]string      // conf_id -> petbase_id(base==自身者不入表)
+	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
+	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
@@ -83,6 +94,13 @@ func Load() (*DB, error) {
 		NatureEffect map[string]NatureEffect `json:"nature_effect"`
 		Images       map[string]imageEntry   `json:"images"`
 		ImageBase    map[string]uint32       `json:"image_base"`
+		Petbase      map[string]struct {
+			N string `json:"n"`
+			B uint32 `json:"b"`
+			F string `json:"f"`
+			S uint32 `json:"s"`
+			E uint32 `json:"e"`
+		} `json:"petbase"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
 		return nil, err
@@ -97,6 +115,18 @@ func Load() (*DB, error) {
 	for k, v := range raw.ImageBase {
 		imageBase[k] = key(v)
 	}
+	petbase := make(map[uint32]PetBaseInfo, len(raw.Petbase))
+	evoIndex := map[uint32][]uint32{}
+	for k, v := range raw.Petbase {
+		id, err := strconv.ParseUint(k, 10, 32)
+		if err != nil {
+			continue
+		}
+		petbase[uint32(id)] = PetBaseInfo{Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E}
+		if v.E != 0 {
+			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
+		}
+	}
 	return &DB{
 		species:      raw.Species,
 		nature:       raw.Nature,
@@ -109,6 +139,8 @@ func Load() (*DB, error) {
 		natureEffect: raw.NatureEffect,
 		images:       raw.Images,
 		imageBase:    imageBase,
+		petbase:      petbase,
+		evoIndex:     evoIndex,
 	}, nil
 }
 
@@ -118,7 +150,14 @@ func (db *DB) PetImage(confID uint32) PetImage {
 	if !ok {
 		pid = key(confID) // base==自身,直接按 conf_id 查 petbase
 	}
-	e, ok := db.images[pid]
+	return db.imageOf(pid)
+}
+
+// PetImageByBase 按 petbase_id 直接取图片(base_conf_id 本身即 petbase id,给出当前形态)。
+func (db *DB) PetImageByBase(petbaseID uint32) PetImage { return db.imageOf(key(petbaseID)) }
+
+func (db *DB) imageOf(petbaseID string) PetImage {
+	e, ok := db.images[petbaseID]
 	if !ok {
 		return PetImage{}
 	}
@@ -136,6 +175,40 @@ func (db *DB) PetImage(confID uint32) PetImage {
 		img.PortraitSmall = "Pet256/JL_" + e.PS + ".webp"
 	}
 	return img
+}
+
+// PetBase 返回 petbase 形态元数据(base_conf_id);ok=false 表示未知。
+func (db *DB) PetBase(petbaseID uint32) (PetBaseInfo, bool) {
+	v, ok := db.petbase[petbaseID]
+	return v, ok
+}
+
+// ChainStep 是进化链上的一个形态(按阶段升序)。
+type ChainStep struct {
+	Petbase uint32   `json:"petbase"`
+	Name    string   `json:"name"`
+	Book    uint32   `json:"book"`
+	Stage   uint32   `json:"stage"`
+	Image   PetImage `json:"image"`
+}
+
+// EvolutionChain 返回 petbase 所属进化链(同一形态线,按阶段升序);未知或单形态返回自身一项。
+func (db *DB) EvolutionChain(petbaseID uint32) []ChainStep {
+	info, ok := db.petbase[petbaseID]
+	if !ok {
+		return nil
+	}
+	ids := db.evoIndex[info.Evo]
+	if info.Evo == 0 || len(ids) == 0 {
+		ids = []uint32{petbaseID} // 无进化链分组:仅自身
+	}
+	steps := make([]ChainStep, 0, len(ids))
+	for _, id := range ids {
+		pi := db.petbase[id]
+		steps = append(steps, ChainStep{Petbase: id, Name: pi.Name, Book: pi.Book, Stage: pi.Stage, Image: db.PetImageByBase(id)})
+	}
+	sort.Slice(steps, func(i, j int) bool { return steps[i].Stage < steps[j].Stage })
+	return steps
 }
 
 // NatureEffect 返回性格的 +10%/-10% 维度(六维编号 1-6;0 表示无)。

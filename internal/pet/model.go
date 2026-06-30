@@ -28,11 +28,15 @@ type Stat struct {
 
 // Pet 是用于前端展示/存储的业务模型(已中文化)。
 type Pet struct {
-	Gid     uint32 `json:"gid"`     // 唯一实例 id
-	ConfID  uint32 `json:"confId"`  // 种类配置 id
-	Species string `json:"species"` // 种类名
-	Name    string `json:"name"`    // 昵称
-	Level   uint32 `json:"level"`
+	Gid        uint32 `json:"gid"`             // 唯一实例 id
+	ConfID     uint32 `json:"confId"`          // 种类配置 id(指向进化线一阶 base)
+	BaseConfID uint32 `json:"baseConfId"`      // 当前形态 petbase id(进化后随之变化)
+	Species    string `json:"species"`         // 种类名(当前形态)
+	Book       uint32 `json:"book,omitempty"`  // 图鉴编号
+	Form       string `json:"form,omitempty"`  // 地区/季节形态名(普通宠物为空)
+	Stage      uint32 `json:"stage,omitempty"` // 进化阶段
+	Name       string `json:"name"`            // 昵称
+	Level      uint32 `json:"level"`
 
 	NatureID uint32   `json:"natureId"`
 	Nature   string   `json:"nature"` // 性格名
@@ -80,19 +84,41 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		}
 	}
 
+	// 当前形态:base_conf_id 直接指向当前 petbase(进化后随之变化),据此取名称/头像/图鉴/形态;
+	// 旧逻辑用 conf_id 只会得到进化线一阶 base(火神显示成火花),故优先用 base_conf_id,缺失再回退。
+	confID, base := p.GetConfId(), p.GetBaseConfId()
+	species, image := db.Species(confID), db.PetImage(confID)
+	var book, stage uint32
+	var form string
+	if base != 0 {
+		if info, ok := db.PetBase(base); ok {
+			if info.Name != "" {
+				species = info.Name
+			}
+			book, form, stage = info.Book, info.Form, info.Stage
+			if img := db.PetImageByBase(base); img != (gamedata.PetImage{}) {
+				image = img
+			}
+		}
+	}
+
 	out := &Pet{
-		Gid:      p.GetGid(),
-		ConfID:   p.GetConfId(),
-		Species:  db.Species(p.GetConfId()),
-		Name:     string(p.GetName()),
-		Level:    p.GetLevel(),
-		NatureID: p.GetNature(),
-		Nature:   db.Nature(p.GetNature()),
-		Gender:   gamedata.GenderName(p.GetGender()),
-		Types:    types,
-		HeightM:  float64(p.GetHeight()) / 100,
-		WeightKg: float64(p.GetWeight()) / 1000,
-		Voice:    p.GetVoice(),
+		Gid:        p.GetGid(),
+		ConfID:     confID,
+		BaseConfID: base,
+		Species:    species,
+		Book:       book,
+		Form:       form,
+		Stage:      stage,
+		Name:       string(p.GetName()),
+		Level:      p.GetLevel(),
+		NatureID:   p.GetNature(),
+		Nature:     db.Nature(p.GetNature()),
+		Gender:     gamedata.GenderName(p.GetGender()),
+		Types:      types,
+		HeightM:    float64(p.GetHeight()) / 100,
+		WeightKg:   float64(p.GetWeight()) / 1000,
+		Voice:      p.GetVoice(),
 
 		TalentRank:      db.TalentRate(p.GetTalentRank()),
 		WearMedalConfID: p.GetWearMedalConfId(),
@@ -105,7 +131,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		Shiny:    p.GetMutationType()&1 != 0,
 		Colorful: p.GetMutationType()&8 != 0,
 
-		Image: db.PetImage(p.GetConfId()),
+		Image: image,
 	}
 
 	if m, ok := db.Medal(p.GetWearMedalConfId()); ok {

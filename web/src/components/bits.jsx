@@ -94,6 +94,22 @@ export function Gender({ g }) {
   return <span className={'gender ' + (g === '♂' ? 'male' : 'female')}>{g}</span>
 }
 
+// Form 渲染地区/季节形态徽标(普通宠物为空)。
+export function Form({ form }) {
+  if (!form) return null
+  return <span className="mark mark-form" title="形态">{form}</span>
+}
+
+// ImgAvatar 按图片相对路径渲染一个头像(进化链等无 pet 对象处用);缺图回退 emoji。
+export function ImgAvatar({ src, alt = '', className = 'pet-avatar' }) {
+  const [bad, setBad] = React.useState(false)
+  React.useEffect(() => setBad(false), [src])
+  if (src && !bad) {
+    return <img className={className} src={imgURL(src)} alt={alt} loading="lazy" onError={() => setBad(true)} />
+  }
+  return <div className={className}>🐾</div>
+}
+
 // Marks 渲染异色/炫彩标记。
 export function Marks({ p }) {
   if (!p) return null

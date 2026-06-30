@@ -141,6 +141,17 @@ img.pet-avatar { object-fit: cover; }
 .mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; }
 .mark-shiny { background: #3a2f6b; color: #c9b6ff; }
 .mark-colorful { background: #6b2f50; color: #ffb6e0; }
+.mark-form { background: #2f4a3a; color: #a8e6c0; font-weight: 500; }
+
+/* 进化链(详情页):头像横向排列,当前形态高亮 */
+.evo-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.evo-step { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; border-radius: 8px; border: 1px solid transparent; min-width: 56px; }
+.evo-step.on { border-color: var(--accent); background: var(--bg-3); }
+.evo-avatar { width: 44px; height: 44px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; }
+img.evo-avatar { object-fit: cover; }
+.evo-name { font-size: 12px; color: var(--fg-dim); }
+.evo-step.on .evo-name { color: var(--fg); font-weight: 600; }
+.evo-arrow { color: var(--fg-dim); }
 
 /* 移动卡片(默认隐藏) */
 .cards { display: none; }
