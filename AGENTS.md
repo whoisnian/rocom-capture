@@ -15,6 +15,11 @@
   `uv run python scripts/gen_gamedata.py`(→ names.json)、`uv run python scripts/gen_images.py`
   (FModel PNG → internal/gamedata/data/img 的 webp,需先在 FModel 里 PNG 导出 Icon 目录);
   抓包脚本 `scripts/capture.sh`(bash)。
+- pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
+  免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
+  `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
+  `-hex` 附原始字节);`-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。解码为 wire 级、
+  不依赖 .proto(规避版本错位),自动跳过 c2s 子头并在 tsf4g 尾前停止。
 - 数据来源**全部随仓库提交、均为 FModel 自行提取**,不依赖外部仓库:中文名称表来自
   `nrc/bin/`(游戏二进制配置,用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb`
   结构、opcode、枚举同出游戏描述符 `nrc/all.pb`(前者经 protoc `--descriptor_set_in` 生成 Go,
