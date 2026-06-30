@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getEvents, subscribe } from '../api'
+import { getEvents, clearEvents, subscribe } from '../api'
 import { Types, Avatar, fmtTime } from '../components/bits'
+import { PetDetailModal } from './PetDetail'
 
 const FIELDS = [
   { k: 'species', label: '种类' },
@@ -29,10 +29,10 @@ function isHighlight(pet, rules) {
 }
 
 export default function Events() {
-  const nav = useNavigate()
   const [events, setEvents] = useState([])
   const [rules, setRules] = useState(loadRules)
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
+  const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
 
   useEffect(() => {
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
@@ -51,6 +51,11 @@ export default function Events() {
     setDraft({ field, value: '' })
   }
   const delRule = (i) => setRules((r) => r.filter((_, idx) => idx !== i))
+  // 清空事件历史(后端删除 + 前端清列表)
+  const clearAll = () => {
+    if (!window.confirm('确定清空所有事件历史?')) return
+    clearEvents().then(() => setEvents([])).catch(() => {})
+  }
 
   return (
     <div>
@@ -77,11 +82,15 @@ export default function Events() {
         </div>
       </div>
 
-      <h3>实时事件</h3>
+      <div className="event-head">
+        <h3>实时事件</h3>
+        <div className="spacer" />
+        <button className="btn" disabled={events.length === 0} onClick={clearAll}>清空</button>
+      </div>
       <div className="event-list">
         {events.map((ev) => (
           <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules) ? ' hl' : '')}
-            onClick={() => ev.gid && nav('/pets/' + ev.gid)}>
+            onClick={() => ev.gid && setDetailGid(ev.gid)}>
             <span className={'badge ' + ev.kind}>{ev.subKind || (ev.kind === 'obtain' ? '获得' : '失去')}</span>
             <Avatar p={ev.pet} />
             <div style={{ flex: 1 }}>
@@ -93,6 +102,8 @@ export default function Events() {
         ))}
         {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
       </div>
+
+      {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>
   )
 }

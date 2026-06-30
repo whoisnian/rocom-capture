@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, Marks, Avatar, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Avatar, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
@@ -27,7 +27,7 @@ const SORTS = [
 ]
 
 // 列表状态(筛选/排序/分页/滚动)用 sessionStorage 持久化,从详情返回时还原。
-const DEFAULT_FILTER = { page: 1, pageSize: 10, sort: 'gid', order: 'asc' }
+const DEFAULT_FILTER = { page: 1, pageSize: 10, sort: 'boxpos', order: 'asc' }
 function loadFilter() {
   try {
     const s = JSON.parse(sessionStorage.getItem('petListFilter'))
@@ -37,8 +37,8 @@ function loadFilter() {
 }
 
 export default function PetList() {
-  const nav = useNavigate()
   const [filter, setFilter] = useState(loadFilter)
+  const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   const [data, setData] = useState({ total: 0, pets: [] })
   const [options, setOptions] = useState({})
   const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
@@ -48,7 +48,6 @@ export default function PetList() {
   const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
   const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
   const reloadRef = useRef(null)
-  const restoredRef = useRef(false)
   const lpRef = useRef(null)        // 长按定时器
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
@@ -83,14 +82,6 @@ export default function PetList() {
   useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
   useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
 
-  // 首次数据到达后还原滚动位置(从详情返回)
-  useEffect(() => {
-    if (restoredRef.current || data.pets.length === 0) return
-    const y = parseInt(sessionStorage.getItem('petListScroll') || '0', 10)
-    if (y > 0) window.scrollTo(0, y)
-    restoredRef.current = true
-  }, [data])
-
   // 实时：收到宠物更新时防抖重载当前页
   useEffect(() => {
     return subscribe((m) => {
@@ -109,17 +100,23 @@ export default function PetList() {
     })
   const sortBy = (key) =>
     setFilter((f) => ({ ...f, sort: key, order: f.sort === key && f.order === 'asc' ? 'desc' : 'asc', page: 1 }))
-  // 进详情前记录滚动位置
-  const goDetail = (gid) => { sessionStorage.setItem('petListScroll', String(window.scrollY)); nav('/pets/' + gid) }
+  // 打开详情弹窗(不离开列表,保留当前操作状态);复制编号到剪贴板
+  const openDetail = (gid) => { setSelected(gid); setDetailGid(gid); setMenu(null) }
+  const copyGid = (gid) => {
+    try { navigator.clipboard && navigator.clipboard.writeText(String(gid)) } catch { /* ignore */ }
+    setMenu(null)
+  }
   // 重置:清空所有过滤条件,保留排序与每页档位
   const reset = () => setFilter((f) => ({ page: 1, pageSize: f.pageSize, sort: f.sort, order: f.order }))
 
-  // 右键/长按菜单:选中并在 (x,y) 弹出(限制不溢出视口)
-  const openMenu = (gid, x, y) => {
-    setSelected(gid)
+  // 右键/长按菜单:选中并在 (x,y) 弹出(限制不溢出视口),菜单内带上宠物用于"筛选相同…"
+  const openMenu = (p, x, y) => {
+    setSelected(p.gid)
     menuAtRef.current = Date.now()
-    setMenu({ gid, x: Math.min(x, window.innerWidth - 140), y: Math.min(y, window.innerHeight - 60) })
+    setMenu({ gid: p.gid, pet: p, x: Math.min(x, window.innerWidth - 140), y: Math.min(y, window.innerHeight - 180) })
   }
+  // 应用一项筛选并关闭菜单(set 会把页码重置为 1)
+  const filterSame = (patch) => { set(patch); setMenu(null) }
   // 菜单打开后:点击空白/滚动/Esc 关闭(忽略打开瞬间紧随的合成 click)
   useEffect(() => {
     if (!menu) return
@@ -160,11 +157,12 @@ export default function PetList() {
   // 列表项交互:单击选中、右键(桌面)/长按(移动)弹菜单
   const itemProps = (p) => ({
     onClick: () => { if (lpFiredRef.current) { lpFiredRef.current = false; return } selectPet(p) },
-    onContextMenu: (e) => { e.preventDefault(); openMenu(p.gid, e.clientX, e.clientY) },
+    onDoubleClick: () => openDetail(p.gid),
+    onContextMenu: (e) => { e.preventDefault(); openMenu(p, e.clientX, e.clientY) },
     onTouchStart: (e) => {
       lpFiredRef.current = false
       const t = e.touches[0]
-      lpRef.current = setTimeout(() => { lpFiredRef.current = true; openMenu(p.gid, t.clientX, t.clientY) }, 450)
+      lpRef.current = setTimeout(() => { lpFiredRef.current = true; openMenu(p, t.clientX, t.clientY) }, 450)
     },
     onTouchMove: () => clearTimeout(lpRef.current),
     onTouchEnd: () => clearTimeout(lpRef.current),
@@ -228,7 +226,7 @@ export default function PetList() {
         <div className="filter-group">
           <label>性别</label>
           <select className="select" value={filter.gender || ''} onChange={(e) => set({ gender: e.target.value })}>
-            <option value="">全部</option><option value="♂">♂</option><option value="♀">♀</option>
+            <option value="">全部</option><option value="♂">♂ 雄</option><option value="♀">♀ 雌</option>
           </select>
         </div>
         <div className="filter-group">
@@ -278,7 +276,7 @@ export default function PetList() {
                     <div className="pet-cell">
                       <Avatar p={p} />
                       <div>
-                        <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
+                        <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /></div>
                         <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p)}</div>
                       </div>
                     </div>
@@ -305,7 +303,7 @@ export default function PetList() {
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
-                  <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
+                  <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /></div>
                   <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p)}</div>
                 </div>
                 <Types types={p.types} />
@@ -337,9 +335,16 @@ export default function PetList() {
 
       {menu && (
         <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
-          <div className="ctx-item" onClick={() => { goDetail(menu.gid); setMenu(null) }}>查看详情</div>
+          <div className="ctx-item" onClick={() => openDetail(menu.gid)}>查看详情</div>
+          <div className="ctx-item" onClick={() => copyGid(menu.gid)}>复制编号</div>
+          <div className="ctx-sep" />
+          <div className="ctx-item" onClick={() => filterSame({ search: menu.pet.species })}>筛选相同种类</div>
+          <div className="ctx-item" onClick={() => filterSame({ nature: menu.pet.nature, natureExclude: '' })}>筛选相同性格</div>
+          <div className="ctx-item" onClick={() => filterSame({ speciality: menu.pet.speciality })}>筛选相同特长</div>
         </div>
       )}
+
+      {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>
   )
 }

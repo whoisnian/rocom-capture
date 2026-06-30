@@ -421,6 +421,12 @@ VALUES(?,?,?,?,?,?,?,?,?)`,
 	return nil
 }
 
+// ClearEvents 清空事件历史。
+func (s *Store) ClearEvents() error {
+	_, err := s.db.Exec(`DELETE FROM events`)
+	return err
+}
+
 // ListEvents 返回最近事件(按时间倒序)。
 func (s *Store) ListEvents(limit, beforeID int) ([]*Event, error) {
 	if limit <= 0 || limit > 500 {

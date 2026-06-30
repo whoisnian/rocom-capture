@@ -2,25 +2,40 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals } from '../api'
-import { Types, Marks, Portrait, locText, fmtTime } from '../components/bits'
+import { Types, Marks, Gender, Portrait, locText, fmtTime } from '../components/bits'
 
 const SIX = [
   ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
   ['物防', 'defense'], ['魔防', 'spDefense'], ['速度', 'speed'],
 ]
 
+// 路由页:直接访问 /pets/:gid 或从其他页跳转时,以弹窗形式呈现,关闭即返回上一页。
 export default function PetDetail() {
   const { gid } = useParams()
   const nav = useNavigate()
+  return <PetDetailModal gid={gid} onClose={() => nav(-1)} />
+}
+
+// PetDetailModal 宠物详情弹窗:覆盖在当前页面之上,不打断底层正在操作的列表/事件页。
+// 点击卡片外区域、按 Esc、点返回均触发 onClose。
+export function PetDetailModal({ gid, onClose }) {
   const [pet, setPet] = useState(null)
   const [err, setErr] = useState(false)
   const [medals, setMedals] = useState([])
   const cardRef = useRef(null)
 
   useEffect(() => {
+    setPet(null)
+    setErr(false)
     getPet(gid).then(setPet).catch(() => setErr(true))
   }, [gid])
   useEffect(() => { getMedals().then(setMedals).catch(() => {}) }, [])
+  // Esc 关闭弹窗
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const exportImg = () => {
     if (!cardRef.current) return
@@ -34,21 +49,29 @@ export default function PetDetail() {
       .catch(() => alert('导出失败'))
   }
 
-  if (err) return <div className="empty">未找到该宠物</div>
-  if (!pet) return <div className="empty">加载中…</div>
-
-  // 点击卡片与工具栏之外的区域 → 返回
+  // 点击卡片与工具栏之外的区域 → 关闭
   const onBackdrop = (e) => {
     if (cardRef.current && cardRef.current.contains(e.target)) return
     if (e.target.closest && e.target.closest('.toolbar')) return
-    nav(-1)
+    onClose()
   }
+
+  if (err) return (
+    <div className="detail-backdrop" onClick={onClose}>
+      <div className="detail-wrap"><div className="empty">未找到该宠物</div></div>
+    </div>
+  )
+  if (!pet) return (
+    <div className="detail-backdrop" onClick={onClose}>
+      <div className="detail-wrap"><div className="empty">加载中…</div></div>
+    </div>
+  )
 
   return (
     <div className="detail-backdrop" onClick={onBackdrop}>
       <div className="detail-wrap">
       <div className="toolbar">
-        <button className="btn" onClick={() => nav(-1)}>← 返回</button>
+        <button className="btn" onClick={onClose}>← 返回</button>
         <div className="spacer" />
         <button className="btn primary" onClick={exportImg}>保存为图片</button>
       </div>
@@ -56,7 +79,7 @@ export default function PetDetail() {
       <div className="detail-card" ref={cardRef}>
         <div className="detail-head">
           <span className="detail-no">No.{pet.gid}</span>
-          <span>{pet.species} {pet.gender}</span>
+          <span>{pet.species} <Gender g={pet.gender} /></span>
         </div>
         <Portrait p={pet} />
         <div className="detail-title">

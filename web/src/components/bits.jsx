@@ -88,6 +88,12 @@ export function Six({ p }) {
   )
 }
 
+// Gender 渲染性别符号(♂ 蓝、♀ 粉,加大加粗,字体差异下也易辨)。
+export function Gender({ g }) {
+  if (g !== '♂' && g !== '♀') return null
+  return <span className={'gender ' + (g === '♂' ? 'male' : 'female')}>{g}</span>
+}
+
 // Marks 渲染异色/炫彩标记。
 export function Marks({ p }) {
   if (!p) return null

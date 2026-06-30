@@ -53,6 +53,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/pets", s.handlePets)
 	s.mux.HandleFunc("GET /api/pets/{gid}", s.handlePet)
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
+	s.mux.HandleFunc("DELETE /api/events", s.handleClearEvents)
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
@@ -171,6 +172,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		events = []*store.Event{}
 	}
 	writeJSON(w, events)
+}
+
+// handleClearEvents 清空事件历史。
+func (s *Server) handleClearEvents(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.ClearEvents(); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleFilterOptions(w http.ResponseWriter, r *http.Request) {

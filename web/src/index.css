@@ -123,13 +123,16 @@ table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; }
 table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
 table.pets tr:hover td { background: var(--bg-2); }
-table.pets tr { cursor: pointer; }
+table.pets tbody tr { cursor: pointer; user-select: none; }
 table.pets tr.selected td { background: #1c2740; }
 table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .pet-cell { display: flex; align-items: center; gap: 8px; }
 .pet-avatar { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-size: 16px; }
 img.pet-avatar { object-fit: cover; }
 .pet-name { font-weight: 600; }
+.gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
+.gender.male { color: #4ea3ff; }
+.gender.female { color: #ff6fae; }
 .pet-sub { font-size: 12px; color: var(--fg-dim); }
 .six { display: grid; grid-template-columns: repeat(3, auto); gap: 1px 10px; font-size: 12px; }
 .six b { color: var(--gold); }
@@ -146,6 +149,7 @@ img.pet-avatar { object-fit: cover; }
 .pager { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
 
 /* ---- 事件页 ---- */
+.event-head { display: flex; align-items: center; gap: 10px; max-width: 720px; }
 .event-list { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
 .event {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
@@ -170,10 +174,16 @@ img.pet-avatar { object-fit: cover; }
 }
 .ctx-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
 .ctx-item:hover { background: var(--bg-3); }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line); }
 
 /* 详情页:卡片外区域可点击返回 */
-.detail-backdrop { min-height: calc(100vh - 120px); }
-.detail-wrap { max-width: 460px; margin: 0 auto; }
+/* 弹窗:固定覆盖全屏(含半透明遮罩),叠在当前页之上,不打断底层操作 */
+.detail-backdrop {
+  position: fixed; inset: 0; z-index: 200; overflow: auto;
+  background: rgba(0, 0, 0, 0.55); padding: 24px 16px;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.detail-wrap { width: 100%; max-width: 460px; margin: auto; }
 .detail-card {
   background: linear-gradient(180deg, #2b3346, #161b22); border: 1px solid var(--line);
   border-radius: 18px; box-shadow: var(--shadow); /* 不裁剪子元素,让奖牌 tooltip 可溢出卡片 */
@@ -239,7 +249,7 @@ img.pet-avatar { object-fit: cover; }
   .cards { display: flex; flex-direction: column; gap: 10px; }
   .card {
     border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1); padding: 12px;
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 8px; user-select: none;
   }
   .card-head { display: flex; align-items: center; gap: 10px; }
   .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 13px; }

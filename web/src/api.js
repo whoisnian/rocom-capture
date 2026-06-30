@@ -23,6 +23,10 @@ export async function getEvents(params) {
   return r.json()
 }
 
+export async function clearEvents() {
+  await fetch('/api/events', { method: 'DELETE' })
+}
+
 export async function getFilterOptions() {
   const r = await fetch('/api/filter-options')
   return r.json()
