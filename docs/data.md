@@ -200,6 +200,11 @@ s2c 0x1346 DATA 明文 body
   解出 gid↔medal 存 `pet_medal` 表,读取时注入 `Pet.MedalIDs`(覆盖 `ToPet` 里仅佩戴的那枚);
   前端 `/api/medals` 全量奖牌 + `medalIds` 过滤出该宠物拥有的渲染奖牌墙。实测火神(gid=1)解出
   命定勇者/结伴同行/燃了鸭/同心相伴 4 枚。奖牌数据**仅完整登录携带**(普通/快速登录可能不含)。
+- **多账号身份**:`ZONE_LOGIN_RSP(0x0102)` 取玩家 `user_id` 作账号键(`"role:"+id`)——wire 三层
+  下钻 `body → #2(LoginData) → #1(base) → {#1=user_id(varint), #3=nickname(bytes)}`
+  (`pet.ParseLoginAccount`,实测两用户 839694713/873234858)。按 user_id 而非客户端 IP 归属
+  (多台设备常经 NAT 共用同一 IP,无法区分);各账号数据在同库内按 `account` 列隔离,
+  详见 [服务架构](architecture.md) 第 5 节「多账号隔离」。
 - **删除/赠送减少事件**:`DELETE_REQ(397)`/赠送相关 opcode 待接入。
 
 待校准(多数需含相应事件/宠物的新样本)：

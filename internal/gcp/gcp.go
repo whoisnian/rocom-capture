@@ -54,8 +54,8 @@ const (
 type Direction uint8
 
 const (
-	C2S Direction = iota // 手机 -> 服务器 (dst port 8195)
-	S2C                  // 服务器 -> 手机
+	C2S Direction = iota // 客户端 -> 服务器 (dst port 8195)
+	S2C                  // 服务器 -> 客户端
 )
 
 func (d Direction) String() string {

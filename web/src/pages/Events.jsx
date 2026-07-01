@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
 import { getEvents, clearEvents, subscribe } from '../api'
 import { Types, Avatar, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
+import { AccountContext } from '../App'
 
 const FIELDS = [
   { k: 'species', label: '种类' },
@@ -29,6 +30,7 @@ function isHighlight(pet, rules) {
 }
 
 export default function Events() {
+  const account = useContext(AccountContext)
   const [events, setEvents] = useState([])
   const [rules, setRules] = useState(loadRules)
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
@@ -37,9 +39,11 @@ export default function Events() {
   useEffect(() => {
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
     return subscribe((m) => {
-      if (m.type === 'event') setEvents((prev) => [m.data, ...prev].slice(0, 300))
+      if (m.type !== 'event') return
+      if (m.account && m.account !== account) return // 只认当前账号的事件
+      setEvents((prev) => [m.data, ...prev].slice(0, 300))
     })
-  }, [])
+  }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
 

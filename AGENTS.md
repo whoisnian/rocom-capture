@@ -4,6 +4,7 @@
 
 `rocom-capture`：在 Linux 网关上被动抓取手机游戏《洛克王国：世界》(进程 `com.tencent.nrc`)
 的 TCP 8195 流量，解析 tsf4g/GCP 协议，对**宠物信息**做自定义统计，并提供响应式 Web 页面。
+支持局域网多设备同时在线,按登录 `user_id` 隔离多账号(单库加 `account` 列,见 docs/architecture.md)。
 不读内存、不注入进程，只解析网络流量。Go 后端 + React 前端，构建为单二进制(前端经 embed)。
 
 面向使用者的说明见 [README.md](README.md)；设计细节见 `docs/`：

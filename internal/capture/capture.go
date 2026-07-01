@@ -3,7 +3,9 @@
 package capture
 
 import (
+	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +21,7 @@ type Message struct {
 	Time      time.Time
 	Direction gcp.Direction
 	Opcode    uint16
+	Session   string // GCP 连接标识 "server:port|client:port"(client 侧为游戏客户端设备,供按设备/账号归属)
 	Plain     []byte // 解密后完整明文(含 internal header)
 	AppBody   []byte // 剥离 internal header 后的 protobuf body
 }
@@ -122,26 +125,29 @@ type streamFactory struct{ e *Engine }
 func (f *streamFactory) New(netFlow, tpFlow gopacket.Flow, tcp *layers.TCP, _ reassembly.AssemblerContext) reassembly.Stream {
 	// reassembly 每个连接只创建一个 Stream，双向数据都进同一 Stream，
 	// 方向由 ReassembledSG 的 sg.Info() 给出。
-	// clientIsPhone: reassembly 的 “client” 是连接发起方(第一个包的 src)。
-	// 触发包若 DstPort==8195(c2s)，则发起方是手机。
-	clientIsPhone := int(tcp.DstPort) == f.e.Port
-	// 规范化 connID 为 "server|phone"。
+	// initiatorIsDevice: reassembly 的 “client” 是连接发起方(第一个包的 src)。
+	// 触发包若 DstPort==8195(c2s)，则发起方是游戏客户端设备(手机/平板/PC)。
+	initiatorIsDevice := int(tcp.DstPort) == f.e.Port
+	// 规范化 connID 为 "server|client"(client 侧为游戏客户端设备)。
 	var connID string
 	if int(tcp.SrcPort) == f.e.Port {
 		connID = netFlow.Src().String() + ":" + tpFlow.Src().String() + "|" + netFlow.Dst().String() + ":" + tpFlow.Dst().String()
 	} else {
 		connID = netFlow.Dst().String() + ":" + tpFlow.Dst().String() + "|" + netFlow.Src().String() + ":" + tpFlow.Src().String()
 	}
-	return &stream{e: f.e, sess: f.e.getSession(connID), clientIsPhone: clientIsPhone}
+	server, client, _ := strings.Cut(connID, "|")
+	log.Printf("检测到新连接: 客户端 %s → 服务器 %s", client, server)
+	return &stream{e: f.e, sess: f.e.getSession(connID), connID: connID, initiatorIsDevice: initiatorIsDevice}
 }
 
 // stream 处理单个 TCP 连接的双向数据，各方向独立累积、分帧、解密。
 type stream struct {
-	e             *Engine
-	sess          *session
-	clientIsPhone bool
-	bufC2S        []byte
-	bufS2C        []byte
+	e                 *Engine
+	sess              *session
+	connID            string
+	initiatorIsDevice bool
+	bufC2S            []byte
+	bufS2C            []byte
 }
 
 func (s *stream) Accept(_ *layers.TCP, _ gopacket.CaptureInfo, _ reassembly.TCPFlowDirection, _ reassembly.Sequence, _ *bool, _ reassembly.AssemblerContext) bool {
@@ -156,7 +162,7 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 	rdir, _, _, _ := sg.Info()
 	// 把 reassembly 方向映射为 c2s/s2c。
 	dir := gcp.S2C
-	if (rdir == reassembly.TCPDirClientToServer) == s.clientIsPhone {
+	if (rdir == reassembly.TCPDirClientToServer) == s.initiatorIsDevice {
 		dir = gcp.C2S
 	}
 	buf := &s.bufS2C
@@ -171,6 +177,9 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 		switch p.Command {
 		case gcp.CmdACK:
 			if k, ok := gcp.ExtractKey(p.HeaderExtra); ok {
+				if s.sess.getKey() == nil {
+					log.Printf("会话密钥就绪 [%s]", s.connID)
+				}
 				s.sess.setKey(k)
 			}
 		case gcp.CmdData:
@@ -191,6 +200,7 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 				Time:      ts,
 				Direction: dir,
 				Opcode:    op,
+				Session:   s.connID,
 				Plain:     plain,
 				AppBody:   gcp.AppBody(dir, plain),
 			})
@@ -198,4 +208,7 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 	}
 }
 
-func (s *stream) ReassemblyComplete(_ reassembly.AssemblerContext) bool { return false }
+func (s *stream) ReassemblyComplete(_ reassembly.AssemblerContext) bool {
+	log.Printf("连接断开 [%s]", s.connID)
+	return false
+}

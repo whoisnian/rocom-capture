@@ -40,10 +40,12 @@ var sortColumns = map[string]string{
 	"name": "name", "species": "species",
 }
 
-// buildWhere 由筛选条件构造 WHERE 子句与参数(列名均属 pets 表)。
-func buildWhere(f Filter) (string, []any) {
-	var where []string
-	var args []any
+// buildWhere 由筛选条件构造 WHERE 子句与参数(列名均属 pets 表)。首谓词恒为
+// account=?(account 作 args[0]);盒子筛选子查询用相关子查询 account=pets.account
+// 收窄到同账号,避免额外占位符。
+func buildWhere(f Filter, account string) (string, []any) {
+	where := []string{"account=?"}
+	args := []any{account}
 	if f.Search != "" {
 		where = append(where, "(name LIKE ? OR species LIKE ?)")
 		args = append(args, "%"+f.Search+"%", "%"+f.Search+"%")
@@ -91,26 +93,24 @@ func buildWhere(f Filter) (string, []any) {
 		where = append(where, "types LIKE ?")
 		args = append(args, "%\""+t+"\"%")
 	}
-	if f.Box != "" { // 取前导整数为 box_id,关联 pet_box 表
+	if f.Box != "" { // 取前导整数为 box_id,关联 pet_box 表(限本账号)
 		idStr := f.Box
 		if i := strings.IndexByte(idStr, '-'); i >= 0 {
 			idStr = idStr[:i]
 		}
 		if id, err := strconv.Atoi(idStr); err == nil {
-			where = append(where, "gid IN (SELECT gid FROM pet_box WHERE box_id=?)")
+			where = append(where, "gid IN (SELECT gid FROM pet_box WHERE box_id=? AND account=pets.account)")
 			args = append(args, id)
 		}
-	}
-	if len(where) == 0 {
-		return "", args
 	}
 	return " WHERE " + strings.Join(where, " AND "), args
 }
 
 // 位置排序键:大世界队伍在前(team_idx*6+pos),其后按盒子(1000+box_id*100+slot),其余末尾。
+// 子查询用相关条件 account=pets.account 限本账号,无需额外占位符。
 const boxPosExpr = `COALESCE(` +
-	`(SELECT team_idx*6+pos FROM pet_team WHERE pet_team.gid=pets.gid),` +
-	`(SELECT 1000+box_id*100+slot FROM pet_box WHERE pet_box.gid=pets.gid),999999)`
+	`(SELECT team_idx*6+pos FROM pet_team WHERE pet_team.gid=pets.gid AND pet_team.account=pets.account),` +
+	`(SELECT 1000+box_id*100+slot FROM pet_box WHERE pet_box.gid=pets.gid AND pet_box.account=pets.account),999999)`
 
 // buildOrder 构造 ORDER BY 表达式(含 gid 兜底,保证稳定顺序)。
 func buildOrder(f Filter) string {
@@ -135,10 +135,10 @@ func clampPageSize(n int) int {
 	return n
 }
 
-// PetPage 返回 gid 在当前筛选+排序下所处的页码(1 起,未命中返回 1)。
-func (s *Store) PetPage(gid uint32, f Filter) int {
-	whereSQL, args := buildWhere(f)
-	rows, err := s.db.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
+// PetPage 返回 gid 在本账号当前筛选+排序下所处的页码(1 起,未命中返回 1)。
+func (sc *Scoped) PetPage(gid uint32, f Filter) int {
+	whereSQL, args := buildWhere(f, sc.account)
+	rows, err := sc.db.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
 	if err != nil {
 		return 1
 	}
@@ -156,11 +156,11 @@ func (s *Store) PetPage(gid uint32, f Filter) int {
 	return 1
 }
 
-// ListPets 按筛选条件返回宠物列表与命中总数。
-func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
-	whereSQL, args := buildWhere(f)
+// ListPets 按筛选条件返回本账号宠物列表与命中总数。
+func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
+	whereSQL, args := buildWhere(f, sc.account)
 
-	if err = s.db.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
+	if err = sc.db.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -172,7 +172,7 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 
 	q := "SELECT data FROM pets" + whereSQL + " ORDER BY " + buildOrder(f) + " LIMIT ? OFFSET ?"
 	args = append(args, pageSize, (page-1)*pageSize)
-	rows, err := s.db.Query(q, args...)
+	rows, err := sc.db.Query(q, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -190,26 +190,28 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	if err = rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	s.attachLocations(pets)
+	sc.attachLocations(pets)
 	return pets, total, nil
 }
 
 // attachLocations 给一页宠物批量注入盒子/队伍位置(各一次查询,按 gid 映射)。
-func (s *Store) attachLocations(pets []*pet.Pet) {
+// 每个查询各构一份 args(account 置首),避免共享 slice 被 append 污染。
+func (sc *Scoped) attachLocations(pets []*pet.Pet) {
 	if len(pets) == 0 {
 		return
 	}
 	byGid := make(map[uint32]*pet.Pet, len(pets))
 	ph := make([]string, len(pets))
-	args := make([]any, len(pets))
+	gidArgs := make([]any, len(pets))
 	for i, p := range pets {
 		byGid[p.Gid] = p
 		ph[i] = "?"
-		args[i] = p.Gid
+		gidArgs[i] = p.Gid
 	}
 	in := "(" + strings.Join(ph, ",") + ")"
+	argsWith := func() []any { return append([]any{sc.account}, gidArgs...) }
 
-	if rows, err := s.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE gid IN `+in, args...); err == nil {
+	if rows, err := sc.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
 		for rows.Next() {
 			var gid uint32
 			var boxID, slot, mark int32
@@ -222,7 +224,7 @@ func (s *Store) attachLocations(pets []*pet.Pet) {
 		}
 		rows.Close()
 	}
-	if rows, err := s.db.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE gid IN `+in, args...); err == nil {
+	if rows, err := sc.db.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
 		for rows.Next() {
 			var gid uint32
 			var teamIdx, pos int32
@@ -235,7 +237,7 @@ func (s *Store) attachLocations(pets []*pet.Pet) {
 		rows.Close()
 	}
 	// 拥有的奖牌(覆盖 ToPet 里仅佩戴的那枚);先清空有 pet_medal 记录的宠物再填,避免回退。
-	if rows, err := s.db.Query(`SELECT gid,medal_id FROM pet_medal WHERE gid IN `+in+` ORDER BY medal_id`, args...); err == nil {
+	if rows, err := sc.db.Query(`SELECT gid,medal_id FROM pet_medal WHERE account=? AND gid IN `+in+` ORDER BY medal_id`, argsWith()...); err == nil {
 		seen := map[uint32]bool{}
 		for rows.Next() {
 			var gid, mid uint32
@@ -253,22 +255,22 @@ func (s *Store) attachLocations(pets []*pet.Pet) {
 	}
 }
 
-// CountPets 返回库中宠物总数。
-func (s *Store) CountPets() (int, error) {
+// CountPets 返回本账号宠物总数。
+func (sc *Scoped) CountPets() (int, error) {
 	var n int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM pets").Scan(&n)
+	err := sc.db.QueryRow("SELECT COUNT(*) FROM pets WHERE account=?", sc.account).Scan(&n)
 	return n, err
 }
 
-// FilterOptions 返回各维度的可选值(用于前端筛选下拉)。
-func (s *Store) FilterOptions() map[string][]string {
+// FilterOptions 返回本账号各维度的可选值(用于前端筛选下拉)。
+func (sc *Scoped) FilterOptions() map[string][]string {
 	out := map[string][]string{}
 	for key, col := range map[string]string{
 		"nature": "nature", "talentRank": "talent_rank",
 		"medal": "medal", "speciality": "speciality", "partnerMark": "partner_mark",
 		"form": "form",
 	} {
-		rows, err := s.db.Query("SELECT DISTINCT " + col + " FROM pets WHERE " + col + "!='' ORDER BY " + col)
+		rows, err := sc.db.Query("SELECT DISTINCT "+col+" FROM pets WHERE account=? AND "+col+"!='' ORDER BY "+col, sc.account)
 		if err != nil {
 			continue
 		}
@@ -281,7 +283,7 @@ func (s *Store) FilterOptions() map[string][]string {
 		rows.Close()
 	}
 	// 宠物盒:取 pet_box 里出现的盒子,形如 "13-性格1"(未命名 → "18-盒18")。
-	if rows, err := s.db.Query(`SELECT DISTINCT box_id, box_name FROM pet_box ORDER BY box_id`); err == nil {
+	if rows, err := sc.db.Query(`SELECT DISTINCT box_id, box_name FROM pet_box WHERE account=? ORDER BY box_id`, sc.account); err == nil {
 		for rows.Next() {
 			var id int
 			var name string

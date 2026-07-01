@@ -32,8 +32,18 @@ type Event struct {
 	Pet     *pet.Pet  `json:"pet"`
 }
 
-// Store 封装 SQLite 连接。
+// Store 封装 SQLite 连接。跨账号操作(migrate/accounts 表)挂在此。
 type Store struct{ db *sql.DB }
+
+// Scoped 是绑定了某个 account 的 Store 视图:所有按账号隔离的读写都经它进行,
+// account 由 For 注入,方法内部不再显式接收 account,避免漏传导致跨账号串数据。
+type Scoped struct {
+	db      *sql.DB
+	account string
+}
+
+// For 返回绑定指定 account 的视图。
+func (s *Store) For(account string) *Scoped { return &Scoped{db: s.db, account: account} }
 
 // New 打开(或创建)数据库并建表。
 func New(path string) (*Store, error) {
@@ -52,7 +62,8 @@ func New(path string) (*Store, error) {
 func (s *Store) migrate() error {
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS pets (
-  gid INTEGER PRIMARY KEY,
+  account TEXT NOT NULL,
+  gid INTEGER,
   conf_id INTEGER, species TEXT, name TEXT, level INTEGER,
   nature_id INTEGER, nature TEXT, gender TEXT, types TEXT,
   height REAL, weight REAL, voice INTEGER,
@@ -62,56 +73,96 @@ CREATE TABLE IF NOT EXISTS pets (
   hp INTEGER, attack INTEGER, defense INTEGER,
   sp_attack INTEGER, sp_defense INTEGER, speed INTEGER,
   form TEXT,
-  data TEXT, updated_at INTEGER
+  data TEXT, updated_at INTEGER,
+  PRIMARY KEY(account, gid)
 );
 CREATE INDEX IF NOT EXISTS idx_pets_species ON pets(species);
 CREATE INDEX IF NOT EXISTS idx_pets_level ON pets(level);
 CREATE INDEX IF NOT EXISTS idx_pets_form ON pets(form);
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account TEXT NOT NULL,
   time INTEGER, kind TEXT, sub_kind TEXT, gid INTEGER,
   species TEXT, nature TEXT, medal TEXT, shiny INTEGER,
   data TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
+CREATE INDEX IF NOT EXISTS idx_events_account_time ON events(account, time);
 CREATE TABLE IF NOT EXISTS pet_box (
-  gid INTEGER PRIMARY KEY,
-  box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER
+  account TEXT NOT NULL, gid INTEGER,
+  box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER,
+  PRIMARY KEY(account, gid)
 );
 CREATE TABLE IF NOT EXISTS pet_team (
-  gid INTEGER PRIMARY KEY,
-  team_idx INTEGER, pos INTEGER
+  account TEXT NOT NULL, gid INTEGER,
+  team_idx INTEGER, pos INTEGER,
+  PRIMARY KEY(account, gid)
 );
 CREATE TABLE IF NOT EXISTS pet_medal (
-  gid INTEGER, medal_id INTEGER,
-  PRIMARY KEY(gid, medal_id)
+  account TEXT NOT NULL, gid INTEGER, medal_id INTEGER,
+  PRIMARY KEY(account, gid, medal_id)
+);
+CREATE TABLE IF NOT EXISTS accounts (
+  account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER
 );
 `)
-	if err != nil {
-		return err
-	}
-	// 老库补列(form 为后加字段);列已存在会报 duplicate column,忽略即可。
-	s.db.Exec(`ALTER TABLE pets ADD COLUMN form TEXT`)
-	return nil
+	return err
 }
 
-// ReplacePetMedals 用一份登录快照替换所有宠物拥有的奖牌(gid↔medal 多对多)。
-func (s *Store) ReplacePetMedals(owns []pet.MedalOwn) error {
-	tx, err := s.db.Begin()
+// AccountInfo 是一个账号的概要(供前端账号下拉)。
+type AccountInfo struct {
+	Account  string `json:"account"`
+	Name     string `json:"name"`
+	PetCount int    `json:"petCount"`
+}
+
+// UpsertAccount 登记/更新一个账号的展示名与活跃时间。
+func (s *Store) UpsertAccount(account, name string) error {
+	_, err := s.db.Exec(`
+INSERT INTO accounts(account,name,updated_at) VALUES(?,?,?)
+ON CONFLICT(account) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at`,
+		account, name, time.Now().Unix())
+	return err
+}
+
+// ListAccounts 返回已知账号(按最近活跃倒序),petCount 含零宠物账号(LEFT JOIN)。
+func (s *Store) ListAccounts() ([]AccountInfo, error) {
+	rows, err := s.db.Query(`
+SELECT a.account, a.name, COUNT(p.gid)
+FROM accounts a LEFT JOIN pets p ON p.account = a.account
+GROUP BY a.account, a.name
+ORDER BY a.updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AccountInfo
+	for rows.Next() {
+		var a AccountInfo
+		if err := rows.Scan(&a.Account, &a.Name, &a.PetCount); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// ReplacePetMedals 用一份登录快照替换本账号所有宠物拥有的奖牌(gid↔medal 多对多)。
+func (sc *Scoped) ReplacePetMedals(owns []pet.MedalOwn) error {
+	tx, err := sc.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DELETE FROM pet_medal`); err != nil {
+	if _, err = tx.Exec(`DELETE FROM pet_medal WHERE account=?`, sc.account); err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO pet_medal(gid,medal_id) VALUES(?,?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO pet_medal(account,gid,medal_id) VALUES(?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, o := range owns {
-		if _, err = stmt.Exec(o.Gid, o.MedalID); err != nil {
+		if _, err = stmt.Exec(sc.account, o.Gid, o.MedalID); err != nil {
 			return err
 		}
 	}
@@ -126,18 +177,19 @@ type BoxLayout struct {
 	Heads map[string]string `json:"heads,omitempty"` // gid(字符串)→小头像路径,供示意图渲染头像
 }
 
-// petHeads 批量读取一组 gid 的小头像路径(image.head);空集或无图忽略。
-func (s *Store) petHeads(gids []uint32) map[string]string {
+// petHeads 批量读取本账号一组 gid 的小头像路径(image.head);空集或无图忽略。
+func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 	if len(gids) == 0 {
 		return nil
 	}
 	ph := make([]string, len(gids))
-	args := make([]any, len(gids))
+	args := make([]any, 0, len(gids)+1)
+	args = append(args, sc.account)
 	for i, g := range gids {
 		ph[i] = "?"
-		args[i] = g
+		args = append(args, g)
 	}
-	rows, err := s.db.Query(`SELECT gid,data FROM pets WHERE gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	rows, err := sc.db.Query(`SELECT gid,data FROM pets WHERE account=? AND gid IN (`+strings.Join(ph, ",")+`)`, args...)
 	if err != nil {
 		return nil
 	}
@@ -157,9 +209,9 @@ func (s *Store) petHeads(gids []uint32) map[string]string {
 	return out
 }
 
-// BoxLayouts 返回所有有宠物的盒子的槽位布局(按 box_id 升序),供前端盒子示意图。
-func (s *Store) BoxLayouts() []BoxLayout {
-	rows, err := s.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box ORDER BY box_id, slot`)
+// BoxLayouts 返回本账号所有有宠物的盒子的槽位布局(按 box_id 升序),供前端盒子示意图。
+func (sc *Scoped) BoxLayouts() []BoxLayout {
+	rows, err := sc.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box WHERE account=? ORDER BY box_id, slot`, sc.account)
 	if err != nil {
 		return nil
 	}
@@ -196,7 +248,7 @@ func (s *Store) BoxLayouts() []BoxLayout {
 				gids = append(gids, g)
 			}
 		}
-		bl.Heads = s.petHeads(gids)
+		bl.Heads = sc.petHeads(gids)
 		out = append(out, *bl)
 	}
 	return out
@@ -208,10 +260,10 @@ type TeamLayout struct {
 	Heads map[string]string `json:"heads,omitempty"` // gid(字符串)→小头像路径
 }
 
-// TeamLayouts 返回大世界队伍的 18 格布局(gid=0 表示空位)。
-func (s *Store) TeamLayouts() TeamLayout {
+// TeamLayouts 返回本账号大世界队伍的 18 格布局(gid=0 表示空位)。
+func (sc *Scoped) TeamLayouts() TeamLayout {
 	tl := TeamLayout{Slots: make([]uint32, 18)}
-	rows, err := s.db.Query(`SELECT team_idx, pos, gid FROM pet_team`)
+	rows, err := sc.db.Query(`SELECT team_idx, pos, gid FROM pet_team WHERE account=?`, sc.account)
 	if err != nil {
 		return tl
 	}
@@ -231,13 +283,13 @@ func (s *Store) TeamLayouts() TeamLayout {
 			gids = append(gids, g)
 		}
 	}
-	tl.Heads = s.petHeads(gids)
+	tl.Heads = sc.petHeads(gids)
 	return tl
 }
 
-// medalsFor 读取单只宠物拥有的奖牌 id 列表(升序),供 GetPet 注入。
-func (s *Store) medalsFor(gid uint32) []uint32 {
-	rows, err := s.db.Query(`SELECT medal_id FROM pet_medal WHERE gid=? ORDER BY medal_id`, gid)
+// medalsFor 读取本账号单只宠物拥有的奖牌 id 列表(升序),供 GetPet 注入。
+func (sc *Scoped) medalsFor(gid uint32) []uint32 {
+	rows, err := sc.db.Query(`SELECT medal_id FROM pet_medal WHERE account=? AND gid=? ORDER BY medal_id`, sc.account, gid)
 	if err != nil {
 		return nil
 	}
@@ -252,23 +304,23 @@ func (s *Store) medalsFor(gid uint32) []uint32 {
 	return out
 }
 
-// ReplacePetBoxes 用一份完整背包快照替换所有宠物盒子位置(整体 DELETE + 批量插入)。
-func (s *Store) ReplacePetBoxes(entries []pet.BoxEntry) error {
-	tx, err := s.db.Begin()
+// ReplacePetBoxes 用一份完整背包快照替换本账号所有宠物盒子位置(整体 DELETE + 批量插入)。
+func (sc *Scoped) ReplacePetBoxes(entries []pet.BoxEntry) error {
+	tx, err := sc.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DELETE FROM pet_box`); err != nil {
+	if _, err = tx.Exec(`DELETE FROM pet_box WHERE account=?`, sc.account); err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(account,gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, e := range entries {
-		if _, err = stmt.Exec(e.Gid, e.BoxID, e.Slot, e.BoxName, e.Mark); err != nil {
+		if _, err = stmt.Exec(sc.account, e.Gid, e.BoxID, e.Slot, e.BoxName, e.Mark); err != nil {
 			return err
 		}
 	}
@@ -277,13 +329,13 @@ func (s *Store) ReplacePetBoxes(entries []pet.BoxEntry) error {
 
 // ApplyBoxMoves 增量应用盒位变更(box_pet_change):把每只宠物移到新(盒,格);
 // 盒名/标记沿用该盒既有行(随盒不随宠);宠物入盒即不在队伍,清除其队伍位置。
-func (s *Store) ApplyBoxMoves(entries []pet.BoxEntry) error {
-	tx, err := s.db.Begin()
+func (sc *Scoped) ApplyBoxMoves(entries []pet.BoxEntry) error {
+	tx, err := sc.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	up, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?)`)
+	up, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(account,gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -292,64 +344,64 @@ func (s *Store) ApplyBoxMoves(entries []pet.BoxEntry) error {
 		var name string
 		var mark int32
 		// 盒名/标记是盒的属性,取该盒任一既有行(增量包不携带)。
-		tx.QueryRow(`SELECT box_name,mark FROM pet_box WHERE box_id=? AND gid<>? LIMIT 1`, e.BoxID, e.Gid).Scan(&name, &mark)
-		if _, err = up.Exec(e.Gid, e.BoxID, e.Slot, name, mark); err != nil {
+		tx.QueryRow(`SELECT box_name,mark FROM pet_box WHERE account=? AND box_id=? AND gid<>? LIMIT 1`, sc.account, e.BoxID, e.Gid).Scan(&name, &mark)
+		if _, err = up.Exec(sc.account, e.Gid, e.BoxID, e.Slot, name, mark); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(`DELETE FROM pet_team WHERE gid=?`, e.Gid); err != nil {
+		if _, err = tx.Exec(`DELETE FROM pet_team WHERE account=? AND gid=?`, sc.account, e.Gid); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-// boxLocFor 读取单只宠物的盒子位置(无则 nil),供 GetPet 注入。
-func (s *Store) boxLocFor(gid uint32) *pet.PetBoxLoc {
+// boxLocFor 读取本账号单只宠物的盒子位置(无则 nil),供 GetPet 注入。
+func (sc *Scoped) boxLocFor(gid uint32) *pet.PetBoxLoc {
 	var boxID, slot, mark int32
 	var name string
-	err := s.db.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE gid=?`, gid).Scan(&boxID, &slot, &name, &mark)
+	err := sc.db.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid=?`, sc.account, gid).Scan(&boxID, &slot, &name, &mark)
 	if err != nil {
 		return nil
 	}
 	return &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
 }
 
-// ReplacePetTeams 用一份大世界队伍快照替换所有宠物队伍位置。
-func (s *Store) ReplacePetTeams(entries []pet.TeamEntry) error {
-	tx, err := s.db.Begin()
+// ReplacePetTeams 用一份大世界队伍快照替换本账号所有宠物队伍位置。
+func (sc *Scoped) ReplacePetTeams(entries []pet.TeamEntry) error {
+	tx, err := sc.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DELETE FROM pet_team`); err != nil {
+	if _, err = tx.Exec(`DELETE FROM pet_team WHERE account=?`, sc.account); err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_team(gid,team_idx,pos) VALUES(?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_team(account,gid,team_idx,pos) VALUES(?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, e := range entries {
-		if _, err = stmt.Exec(e.Gid, e.TeamIdx, e.Pos); err != nil {
+		if _, err = stmt.Exec(sc.account, e.Gid, e.TeamIdx, e.Pos); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-// teamLocFor 读取单只宠物的队伍位置(无则 nil),供 GetPet 注入。
-func (s *Store) teamLocFor(gid uint32) *pet.PetTeamLoc {
+// teamLocFor 读取本账号单只宠物的队伍位置(无则 nil),供 GetPet 注入。
+func (sc *Scoped) teamLocFor(gid uint32) *pet.PetTeamLoc {
 	var teamIdx, pos int32
-	if s.db.QueryRow(`SELECT team_idx,pos FROM pet_team WHERE gid=?`, gid).Scan(&teamIdx, &pos) != nil {
+	if sc.db.QueryRow(`SELECT team_idx,pos FROM pet_team WHERE account=? AND gid=?`, sc.account, gid).Scan(&teamIdx, &pos) != nil {
 		return nil
 	}
 	return &pet.PetTeamLoc{TeamIdx: teamIdx, Pos: pos}
 }
 
-// UpsertPet 插入或更新一只宠物，返回是否为新增(库中此前无该 gid)。
-func (s *Store) UpsertPet(p *pet.Pet) (isNew bool, err error) {
+// UpsertPet 插入或更新本账号一只宠物，返回是否为新增(该账号此前无该 gid)。
+func (sc *Scoped) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 	var one int
-	err = s.db.QueryRow(`SELECT 1 FROM pets WHERE gid=?`, p.Gid).Scan(&one)
+	err = sc.db.QueryRow(`SELECT 1 FROM pets WHERE account=? AND gid=?`, sc.account, p.Gid).Scan(&one)
 	isNew = err == sql.ErrNoRows
 	if err != nil && err != sql.ErrNoRows {
 		return false, err
@@ -357,12 +409,12 @@ func (s *Store) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 
 	data, _ := json.Marshal(p)
 	types, _ := json.Marshal(p.Types)
-	_, err = s.db.Exec(`
-INSERT INTO pets(gid,conf_id,species,name,level,nature_id,nature,gender,types,
+	_, err = sc.db.Exec(`
+INSERT INTO pets(account,gid,conf_id,species,name,level,nature_id,nature,gender,types,
   height,weight,voice,talent_rank,medal,medal_id,partner_mark,speciality,speciality_id,
   catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,data,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-ON CONFLICT(gid) DO UPDATE SET
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(account,gid) DO UPDATE SET
   conf_id=excluded.conf_id,species=excluded.species,name=excluded.name,level=excluded.level,
   nature_id=excluded.nature_id,nature=excluded.nature,gender=excluded.gender,types=excluded.types,
   height=excluded.height,weight=excluded.weight,voice=excluded.voice,talent_rank=excluded.talent_rank,
@@ -371,7 +423,7 @@ ON CONFLICT(gid) DO UPDATE SET
   shiny=excluded.shiny,colorful=excluded.colorful,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
   sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,form=excluded.form,
   data=excluded.data,updated_at=excluded.updated_at`,
-		p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
+		sc.account, p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
 		p.HeightM, p.WeightKg, p.Voice, p.TalentRank, p.Medal, p.WearMedalConfID, p.PartnerMark,
 		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny), b2i(p.Colorful),
 		p.HP.Value, p.Attack.Value, p.Defense.Value, p.SpAttack.Value, p.SpDefense.Value, p.Speed.Value,
@@ -379,24 +431,24 @@ ON CONFLICT(gid) DO UPDATE SET
 	return isNew, err
 }
 
-// RemovePet 删除宠物，返回被删除的快照(若存在)。
-func (s *Store) RemovePet(gid uint32) (*pet.Pet, error) {
-	p, err := s.GetPet(gid)
+// RemovePet 删除本账号宠物，返回被删除的快照(若存在)。
+func (sc *Scoped) RemovePet(gid uint32) (*pet.Pet, error) {
+	p, err := sc.GetPet(gid)
 	if err != nil || p == nil {
 		return nil, err
 	}
-	_, err = s.db.Exec(`DELETE FROM pets WHERE gid=?`, gid)
+	_, err = sc.db.Exec(`DELETE FROM pets WHERE account=? AND gid=?`, sc.account, gid)
 	// 一并清掉盒位/队位/奖牌关联,否则示意图仍把该格当作占用(灰底可点、却无头像)。
-	s.db.Exec(`DELETE FROM pet_box WHERE gid=?`, gid)
-	s.db.Exec(`DELETE FROM pet_team WHERE gid=?`, gid)
-	s.db.Exec(`DELETE FROM pet_medal WHERE gid=?`, gid)
+	sc.db.Exec(`DELETE FROM pet_box WHERE account=? AND gid=?`, sc.account, gid)
+	sc.db.Exec(`DELETE FROM pet_team WHERE account=? AND gid=?`, sc.account, gid)
+	sc.db.Exec(`DELETE FROM pet_medal WHERE account=? AND gid=?`, sc.account, gid)
 	return p, err
 }
 
-// GetPet 按 gid 返回宠物。
-func (s *Store) GetPet(gid uint32) (*pet.Pet, error) {
+// GetPet 按 gid 返回本账号宠物。
+func (sc *Scoped) GetPet(gid uint32) (*pet.Pet, error) {
 	var data string
-	err := s.db.QueryRow(`SELECT data FROM pets WHERE gid=?`, gid).Scan(&data)
+	err := sc.db.QueryRow(`SELECT data FROM pets WHERE account=? AND gid=?`, sc.account, gid).Scan(&data)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -407,20 +459,20 @@ func (s *Store) GetPet(gid uint32) (*pet.Pet, error) {
 	if err := json.Unmarshal([]byte(data), &p); err != nil {
 		return nil, err
 	}
-	p.Box = s.boxLocFor(gid)
-	p.Team = s.teamLocFor(gid)
-	if ms := s.medalsFor(gid); ms != nil {
+	p.Box = sc.boxLocFor(gid)
+	p.Team = sc.teamLocFor(gid)
+	if ms := sc.medalsFor(gid); ms != nil {
 		p.MedalIDs = ms
 	}
 	return &p, nil
 }
 
-// AddEvent 写入一条事件。
-func (s *Store) AddEvent(e *Event) error {
+// AddEvent 写入本账号一条事件。
+func (sc *Scoped) AddEvent(e *Event) error {
 	data, _ := json.Marshal(e.Pet)
-	res, err := s.db.Exec(`INSERT INTO events(time,kind,sub_kind,gid,species,nature,medal,shiny,data)
-VALUES(?,?,?,?,?,?,?,?,?)`,
-		e.Time, e.Kind, e.SubKind, e.Gid,
+	res, err := sc.db.Exec(`INSERT INTO events(account,time,kind,sub_kind,gid,species,nature,medal,shiny,data)
+VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		sc.account, e.Time, e.Kind, e.SubKind, e.Gid,
 		nz(e.Pet, func(p *pet.Pet) any { return p.Species }),
 		nz(e.Pet, func(p *pet.Pet) any { return p.Nature }),
 		nz(e.Pet, func(p *pet.Pet) any { return p.Medal }),
@@ -432,26 +484,26 @@ VALUES(?,?,?,?,?,?,?,?,?)`,
 	return nil
 }
 
-// ClearEvents 清空事件历史。
-func (s *Store) ClearEvents() error {
-	_, err := s.db.Exec(`DELETE FROM events`)
+// ClearEvents 清空本账号事件历史。
+func (sc *Scoped) ClearEvents() error {
+	_, err := sc.db.Exec(`DELETE FROM events WHERE account=?`, sc.account)
 	return err
 }
 
-// ListEvents 返回最近事件(按时间倒序)。
-func (s *Store) ListEvents(limit, beforeID int) ([]*Event, error) {
+// ListEvents 返回本账号最近事件(按时间倒序)。
+func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	q := `SELECT id,time,kind,sub_kind,gid,data FROM events`
-	var args []any
+	q := `SELECT id,time,kind,sub_kind,gid,data FROM events WHERE account=?`
+	args := []any{sc.account}
 	if beforeID > 0 {
-		q += ` WHERE id < ?`
+		q += ` AND id < ?`
 		args = append(args, beforeID)
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
-	rows, err := s.db.Query(q, args...)
+	rows, err := sc.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

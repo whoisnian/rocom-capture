@@ -42,6 +42,7 @@ button, input, select { font: inherit; color: inherit; }
 .navlink.active { background: var(--bg-3); color: var(--fg); }
 .navlink:hover { color: var(--fg); }
 .count { margin-left: auto; color: var(--fg-dim); font-size: 13px; }
+.account-select { margin-left: auto; max-width: 200px; }
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }
@@ -134,7 +135,9 @@ img.pet-avatar { object-fit: cover; }
 .gender.male { color: #4ea3ff; }
 .gender.female { color: #ff6fae; }
 .pet-sub { font-size: 12px; color: var(--fg-dim); }
-.six { display: grid; grid-template-columns: repeat(3, auto); gap: 1px 10px; font-size: 12px; }
+/* 固定三列等宽:各宠物的 .six 是独立 grid,用 auto 会让每行列宽随本行数值变化而错位,
+   改为定宽让「生命/物攻/物防」三列在所有行间对齐(84px 可容纳「生命 118 ↑+10」级最宽内容)。 */
+.six { display: grid; grid-template-columns: repeat(3, 84px); gap: 1px 10px; font-size: 12px; }
 .six b { color: var(--gold); }
 .up { color: var(--green); } .down { color: var(--red); }
 .talent { color: var(--gold); font-size: 11px; margin-left: 3px; font-weight: 600; }

@@ -18,6 +18,8 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -28,6 +30,7 @@ import (
 )
 
 func main() {
+	log.SetOutput(io.Discard) // 静音 capture 包的连接日志,保持结构化输出干净
 	pcapPath := flag.String("pcap", "", "pcap 文件路径(必填)")
 	opFilter := flag.String("op", "", "只转储这些 opcode(逗号分隔;支持 0x1888 / 6280 / 名称子串 FREE)")
 	gidScan := flag.String("gid", "", "扫描这些宠物 gid 出现在哪些 opcode(逗号分隔)")

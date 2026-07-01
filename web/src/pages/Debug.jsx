@@ -38,6 +38,7 @@ export default function Debug() {
               <tr key={i}>
                 <td className="muted">{fmtTime(r.time)}</td>
                 <td className={r.dir === 'c2s' ? 'dir-c2s' : 'dir-s2c'}>{r.dir}</td>
+                <td className="muted">{(r.account || '').replace(/^ip:/, '')}</td>
                 <td>{r.opcode}</td>
                 <td>{r.name}</td>
               </tr>

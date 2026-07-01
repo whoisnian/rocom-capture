@@ -292,6 +292,53 @@ func wireSubs(b []byte, want uint32) [][]byte {
 	return out
 }
 
+// wireBytes 取消息里指定字段号第一个 length-delimited 值(无/类型不符则 false)。
+func wireBytes(b []byte, want uint32) ([]byte, bool) {
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			return nil, false
+		}
+		b = b[n:]
+		if uint32(num) == want && typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				return nil, false
+			}
+			return v, true
+		}
+		m := protowire.ConsumeFieldValue(num, typ, b)
+		if m < 0 {
+			return nil, false
+		}
+		b = b[m:]
+	}
+	return nil, false
+}
+
+// ParseLoginAccount 从 ZoneLoginRsp(opcode 0x0102)取玩家 user_id 与昵称。
+// body 结构(实测,见 docs/architecture.md「多账号隔离」):{ #1: RetInfo, #2: LoginData{ #1: base{...} } },
+// base 内 #1=user_id(varint)、#2=openid(str)、#3=nickname(bytes)。user_id 全局唯一、
+// 跨设备/跨服稳定,作账号身份键;昵称仅供展示(可能为占位名如「你的名字」)。
+func ParseLoginAccount(body []byte) (userID uint64, name string, ok bool) {
+	data, ok2 := wireBytes(body, 2) // LoginData
+	if !ok2 {
+		return 0, "", false
+	}
+	base, ok1 := wireBytes(data, 1) // LoginData.#1(玩家基础信息)
+	if !ok1 {
+		return 0, "", false
+	}
+	id, okID := wireVarint(base, 1)
+	if !okID || id == 0 {
+		return 0, "", false
+	}
+	if nb, ok3 := wireBytes(base, 3); ok3 {
+		name = string(nb)
+	}
+	return id, name, true
+}
+
 // ParseBoxMoves 从盒子操作回包(GoodsChangeItem.box_pet_change)抽取盒位增量变更。
 // 每个 PetBoxPetChange = {pet_gid, is_in_team, id=box_id, pos(1 起)};只取非在队、gid 非 0、
 // box/pos 在合理范围的盒位放置,转为 BoxEntry(Slot=pos-1)。空位变更(gid=0)被移走的宠物

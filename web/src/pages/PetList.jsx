@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
+import { AccountContext } from '../App'
 import { Types, Six, Marks, Gender, Form, Avatar, StatRange, boxLabel, teamLabel, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
@@ -37,6 +38,7 @@ function loadFilter() {
 }
 
 export default function PetList() {
+  const account = useContext(AccountContext)
   const [filter, setFilter] = useState(loadFilter)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   const [data, setData] = useState({ total: 0, pets: [] })
@@ -48,7 +50,8 @@ export default function PetList() {
   const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
   const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
   const reloadRef = useRef(null)
-  const filterRef = useRef(filter)  // 供 SSE 回调读取最新筛选(避免闭包旧值)
+  const filterRef = useRef(filter)      // 供 SSE 回调读取最新筛选(避免闭包旧值)
+  const containersRef = useRef([])       // 供 SSE 回调按盒号查容器名(避免闭包旧值)
   const lpRef = useRef(null)        // 长按定时器
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
@@ -80,21 +83,32 @@ export default function PetList() {
   }, [filter.box, containers])
 
   // 持久化筛选状态与筛选栏折叠态
+  useEffect(() => { containersRef.current = containers }, [containers])
   useEffect(() => { filterRef.current = filter }, [filter])
   useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
   useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
 
-  // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(手机端刚调整位置),
+  // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(客户端刚调整位置),
   // 自动切到该宠物所在页并选中,示意图跟随展示其盒子/队伍。
   useEffect(() => {
     return subscribe((m) => {
       if (m.type !== 'pet') return
+      if (m.account && m.account !== account) return // 只认当前账号的更新
       const focus = m.data && m.data.focusGid
       if (focus) {
-        getPetPage(focus, filterRef.current)
-          .then((r) => setFilter((f) => ({ ...f, page: (r && r.page) || 1 })))
-          .catch(() => {})
         setSelected(focus)
+        // 清掉其它筛选、改按该宠物移动后所在的盒子过滤:既保证被选中的宠物一定在列表中
+        // (否则原有筛选可能把它排除),又通过 filter.box 联动让左上角示意图切到该盒。
+        const f = filterRef.current
+        const base = { pageSize: f.pageSize, sort: f.sort, order: f.order }
+        const box = m.data.focusBox
+        if (box) {
+          const cont = containersRef.current.find((c) => c.type === 'box' && c.id === box)
+          base.box = cont ? `${cont.id}-${cont.name}` : `${box}-`
+        }
+        getPetPage(focus, base)
+          .then((r) => setFilter({ ...base, page: (r && r.page) || 1 }))
+          .catch(() => setFilter({ ...base, page: 1 }))
         loadBoxes()
       }
       // 防抖重载用 filterRef 读取最新筛选(含 focus 切过去的新页),
@@ -104,7 +118,7 @@ export default function PetList() {
         if (reloadRef.current) { getPets(filterRef.current).then(setData).catch(() => {}); loadBoxes() }
       }, 600)
     })
-  }, [load, loadBoxes])
+  }, [load, loadBoxes, account])
 
   const set = (patch) => setFilter((f) => ({ ...f, ...patch, page: patch.page || 1 }))
   const toggleType = (t) =>
