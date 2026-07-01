@@ -19,6 +19,7 @@ const (
 	OpLoginRsp            = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
 	OpPetBoxChangePetRsp  = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
 	OpPetMedalCommonRsp   = 0x141e // ZONE_PET_MEDAL_COMMON_RSP(5150), 换牌等回包(含更新后 PetData)
+	OpPetEvoluteRsp       = 0x01ae // ZONE_PET_EVOLUTE_RSP(430), 进化回包(含进化后完整 PetData,base_conf_id 已换形态)
 )
 
 // 盒子操作 opcode 区间(ZoneSvrCmd 十进制 6272-6292,如 TIDY_RSP/SETTING_UP_RSP 携带全量盒子)。

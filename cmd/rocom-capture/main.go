@@ -127,8 +127,9 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			}
 		}
 
-		// 换牌等回包携带更新后的完整 PetData(如佩戴奖牌已变),更新但不产生获得事件。
-		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetMedalCommonRsp {
+		// 携带更新后完整 PetData 的回包(换牌:佩戴奖牌已变;进化:base_conf_id 换形态、
+		// 等级/属性/技能刷新),就地更新宠物(同一 gid)但不产生获得事件。
+		if m.Direction == gcp.S2C && (m.Opcode == pet.OpPetMedalCommonRsp || m.Opcode == pet.OpPetEvoluteRsp) {
 			if pd := pet.FindNewPet(m.AppBody); pd != nil {
 				p := pet.ToPet(pd, db)
 				st.UpsertPet(p)
