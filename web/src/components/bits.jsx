@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 
 const imgURL = (path) => '/img/' + path
 
@@ -85,6 +86,51 @@ export function Six({ p }) {
         )
       })}
     </div>
+  )
+}
+
+// StatRange 渲染身高/体重值;悬停时 tooltip 以 `99.67% (下限-上限)` 显示当前值百分位与该形态取值范围。
+// 范围/百分位来自后端 FillSizePercentile(按当前形态注入);未知形态无范围时退化为纯文本(无 tooltip)。
+// tooltip 经 portal 渲染到 body、fixed 定位:不受列表 .table-wrap 的 overflow 裁剪,
+// 默认浮在值上方,顶部空间不足时翻转到下方,并按视口左右夹取(可溢出列表但不出屏)。
+export function StatRange({ value, min, max, pct, unit }) {
+  const text = `${value}${unit}`
+  const ref = React.useRef(null)
+  const [anchor, setAnchor] = React.useState(null) // 悬停时锚点元素的视口矩形
+  if (!(max > min)) return <>{text}</>
+  const pctText = pct != null ? `${pct.toFixed(2)}%` : null
+  const content = pctText ? `${pctText} (${min}-${max})` : `${min}-${max}`
+  const show = () => { if (ref.current) setAnchor(ref.current.getBoundingClientRect()) }
+  const hide = () => setAnchor(null)
+  return (
+    <span ref={ref} onMouseEnter={show} onMouseLeave={hide}>
+      {text}
+      {anchor && <Tooltip content={content} anchor={anchor} />}
+    </span>
+  )
+}
+
+// Tooltip 把内容 portal 到 body 并 fixed 定位:挂载后按自身尺寸相对锚点居中,
+// 默认放上方,空间不足翻下方,水平方向夹在视口内(留 4px 边距)。定位算完前隐藏避免闪跳。
+function Tooltip({ content, anchor }) {
+  const ref = React.useRef(null)
+  const [pos, setPos] = React.useState(null)
+  React.useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const gap = 6
+    const w = el.offsetWidth, h = el.offsetHeight
+    let left = anchor.left + anchor.width / 2 - w / 2
+    left = Math.max(4, Math.min(left, window.innerWidth - w - 4))
+    let top = anchor.top - gap - h            // 默认上方
+    if (top < 4) top = anchor.bottom + gap    // 上方放不下 → 翻到下方
+    setPos({ left, top })
+  }, [content, anchor])
+  return createPortal(
+    <div ref={ref} className="tip-pop" style={pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: 'hidden' }}>
+      {content}
+    </div>,
+    document.body,
   )
 }
 

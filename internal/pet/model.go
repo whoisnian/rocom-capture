@@ -1,6 +1,8 @@
 package pet
 
 import (
+	"math"
+
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pb"
 )
@@ -45,7 +47,15 @@ type Pet struct {
 
 	HeightM  float64 `json:"heightM"`  // 身高(米)
 	WeightKg float64 `json:"weightKg"` // 体重(千克)
-	Voice    int32   `json:"voice"`    // 声音值
+	// 当前形态的身高/体重取值范围(米/千克)与当前值在范围内的百分位(0-100);
+	// 由 FillSizePercentile 按 base_conf_id 在读取时注入(缺该形态数据则为 nil/0,前端据此不显示区间)。
+	HeightMin float64  `json:"heightMin,omitempty"`
+	HeightMax float64  `json:"heightMax,omitempty"`
+	HeightPct *float64 `json:"heightPct,omitempty"`
+	WeightMin float64  `json:"weightMin,omitempty"`
+	WeightMax float64  `json:"weightMax,omitempty"`
+	WeightPct *float64 `json:"weightPct,omitempty"`
+	Voice     int32   `json:"voice"` // 声音值
 
 	TalentRank      string   `json:"talentRank"` // 天分评价
 	Medal           string   `json:"medal"`      // 佩戴奖牌名
@@ -202,4 +212,37 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		}
 	}
 	return out
+}
+
+// FillSizePercentile 按当前形态(base_conf_id)为宠物注入身高/体重取值范围及当前值百分位。
+//
+// 范围属静态参考数据,不随宠物存库,故在读取时注入(与奖牌墙同):这样历史入库的宠物无需
+// 重新抓包也能显示,且游戏版本更新后范围随 gamedata 同步刷新。范围原始整数与 PetData.height/
+// weight 同单位(÷100 米、÷1000 千克),百分位 = (当前值-下限)/(上限-下限),裁剪到 0-100。
+func FillSizePercentile(db *gamedata.DB, pets ...*Pet) {
+	for _, p := range pets {
+		info, ok := db.PetBase(p.BaseConfID)
+		if !ok {
+			continue
+		}
+		p.HeightMin, p.HeightMax = float64(info.HeightLow)/100, float64(info.HeightHigh)/100
+		p.WeightMin, p.WeightMax = float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000
+		p.HeightPct = percentile(p.HeightM, p.HeightMin, p.HeightMax)
+		p.WeightPct = percentile(p.WeightKg, p.WeightMin, p.WeightMax)
+	}
+}
+
+// percentile 返回 cur 落在 [min,max] 内的百分位(0-100,保留两位小数);范围无效(max<=min)返回 nil。
+func percentile(cur, min, max float64) *float64 {
+	if max <= min {
+		return nil
+	}
+	v := (cur - min) / (max - min) * 100
+	if v < 0 {
+		v = 0
+	} else if v > 100 {
+		v = 100
+	}
+	v = math.Round(v*100) / 100
+	return &v
 }

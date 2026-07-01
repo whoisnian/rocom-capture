@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, Marks, Gender, Form, Avatar, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Form, Avatar, StatRange, boxLabel, teamLabel, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -27,7 +27,7 @@ const SORTS = [
 ]
 
 // 列表状态(筛选/排序/分页/滚动)用 sessionStorage 持久化,从详情返回时还原。
-const DEFAULT_FILTER = { page: 1, pageSize: 10, sort: 'boxpos', order: 'asc' }
+const DEFAULT_FILTER = { page: 1, pageSize: 20, sort: 'boxpos', order: 'asc' }
 function loadFilter() {
   try {
     const s = JSON.parse(sessionStorage.getItem('petListFilter'))
@@ -304,8 +304,8 @@ export default function PetList() {
                   <td>{p.speciality || '无'}</td>
                   <td>{p.medal || '-'}</td>
                   <td>{p.voice}</td>
-                  <td>{p.weightKg} kg</td>
-                  <td>{p.heightM} m</td>
+                  <td><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
+                  <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></td>
                   <td><Six p={p} /></td>
                   <td className="muted">{fmtTime(p.catchTime)}</td>
                 </tr>
@@ -330,8 +330,8 @@ export default function PetList() {
                 <div>性格：{p.nature || '-'}</div>
                 <div>特长：{p.speciality || '无'}</div>
                 <div>奖牌：{p.medal || '-'}</div>
-                <div>体重：{p.weightKg}kg</div>
-                <div>身高：{p.heightM}m</div>
+                <div>体重：<StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></div>
+                <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
                 <div>声音：{p.voice}</div>
               </div>
               <Six p={p} />
@@ -342,9 +342,11 @@ export default function PetList() {
         {data.pets.length === 0 && <div className="empty">没有匹配的宠物</div>}
 
         <div className="pager">
+          <button className="btn" disabled={filter.page <= 1} onClick={() => set({ page: 1 })}>首页</button>
           <button className="btn" disabled={filter.page <= 1} onClick={() => set({ page: filter.page - 1 })}>上一页</button>
           <span className="muted">{filter.page} / {pages}</span>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: filter.page + 1 })}>下一页</button>
+          <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: pages })}>尾页</button>
           <select className="select" style={{ width: 110 }} value={filter.pageSize} onChange={(e) => set({ pageSize: +e.target.value })}>
             {[10, 20, 30, 60, 100].map((n) => <option key={n} value={n}>{n} 条/页</option>)}
           </select>

@@ -217,8 +217,6 @@ img.evo-avatar { object-fit: cover; }
 .stat .l { font-size: 12px; color: var(--fg-dim); }
 .medals { display: flex; flex-wrap: wrap; gap: 8px; }
 .medal { background: var(--bg-3); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
-/* 奖牌墙:宠物拥有的奖牌(金色高亮) */
-.medal.owned { background: var(--gold); color: #222; font-weight: 600; }
 /* hover tooltip 显示奖牌描述 */
 .medal-tip { position: relative; cursor: default; }
 .medal-tip::after {
@@ -232,6 +230,16 @@ img.evo-avatar { object-fit: cover; }
 }
 .medal-tip:hover::after { opacity: 1; }
 .medal-tip:hover { z-index: 51; }
+
+/* 身高/体重范围 tooltip:由 StatRange 经 portal 渲染到 body、fixed 定位(避开 .table-wrap
+   的 overflow 裁剪与常驻滚动条问题);值本身不加特殊样式,定位由 JS 计算(默认上方/自动翻转)。 */
+.tip-pop {
+  position: fixed; padding: 6px 10px; border-radius: 8px;
+  background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
+  font-size: 12px; font-weight: 400; line-height: 1.5;
+  white-space: nowrap; text-align: left;
+  pointer-events: none; z-index: 200; box-shadow: var(--shadow);
+}
 
 /* ---- debug ---- */
 .debug-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }

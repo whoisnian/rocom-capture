@@ -155,6 +155,7 @@ func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
 	if pets == nil {
 		pets = []*pet.Pet{}
 	}
+	pet.FillSizePercentile(s.db, pets...) // 读取时注入身高/体重范围与百分位(静态参考,不入库)
 	writeJSON(w, map[string]any{"total": total, "pets": pets})
 }
 
@@ -169,6 +170,7 @@ func (s *Server) handlePet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
+	pet.FillSizePercentile(s.db, p)
 	writeJSON(w, p)
 }
 

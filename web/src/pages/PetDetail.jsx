@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals, getEvolution } from '../api'
-import { Types, Marks, Gender, Form, Portrait, ImgAvatar, locText, fmtTime } from '../components/bits'
+import { Types, Marks, Gender, Form, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
 
 const SIX = [
   ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
@@ -123,8 +123,8 @@ export function PetDetailModal({ gid, onClose }) {
           <div className="kv">
             <Item k="性格" v={pet.nature} />
             <Item k="特长" v={pet.speciality || '无'} />
-            <Item k="身高" v={pet.heightM + ' m'} />
-            <Item k="体重" v={pet.weightKg + ' kg'} />
+            <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
+            <Item k="体重" v={<StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" />} />
             <Item k="声音" v={pet.voice} />
             <Item k="标记" v={pet.partnerMark || '无'} />
             <Item k="位置" v={locText(pet)} />
@@ -158,7 +158,7 @@ export function PetDetailModal({ gid, onClose }) {
                 <div className="muted" style={{ marginBottom: 6 }}>奖牌墙</div>
                 <div className="medals">
                   {owned.map((m) => (
-                    <div key={m.id} className="medal owned medal-tip" data-tip={m.desc || m.name}>
+                    <div key={m.id} className="medal medal-tip" data-tip={m.desc || m.name}>
                       🏅 {m.name}
                     </div>
                   ))}

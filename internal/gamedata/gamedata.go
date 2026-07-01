@@ -51,13 +51,18 @@ type PetImage struct {
 	PortraitSmall string `json:"portraitSmall"` // 全身缩略 Pet256/JL_<x>.webp
 }
 
-// PetBaseInfo 是 petbase 形态的元数据(名称/图鉴号/形态名/进化阶段/进化链分组)。
+// PetBaseInfo 是 petbase 形态的元数据(名称/图鉴号/形态名/进化阶段/进化链分组/身高体重范围)。
 type PetBaseInfo struct {
 	Name  string // 当前形态名(火神/音速犬/岚鸟…)
 	Book  uint32 // 图鉴编号(pictorial_book_id)
 	Form  string // 地区/季节形态名(春天的样子…),普通宠物为空
 	Stage uint32 // 进化阶段(1 起)
 	Evo   uint32 // 进化链分组 id(同链共享),用于重建进化链
+	// 身高/体重取值范围(原始整数,与 PetData.height/weight 同单位:height÷100=米,weight÷1000=千克)。
+	HeightLow  uint32
+	HeightHigh uint32
+	WeightLow  uint32
+	WeightHigh uint32
 }
 
 // DB 是只读名称查找库。
@@ -99,11 +104,15 @@ func Load() (*DB, error) {
 		Images       map[string]imageEntry   `json:"images"`
 		ImageBase    map[string]uint32       `json:"image_base"`
 		Petbase      map[string]struct {
-			N string `json:"n"`
-			B uint32 `json:"b"`
-			F string `json:"f"`
-			S uint32 `json:"s"`
-			E uint32 `json:"e"`
+			N  string `json:"n"`
+			B  uint32 `json:"b"`
+			F  string `json:"f"`
+			S  uint32 `json:"s"`
+			E  uint32 `json:"e"`
+			HL uint32 `json:"hl"`
+			HH uint32 `json:"hh"`
+			WL uint32 `json:"wl"`
+			WH uint32 `json:"wh"`
 		} `json:"petbase"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
@@ -126,7 +135,10 @@ func Load() (*DB, error) {
 		if err != nil {
 			continue
 		}
-		petbase[uint32(id)] = PetBaseInfo{Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E}
+		petbase[uint32(id)] = PetBaseInfo{
+			Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E,
+			HeightLow: v.HL, HeightHigh: v.HH, WeightLow: v.WL, WeightHigh: v.WH,
+		}
 		if v.E != 0 {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
 		}
