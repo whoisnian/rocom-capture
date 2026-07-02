@@ -128,8 +128,55 @@ for src in ("MONSTER_CONF.json", "PET_CONF.json"):
 #   hl/hh:身高下/上限 wl/wh:体重下/上限(原始整数,与 PetData.height/weight 同单位)}。
 #   宠物当前形态由 PetData.base_conf_id 直接给出(指向当前 petbase),据此取当前名称/头像/图鉴;
 #   conf_id 只指向该线一阶 base,evolved 宠物若用 conf_id 会显示成基础形态。
-#   同一 pet_evolution_id 分组、按 stage 排序即该形态的完整进化链(雪绒鸟→冬羽雀→岚鸟)。
+#   进化链分组 e 由下方连通分量重建(非直接用 pet_evolution_id),Go 侧按 e 分组、stage 排序还原整条链。
 #   身高/体重范围逐形态不同(base 越进化数值越大),用于列表 tooltip 显示区间与当前值百分位。
+# 进化链分组(重建)。游戏原始的 pet_evolution_id 分组有两个问题:
+#   ① 分支进化只跟单条路径——果冻→抹茶布丁,漏掉同为二阶的椰浆布丁/熔岩布丁;
+#   ② 把共享"身份背景"的 NPC 混进链——珂赛特老师(背景=厉毒修萝)、希露德老师(背景=公平鸽),
+#      以及小游戏变形/剧情/测试/首领(boss)等复制形态,它们与真实图鉴形态同组。
+# 真实图鉴形态判据 _real:有图鉴编号(pictorial_book_id)且 petbase_id 在常规区间(<1e7)。
+#   * 不能用 legal_petbase==1:传说宠整条链(里奥→灵羽勇士→圣羽翼王、小帕尔→…→龙息帕尔等)
+#     legal 均为空,会被整条漏掉。
+#   * 有图鉴号:排除无图鉴的纯 NPC(珂赛特老师/希露德老师/药炉,book=None)。
+#   * <1e7:排除复制形态——它们虽照抄了图鉴号,但 petbase_id 落在 1.3e7~1.9e7 特殊区间
+#     (如"迪莫"16000004、"钨丝贝贝(S2剧情骑乘专用)"19000008、"深渊罗隐"13000169);真实形态
+#     的 petbase_id 都是几千量级。
+# 对 _real 形态按两类无向边求连通分量:evolution_pet_id(该形态可进化成的目标,含全部分支)
+#   + 原 pet_evolution_id(同组互联,兜底季节地区形态)。每个含 ≥2 形态的分量即一条完整进化链
+#   (取分量内最小 petbase_id 作分组号);单形态(含 boss/特殊形态如"霜翼领主")不入链。
+_real = {int(pid) for pid, p in _petbase.items()
+         if p.get("pictorial_book_id") and int(pid) < 10_000_000}
+_adj = {pid: set() for pid in _real}
+for pid, p in _petbase.items():
+    pid = int(pid)
+    if pid not in _real:
+        continue
+    for t in p.get("evolution_pet_id") or []:  # 进化目标(含分支)
+        if int(t) in _real:
+            _adj[pid].add(int(t))
+            _adj[int(t)].add(pid)
+    ev = p.get("pet_evolution_id")             # 原分组(兜底,如季节地区形态)
+    if isinstance(ev, list) and ev:
+        _adj.setdefault(("g", ev[0]), set()).add(pid)  # 用组节点把同组成员连成星形
+        _adj[pid].add(("g", ev[0]))
+_seen, chain_group = set(), {}
+for pid in _real:
+    if pid in _seen:
+        continue
+    stack, comp = [pid], []
+    while stack:  # DFS 连通分量(组节点只作桥,不计入成员)
+        x = stack.pop()
+        if x in _seen:
+            continue
+        _seen.add(x)
+        if not isinstance(x, tuple):
+            comp.append(x)
+        stack.extend(_adj[x] - _seen)
+    if len(comp) >= 2:
+        g = min(comp)
+        for x in comp:
+            chain_group[x] = g
+
 petbase = {}
 for pid, p in _petbase.items():
     name = p.get("name")
@@ -142,9 +189,8 @@ for pid, p in _petbase.items():
         e["f"] = p["form"]
     if p.get("stage"):
         e["s"] = p["stage"]
-    evo = p.get("pet_evolution_id")
-    if isinstance(evo, list) and evo:
-        e["e"] = evo[0]
+    if int(pid) in chain_group:
+        e["e"] = chain_group[int(pid)]
     for src, dst in (("height_low", "hl"), ("height_high", "hh"),
                      ("weight_low", "wl"), ("weight_high", "wh")):
         if p.get(src):

@@ -248,7 +248,13 @@ func (db *DB) EvolutionChain(petbaseID uint32) []ChainStep {
 		pi := db.petbase[id]
 		steps = append(steps, ChainStep{Petbase: id, Name: pi.Name, Book: pi.Book, Stage: pi.Stage, Image: db.PetImageByBase(id, false)})
 	}
-	sort.Slice(steps, func(i, j int) bool { return steps[i].Stage < steps[j].Stage })
+	// 按阶段升序;同阶段(分支进化,如果冻→抹茶/椰浆/熔岩布丁)再按图鉴号,保证顺序稳定。
+	sort.Slice(steps, func(i, j int) bool {
+		if steps[i].Stage != steps[j].Stage {
+			return steps[i].Stage < steps[j].Stage
+		}
+		return steps[i].Book < steps[j].Book
+	})
 	return steps
 }
 

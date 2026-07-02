@@ -137,12 +137,17 @@ export function PetDetailModal({ gid, onClose }) {
             <div>
               <div className="muted" style={{ marginBottom: 6 }}>进化链{pet.form ? `（${pet.form}）` : ''}</div>
               <div className="evo-chain">
-                {chain.map((s, i) => (
-                  <React.Fragment key={s.petbase}>
+                {evoStages(chain).map((forms, i) => (
+                  <React.Fragment key={forms[0].stage}>
                     {i > 0 && <span className="evo-arrow">→</span>}
-                    <div className={'evo-step' + (s.petbase === pet.baseConfId ? ' on' : '')} title={`图鉴#${s.book}`}>
-                      <ImgAvatar src={s.image && s.image.head} alt={s.name} className="evo-avatar" />
-                      <div className="evo-name">{s.name}</div>
+                    {/* 同阶段多形态=分支进化(蓝珠天鹅→翠顶夫人/黑羽夫人),纵向并列 */}
+                    <div className="evo-stage">
+                      {forms.map((s) => (
+                        <div key={s.petbase} className={'evo-step' + (s.petbase === pet.baseConfId ? ' on' : '')} title={`图鉴#${s.book}`}>
+                          <ImgAvatar src={s.image && s.image.head} alt={s.name} className="evo-avatar" />
+                          <div className="evo-name">{s.name}</div>
+                        </div>
+                      ))}
                     </div>
                   </React.Fragment>
                 ))}
@@ -180,6 +185,18 @@ export function PetDetailModal({ gid, onClose }) {
       </div>
     </div>
   )
+}
+
+// evoStages 把进化链(后端已按 阶段,图鉴号 排序)按阶段分组:每组=同一进化阶段的形态,
+// 同组有多项即分支进化(如三阶的 翠顶夫人/黑羽夫人)。返回 [[stage1 形态...], [stage2...], ...]。
+function evoStages(chain) {
+  const stages = []
+  for (const s of chain) {
+    const last = stages[stages.length - 1]
+    if (last && last[0].stage === s.stage) last.push(s)
+    else stages.push([s])
+  }
+  return stages
 }
 
 function Item({ k, v }) {

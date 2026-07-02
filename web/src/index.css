@@ -148,6 +148,7 @@ img.pet-avatar { object-fit: cover; }
 
 /* 进化链(详情页):头像横向排列,当前形态高亮 */
 .evo-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.evo-stage { display: flex; flex-direction: column; gap: 6px; }
 .evo-step { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; border-radius: 8px; border: 1px solid transparent; min-width: 56px; }
 .evo-step.on { border-color: var(--accent); background: var(--bg-3); }
 .evo-avatar { width: 44px; height: 44px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; }
