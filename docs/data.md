@@ -171,7 +171,22 @@ s2c 0x1346 DATA 明文 body
   实测 6 个样本里 0x0160 仅花种捕捉那一条携带有效新宠物,全量同步 543 只 0 误报;
 - 上述四个获得 opcode(孵蛋/战斗外/普通战斗内/花种战斗内)统一处理:`FindNewPet` 加严格判据
   (conf_id>1000 且名称含中文)防误报,按 `catch_way` 区分子类型(1/4=捕捉、3=孵蛋),
-  `isNew` 去重(同宠物可能多 opcode 下发);
+  `isNew` 去重(同宠物可能多 opcode 下发);受赠宠物 `catch_way` 仍为 1 但应记「赠送获得」,
+  见下「共同捕捉转赠」;
+- **共同捕捉转赠(好友互赠)**:世界主人与到访好友「一起捕捉」一只宠物再转赠(4 小时转赠窗口),
+  宠物 `PetData.together_catch_info`(#90)记录双方——`related_uin`=接收方、`catched_uin`=捕捉方
+  (另有 `transfer_deadline` 等)。**捕捉与赠送是相互独立的事件**,两端分别处理:
+  - **送出方**:先由捕捉回包 `0x1983` 照常记「捕捉」入库;之后开盒子手动赠送,经
+    `ZONE_TOGETHER_CATCH_PET_FOR_GIFTING_RSP(0x1808)` 确认 → `ParseTogetherCatchGiftRsp`
+    取 `pet_gid`(顶层 field3)移除并记 lose「赠送」。该 opcode 有两种回包且都在顶层带 gid:
+    内嵌完整 PetData 的宠物详情(赠送前预览/同步)与紧凑 ack(仅 `ret_info`+gid);**只认后者**
+    (内嵌 PetData 的返回 0),避免预览误删 + 两种回包重复记;
+  - **接收方**:受赠宠物经 `ZONE_GOODS_REWARD_NOTIFY(0x0243)` 下发(走 `FindNewPet` 入库),
+    其 `catch_way` 仍为 1,故靠 `together_catch_info` 区分:`related_uin`==本账号 且 `catched_uin`≠本账号
+    → 记 obtain「赠送获得」而非「捕捉」;
+  - 判据**对称**、不依赖 opcode:送出方 `catched_uin`==本账号故仍记「捕捉」,接收方 `related_uin`==本账号
+    故记「赠送获得」(`catchWayName` 据 `uidFromAcc(acc)` 判定)。实测两侧样本(20645 送出、20646 受赠)
+    各自事件与宠物库变更均正确;
 - **异色/炫彩**：`mutation_type` 为位标志,bit0=异色、bit3=炫彩(9 样本实测验证);
   炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
 - **盒子位置**：`PetData` 无位置字段,位置由仓库布局 `PetBackpackInfo` 表达——
@@ -205,7 +220,9 @@ s2c 0x1346 DATA 明文 body
   (`pet.ParseLoginAccount`,实测两用户 839694713/873234858)。按 user_id 而非客户端 IP 归属
   (多台设备常经 NAT 共用同一 IP,无法区分);各账号数据在同库内按 `account` 列隔离,
   详见 [服务架构](architecture.md) 第 5 节「多账号隔离」。
-- **删除/赠送减少事件**:`DELETE_REQ(397)`/赠送相关 opcode 待接入。
+- **宠物减少途径已覆盖**:游戏内无「删除宠物」操作入口,玩家能主动减少宠物的途径只有放生
+  (`ZONE_PET_FREE_RSP(0x01c5)`)与赠送(共同捕捉转赠 `0x1808`),二者均已接入(见上)。
+  协议里虽存在 `DELETE_REQ(397)`,但无对应 UI 入口、玩家不可触发,故无需接入。
 
 待校准(多数需含相应事件/宠物的新样本)：
 - **咕噜球/蛋组/技能名**本地化尚未梳理;

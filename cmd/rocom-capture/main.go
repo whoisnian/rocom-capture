@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
@@ -195,7 +196,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				isNew, _ := sc.UpsertPet(p)
 				srv.Hub().Broadcast("pet", acc, p)
 				if isNew {
-					ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: catchWayName(pd), Gid: p.Gid, Pet: p}
+					ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: catchWayName(pd, acc), Gid: p.Gid, Pet: p}
 					if sc.AddEvent(ev) == nil {
 						logEvent(acc, ev)
 						srv.Hub().Broadcast("event", acc, ev)
@@ -224,6 +225,22 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue
 		}
 
+		// 赠送:玩家开盒子手动把共同捕捉的宠物赠送给好友(与先前捕捉是相互独立的事件),
+		// 执行回包携带被送出的 gid;据此从自己库中移除并记一条「赠送」失去事件。
+		if m.Direction == gcp.S2C && m.Opcode == pet.OpTogetherCatchGiftRsp {
+			if gid := pet.ParseTogetherCatchGiftRsp(m.AppBody); gid != 0 {
+				old, _ := sc.RemovePet(gid)
+				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "赠送", Gid: gid, Pet: old}
+				if sc.AddEvent(ev) == nil {
+					logEvent(acc, ev)
+					srv.Hub().Broadcast("event", acc, ev)
+				}
+				// 刷新列表与盒子/队伍示意图(赠送已清掉盒位/队位)
+				srv.Hub().Broadcast("pet", acc, map[string]any{"locUpdate": true})
+			}
+			continue
+		}
+
 		if m.Direction != gcp.S2C || m.Opcode != pet.OpGetPetInfoByPageRsp {
 			continue
 		}
@@ -239,7 +256,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				ev := &store.Event{
 					Time:    int64(pd.GetAddTime()),
 					Kind:    store.EventObtain,
-					SubKind: catchWayName(pd),
+					SubKind: catchWayName(pd, acc),
 					Gid:     p.Gid,
 					Pet:     p,
 				}
@@ -266,7 +283,15 @@ func logEvent(acc string, ev *store.Event) {
 }
 
 // catchWayName 由 catch_way 推断获得方式(实测：1=捕捉、3=孵蛋;其余未知归“获得”)。
-func catchWayName(pd *pb.PetData) string {
+// 例外:共同捕捉转赠的宠物 catch_way 仍是 1,但对接收方应记「赠送获得」而非「捕捉」——
+// 据 together_catch_info 区分(related_uin=接收方、catched_uin=捕捉方):本账号是接收方且非捕捉方即为受赠。
+func catchWayName(pd *pb.PetData, acc string) string {
+	if tci := pd.GetTogetherCatchInfo(); tci != nil {
+		if uid, ok := uidFromAcc(acc); ok &&
+			tci.GetRelatedUin() == uid && tci.GetCatchedUin() != 0 && tci.GetCatchedUin() != uid {
+			return "赠送获得"
+		}
+	}
 	switch pd.GetCatchWay() {
 	case 1, 4:
 		return "捕捉" // 1=普通/战斗外捕捉, 4=花种(稀兽)战斗内捕捉
@@ -275,4 +300,17 @@ func catchWayName(pd *pb.PetData) string {
 	default:
 		return "获得"
 	}
+}
+
+// uidFromAcc 从账号标识("role:<user_id>")取回 user_id。
+func uidFromAcc(acc string) (uint32, bool) {
+	s, ok := strings.CutPrefix(acc, "role:")
+	if !ok {
+		return 0, false
+	}
+	v, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(v), true
 }

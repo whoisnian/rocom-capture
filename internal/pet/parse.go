@@ -10,16 +10,17 @@ import (
 
 // 宠物相关 opcode(来自 ZoneSvrCmd enum,见 names.json opcodes,源自 nrc/all.pb)。
 const (
-	OpGetPetInfoByPageRsp = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
-	OpPetFreeRsp          = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
-	OpCrackEggRsp         = 0x030c // ZONE_CRACK_EGG_RSP(780), 孵蛋(新宠物嵌在 goods_reward)
-	OpPetCatchRsp         = 0x1983 // ZONE_SCENE_THROW_CATCH_FINISH_RSP(6531), 战斗外捕捉(赛季球/高级球)
-	OpGoodsRewardNotify   = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
-	OpPlayerSyncNotify    = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
-	OpLoginRsp            = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
-	OpPetBoxChangePetRsp  = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
-	OpPetMedalCommonRsp   = 0x141e // ZONE_PET_MEDAL_COMMON_RSP(5150), 换牌等回包(含更新后 PetData)
-	OpPetEvoluteRsp       = 0x01ae // ZONE_PET_EVOLUTE_RSP(430), 进化回包(含进化后完整 PetData,base_conf_id 已换形态)
+	OpGetPetInfoByPageRsp  = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
+	OpPetFreeRsp           = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
+	OpTogetherCatchGiftRsp = 0x1808 // ZONE_TOGETHER_CATCH_PET_FOR_GIFTING_RSP(6152), 赠送共同捕捉的宠物给好友(执行回包含 gid)
+	OpCrackEggRsp          = 0x030c // ZONE_CRACK_EGG_RSP(780), 孵蛋(新宠物嵌在 goods_reward)
+	OpPetCatchRsp          = 0x1983 // ZONE_SCENE_THROW_CATCH_FINISH_RSP(6531), 战斗外捕捉(赛季球/高级球)
+	OpGoodsRewardNotify    = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
+	OpPlayerSyncNotify     = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
+	OpLoginRsp             = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
+	OpPetBoxChangePetRsp   = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
+	OpPetMedalCommonRsp    = 0x141e // ZONE_PET_MEDAL_COMMON_RSP(5150), 换牌等回包(含更新后 PetData)
+	OpPetEvoluteRsp        = 0x01ae // ZONE_PET_EVOLUTE_RSP(430), 进化回包(含进化后完整 PetData,base_conf_id 已换形态)
 )
 
 // 盒子操作 opcode 区间(ZoneSvrCmd 十进制 6272-6292,如 TIDY_RSP/SETTING_UP_RSP 携带全量盒子)。
@@ -502,6 +503,57 @@ func ParseFreeRsp(body []byte) []uint32 {
 		b = b[m:]
 	}
 	return gids
+}
+
+// ParseTogetherCatchGiftRsp 解析 ZoneTogetherCatchPetForGiftingRsp(赠送共同捕捉的宠物)的 body，
+// 返回被赠送出的 pet_gid(0 表示非赠送执行回包)。捕捉与赠送是相互独立的事件:先前捕捉照常入库,
+// 之后玩家开盒子手动选择赠送才走本回包,应据此从自己的库中移除并记一条「赠送」失去事件。
+// 该 opcode 有两种回包且都在顶层带 pet_gid(field3):一种是内嵌完整 PetData 的宠物详情(赠送前预览/
+// 同步,不代表已送出),一种是紧凑的执行确认 ack({ RetInfo ret_info=1; uint32 _=2; uint32 pet_gid=3; })。
+// 只认后者:内嵌 PetData 的直接返回 0,避免预览误记 + 两种回包重复记;ack 里 result==0 且 gid>0 才算成功。
+func ParseTogetherCatchGiftRsp(body []byte) uint32 {
+	if FindNewPet(body) != nil { // 宠物详情回包(预览/同步),非执行确认
+		return 0
+	}
+	var result int64 = -1 // ret_info.result(field1.field1);-1=未见
+	var gid uint32
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		var m int
+		switch {
+		case num == 1 && typ == protowire.BytesType: // ret_info: 取其 field1 作为 result
+			var v []byte
+			v, m = protowire.ConsumeBytes(b)
+			if m >= 0 {
+				if rnum, rtyp, rn := protowire.ConsumeTag(v); rn >= 0 && rnum == 1 && rtyp == protowire.VarintType {
+					if rv, rm := protowire.ConsumeVarint(v[rn:]); rm >= 0 {
+						result = int64(rv)
+					}
+				}
+			}
+		case num == 3 && typ == protowire.VarintType: // pet_gid
+			var v uint64
+			v, m = protowire.ConsumeVarint(b)
+			if m >= 0 {
+				gid = uint32(v)
+			}
+		default:
+			m = protowire.ConsumeFieldValue(num, typ, b)
+		}
+		if m < 0 {
+			break
+		}
+		b = b[m:]
+	}
+	if result == 0 {
+		return gid
+	}
+	return 0
 }
 
 // PageResult 是一页宠物列表的解析结果。
