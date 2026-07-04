@@ -41,12 +41,23 @@ def rows(table):
     )["RocoDataRows"]
 
 
-# PET_FILTER 按 enum 名分组: {enum_name: {value_name: desc}}
+def texkey(ref):
+    """从 UE 资产引用 <Cls>'/Game/.../Dir/NAME.NAME' 抠出原始文件名 NAME(PaperSprite/Texture2D 皆可)。"""
+    if not isinstance(ref, str):
+        return None
+    m = re.search(r"/Game/.*/([^/.']+)\.", ref)
+    return m.group(1) if m else None
+
+
+# PET_FILTER 按 enum 名分组: {enum_name: {value_name: desc}};并记录带图标的值 -> 图标原始文件名。
 filter_groups = {}
+filter_iconed = {}  # {enum_name: {value_name: icon_文件名}}——用于筛选图标索引(只收录有图标者)
 for r in rows("PET_FILTER_CONF.json").values():
     en = r.get("filter_enum_name")
     if en:
         filter_groups.setdefault(en, {})[r.get("filter_enum_value")] = r.get("filter_desc")
+        if texkey(r.get("filter_icon")):
+            filter_iconed.setdefault(en, {})[r.get("filter_enum_value")] = texkey(r.get("filter_icon"))
 
 
 def enum_dim(enum_name):
@@ -56,6 +67,28 @@ def enum_dim(enum_name):
     for vname, desc in filter_groups.get(enum_name, {}).items():
         if vname in name2int:
             out[str(name2int[vname])] = desc
+    return out
+
+
+def enum_icon(enum_name):
+    """带图标的枚举整数值 -> 图标原始文件名。webp 保持原始解包文件名(见 gen_icons.py),
+    Go 侧据此拼 filter/<原名>.webp。"""
+    name2int = pbdesc.enum(_FDS, enum_name)
+    out = {}
+    for vname, iconname in filter_iconed.get(enum_name, {}).items():
+        if vname in name2int:
+            out[str(name2int[vname])] = iconname
+    return out
+
+
+def id_icons(table, id_field, icon_field):
+    """CONF 行 -> {str(id): 图标原始文件名}(id_field→id,icon_field→资产引用)。
+    用于 blood/medal 索引;webp 保持原名,Go 侧拼 <组>/<原名>.webp。"""
+    out = {}
+    for r in rows(table).values():
+        i, k = r.get(id_field), texkey(r.get(icon_field))
+        if i is not None and k:
+            out[str(int(i))] = k
     return out
 
 
@@ -69,14 +102,6 @@ species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get(
 #   头像取自 MODEL_CONF(经 PETBASE.model_conf 关联)的 icon/big_icon;全身图取自 PETBASE.JL_res。
 #   文件名【不能用 id 拼】(728 个形态共用他人头像,如 3228 用 3012),故存表;
 #   Go 侧按固定目录(HeadIcon/BigHeadIcon256/Pet1024/Pet256)拼出 .webp 路径。
-def texkey(ref):
-    """从 UE 贴图引用 Texture2D'/Game/.../Dir/NAME.NAME' 抠出文件名 NAME。"""
-    if not isinstance(ref, str):
-        return None
-    m = re.search(r"/Game/.*/([^/.']+)\.", ref)
-    return m.group(1) if m else None
-
-
 _petbase = rows("PETBASE_CONF.json")
 _model = rows("MODEL_CONF.json")
 
@@ -220,6 +245,17 @@ data = {
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),
+    # UI 图标索引: 语义键 -> 图标原始文件名(webp 保持原名,gen_icons.py 裁出/转码)。
+    #   filter_icons: {组名: {枚举整数值: 原名}} 系别(属性)/六维(增益类与裸值)/搭档标记三组。
+    #   blood_icons:  {血脉id: 原名}(PET_BLOOD_CONF)。medal_icons: {奖牌id: 原名}(MEDAL_CONF)。
+    # Go 侧据此拼 <组>/<原名>.webp。
+    "filter_icons": {
+        "skill_dam_type": enum_icon("SkillDamType"),
+        "attribute_type": enum_icon("AttributeType"),
+        "partner_mark": enum_icon("PetPartnerMarkType"),
+    },
+    "blood_icons": id_icons("PET_BLOOD_CONF.json", "blood", "icon"),
+    "medal_icons": id_icons("MEDAL_CONF.json", "id", "icon"),
     # 特长：仅取 PET_TALENT_CONF 里 filter_enum_value=PTFN_TALENT_* 的固定特长，
     # 避免误用非特长条目;id=502 的 name 为"勇敢"，游戏内显示为"无畏"。
     "speciality": {

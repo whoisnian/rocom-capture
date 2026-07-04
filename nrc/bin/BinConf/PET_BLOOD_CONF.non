@@ -1,0 +1,153 @@
+{
+    "Name": "PET_BLOOD_CONF",
+    "Type": "EStruct",
+    "UniqueKey": "id",
+    "Properties": [
+        {
+            "Name": "id",
+            "Type": "EUint32",
+            "Offset": 0,
+            "Size": 4
+        },
+        {
+            "Name": "blood",
+            "Type": "EInt32",
+            "Offset": 4,
+            "Size": 4
+        },
+        {
+            "Name": "name",
+            "Type": "ELocalizedString",
+            "Offset": 8,
+            "Size": 4
+        },
+        {
+            "Name": "blood_type",
+            "Type": "EInt32",
+            "Offset": 12,
+            "Size": 4
+        },
+        {
+            "Name": "is_precious",
+            "Type": "EInt32",
+            "Offset": 16,
+            "Size": 4
+        },
+        {
+            "Name": "change_blood_action",
+            "Type": "EInt32",
+            "Offset": 20,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "change_to_this_blood_action",
+            "Type": "EInt32",
+            "Offset": 24,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "icon",
+            "Type": "EString",
+            "Offset": 28,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_1",
+            "Type": "EString",
+            "Offset": 32,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_flower",
+            "Type": "EString",
+            "Offset": 36,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_flower_2",
+            "Type": "EString",
+            "Offset": 40,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "blood_name",
+            "Type": "ELocalizedString",
+            "Offset": 44,
+            "Size": 4
+        },
+        {
+            "Name": "attribute_type",
+            "Type": "EInt32",
+            "Offset": 48,
+            "Size": 4
+        },
+        {
+            "Name": "attribute_data",
+            "Type": "EInt32",
+            "Offset": 52,
+            "Size": 4
+        },
+        {
+            "Name": "inherit_or_not",
+            "Type": "EInt32",
+            "Offset": 56,
+            "Size": 4
+        },
+        {
+            "Name": "blood_tips",
+            "Type": "EInt32",
+            "Offset": 60,
+            "Size": 4
+        },
+        {
+            "Name": "tips_desc",
+            "Type": "EString",
+            "Offset": 64,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "blood_skill",
+            "Type": "EUint32",
+            "Offset": 68,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "team_battle_location",
+            "Type": "EString",
+            "Offset": 72,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_magicbook_limited_flower_seed",
+            "Type": "EString",
+            "Offset": 76,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "icon_activity_limited_flower_seed",
+            "Type": "EString",
+            "Offset": 80,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "star_ratio",
+            "Type": "EInt32",
+            "Offset": 84,
+            "Size": 4
+        }
+    ]
+}

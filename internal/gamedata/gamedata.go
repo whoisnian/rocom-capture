@@ -81,6 +81,10 @@ type DB struct {
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
 	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
 	imgFiles     map[string]bool        // 实际 embed 的图片相对路径(异色图缺失时回退普通)
+	// UI 图标索引: 语义键 -> 图标原始文件名(webp 保持原名),Go 侧拼 <组>/<原名>.webp。
+	filterIcons map[string]map[string]string // 组名 -> {枚举整数值: 原名}(filter/)
+	bloodIcons  map[string]string            // 血脉id -> 原名(blood/)
+	medalIcons  map[string]string            // 奖牌id -> 原名(medal/)
 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
@@ -92,17 +96,20 @@ type NatureEffect struct {
 // Load 加载 embed 的名称表。
 func Load() (*DB, error) {
 	var raw struct {
-		Species      map[string]string       `json:"species"`
-		Nature       map[string]string       `json:"nature"`
-		SkillDamType map[string]string       `json:"skill_dam_type"`
-		TalentRate   map[string]string       `json:"talent_rate"`
-		PartnerMark  map[string]string       `json:"partner_mark"`
-		Speciality   map[string]string       `json:"speciality"`
-		Medal        map[string]Medal        `json:"medal"`
-		Opcodes      map[string]string       `json:"opcodes"`
-		NatureEffect map[string]NatureEffect `json:"nature_effect"`
-		Images       map[string]imageEntry   `json:"images"`
-		ImageBase    map[string]uint32       `json:"image_base"`
+		Species      map[string]string            `json:"species"`
+		Nature       map[string]string            `json:"nature"`
+		SkillDamType map[string]string            `json:"skill_dam_type"`
+		TalentRate   map[string]string            `json:"talent_rate"`
+		PartnerMark  map[string]string            `json:"partner_mark"`
+		Speciality   map[string]string            `json:"speciality"`
+		Medal        map[string]Medal             `json:"medal"`
+		Opcodes      map[string]string            `json:"opcodes"`
+		NatureEffect map[string]NatureEffect      `json:"nature_effect"`
+		FilterIcons  map[string]map[string]string `json:"filter_icons"`
+		BloodIcons   map[string]string            `json:"blood_icons"`
+		MedalIcons   map[string]string            `json:"medal_icons"`
+		Images       map[string]imageEntry        `json:"images"`
+		ImageBase    map[string]uint32            `json:"image_base"`
 		Petbase      map[string]struct {
 			N  string `json:"n"`
 			B  uint32 `json:"b"`
@@ -161,6 +168,9 @@ func Load() (*DB, error) {
 		medal:        raw.Medal,
 		opcodes:      opcodes,
 		natureEffect: raw.NatureEffect,
+		filterIcons:  raw.FilterIcons,
+		bloodIcons:   raw.BloodIcons,
+		medalIcons:   raw.MedalIcons,
 		images:       raw.Images,
 		imageBase:    imageBase,
 		petbase:      petbase,
@@ -274,6 +284,43 @@ func (db *DB) Nature(id uint32) string { return db.nature[key(id)] }
 
 // SkillDamType 返回系别名(SkillDamType enum 整数值)。
 func (db *DB) SkillDamType(v int32) string { return db.skillDamType[strconv.FormatInt(int64(v), 10)] }
+
+// iconPath 由「原始文件名」拼出 <group>/<name>.webp;name 为空或未 embed 时返回空串。
+func (db *DB) iconPath(group, name string) string {
+	if name == "" {
+		return ""
+	}
+	p := group + "/" + name + ".webp"
+	if !db.imgFiles[p] {
+		return ""
+	}
+	return p
+}
+
+// filterIcon 查 filter_icons 索引(组名 + 枚举整数值)拿原名,拼 filter/<原名>.webp。
+func (db *DB) filterIcon(group string, v int32) string {
+	return db.iconPath("filter", db.filterIcons[group][strconv.FormatInt(int64(v), 10)])
+}
+
+// SkillDamTypeIcon 返回系别(属性)图标路径(SkillDamType enum 整数值)。
+func (db *DB) SkillDamTypeIcon(v int32) string { return db.filterIcon("skill_dam_type", v) }
+
+// AttributeTypeIcon 返回六维属性图标路径(AttributeType enum 整数值;1-6 即六维编号,
+// 79-84 为对应增益类)。
+func (db *DB) AttributeTypeIcon(v int32) string { return db.filterIcon("attribute_type", v) }
+
+// PartnerMarkIcon 返回搭档标记图标路径(PetPartnerMarkType enum 整数值)。
+func (db *DB) PartnerMarkIcon(v int32) string { return db.filterIcon("partner_mark", v) }
+
+// BloodIcon 返回血脉主图标路径 blood/<原名>.webp(PET_BLOOD_CONF.blood,1-24);无图或未 embed 时空串。
+func (db *DB) BloodIcon(bloodID uint32) string {
+	return db.iconPath("blood", db.bloodIcons[key(bloodID)])
+}
+
+// MedalIcon 返回奖牌小图路径 medal/<原名>.webp(MEDAL_CONF.id → icon(BagItem));无图或未 embed 时空串。
+func (db *DB) MedalIcon(medalID uint32) string {
+	return db.iconPath("medal", db.medalIcons[key(medalID)])
+}
 
 // TalentRate 返回天分评价名(talent_rank)。
 func (db *DB) TalentRate(rank uint32) string { return db.talentRate[key(rank)] }
