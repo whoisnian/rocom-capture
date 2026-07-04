@@ -922,6 +922,8 @@ const (
 	RPBehaviorType_RPBT_RELAX_QIUKA            RPBehaviorType = 108
 	RPBehaviorType_RPBT_THANKS                 RPBehaviorType = 109
 	RPBehaviorType_RPBT_THANKS_2               RPBehaviorType = 110
+	RPBehaviorType_RPBT_BIRTHDAY               RPBehaviorType = 146
+	RPBehaviorType_RPBT_BIRTHDAY_2             RPBehaviorType = 147
 )
 
 // Enum value maps for RPBehaviorType.
@@ -1036,6 +1038,8 @@ var (
 		108: "RPBT_RELAX_QIUKA",
 		109: "RPBT_THANKS",
 		110: "RPBT_THANKS_2",
+		146: "RPBT_BIRTHDAY",
+		147: "RPBT_BIRTHDAY_2",
 	}
 	RPBehaviorType_value = map[string]int32{
 		"RPBT_HAPPY":                  1,
@@ -1147,6 +1151,8 @@ var (
 		"RPBT_RELAX_QIUKA":            108,
 		"RPBT_THANKS":                 109,
 		"RPBT_THANKS_2":               110,
+		"RPBT_BIRTHDAY":               146,
+		"RPBT_BIRTHDAY_2":             147,
 	}
 )
 
@@ -22146,6 +22152,7 @@ const (
 	ExchangeUseType_EUT_PROCESSING_PRODUCTS         ExchangeUseType = 15
 	ExchangeUseType_EUT_ACTIVIY_SHOP_LIMIT_EXCHANGE ExchangeUseType = 16
 	ExchangeUseType_EUT_MANUFACTURE_PET_USE         ExchangeUseType = 17
+	ExchangeUseType_EUT_TEAM_CODE                   ExchangeUseType = 19
 )
 
 // Enum value maps for ExchangeUseType.
@@ -22169,6 +22176,7 @@ var (
 		15: "EUT_PROCESSING_PRODUCTS",
 		16: "EUT_ACTIVIY_SHOP_LIMIT_EXCHANGE",
 		17: "EUT_MANUFACTURE_PET_USE",
+		19: "EUT_TEAM_CODE",
 	}
 	ExchangeUseType_value = map[string]int32{
 		"EUT_NONE":                        0,
@@ -22189,6 +22197,7 @@ var (
 		"EUT_PROCESSING_PRODUCTS":         15,
 		"EUT_ACTIVIY_SHOP_LIMIT_EXCHANGE": 16,
 		"EUT_MANUFACTURE_PET_USE":         17,
+		"EUT_TEAM_CODE":                   19,
 	}
 )
 
@@ -38715,6 +38724,7 @@ const (
 	ActivityType_ATP_ACTIVITY_RECALL_BP         ActivityType = 51
 	ActivityType_ATP_ACTIVITY_RECALL            ActivityType = 52
 	ActivityType_ATP_PRE_DOWNLOAD               ActivityType = 53
+	ActivityType_ATP_SEASON_SPRINT              ActivityType = 63
 )
 
 // Enum value maps for ActivityType.
@@ -38771,6 +38781,7 @@ var (
 		51: "ATP_ACTIVITY_RECALL_BP",
 		52: "ATP_ACTIVITY_RECALL",
 		53: "ATP_PRE_DOWNLOAD",
+		63: "ATP_SEASON_SPRINT",
 	}
 	ActivityType_value = map[string]int32{
 		"ATP_ACTIVITY_SPECIAL":           1,
@@ -38824,6 +38835,7 @@ var (
 		"ATP_ACTIVITY_RECALL_BP":         51,
 		"ATP_ACTIVITY_RECALL":            52,
 		"ATP_PRE_DOWNLOAD":               53,
+		"ATP_SEASON_SPRINT":              63,
 	}
 )
 
@@ -57345,7 +57357,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x12\x12\n" +
 	"\x0eBT_ACTION_SORT\x10\v\x12\x10\n" +
 	"\fBT_SUIT_SORT\x10\f\x12\x12\n" +
-	"\x0eBT_PUTPRO_SORT\x10\r*\xd5\x12\n" +
+	"\x0eBT_PUTPRO_SORT\x10\r*\xff\x12\n" +
 	"\x0eRPBehaviorType\x12\x0e\n" +
 	"\n" +
 	"RPBT_HAPPY\x10\x01\x12\f\n" +
@@ -57466,7 +57478,9 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x16RPBT_PROP_PUMPKINCHAIR\x10k\x12\x14\n" +
 	"\x10RPBT_RELAX_QIUKA\x10l\x12\x0f\n" +
 	"\vRPBT_THANKS\x10m\x12\x11\n" +
-	"\rRPBT_THANKS_2\x10n*\xc2\x02\n" +
+	"\rRPBT_THANKS_2\x10n\x12\x12\n" +
+	"\rRPBT_BIRTHDAY\x10\x92\x01\x12\x14\n" +
+	"\x0fRPBT_BIRTHDAY_2\x10\x93\x01*\xc2\x02\n" +
 	"\vSceneEffect\x12\v\n" +
 	"\aSE_NONE\x10\x00\x12\v\n" +
 	"\aSE_SAFE\x10\x01\x12\x0e\n" +
@@ -61000,7 +61014,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"SLT_STATIC\x10\x01\x12\x0f\n" +
 	"\vSLT_DYNAMIC\x10\x02* \n" +
 	"\rMainBlockType\x12\x0f\n" +
-	"\vCOMPS_BLOCK\x10\x00*\xda\x03\n" +
+	"\vCOMPS_BLOCK\x10\x00*\xed\x03\n" +
 	"\x0fExchangeUseType\x12\f\n" +
 	"\bEUT_NONE\x10\x00\x12\x13\n" +
 	"\x0fEUT_MANUFACTURE\x10\x01\x12\x13\n" +
@@ -61020,7 +61034,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\rEUT_FURNITURE\x10\x0e\x12\x1b\n" +
 	"\x17EUT_PROCESSING_PRODUCTS\x10\x0f\x12#\n" +
 	"\x1fEUT_ACTIVIY_SHOP_LIMIT_EXCHANGE\x10\x10\x12\x1b\n" +
-	"\x17EUT_MANUFACTURE_PET_USE\x10\x11*B\n" +
+	"\x17EUT_MANUFACTURE_PET_USE\x10\x11\x12\x11\n" +
+	"\rEUT_TEAM_CODE\x10\x13*B\n" +
 	"\x10ExchangeNumLimit\x12\x15\n" +
 	"\x11EXCHANGE_NO_LIMIT\x10\x00\x12\x17\n" +
 	"\x13EXCHANGE_TIME_LIMIT\x10\x01*G\n" +
@@ -63725,7 +63740,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x10WCERS_PROCESSING\x10\x00\x12\x12\n" +
 	"\x0eWCERS_COMPLETE\x10\x01\x12\x0e\n" +
 	"\n" +
-	"WCERS_FAIL\x10\x02*\x89\n" +
+	"WCERS_FAIL\x10\x02*\xa0\n" +
 	"\n" +
 	"\fActivityType\x12\x18\n" +
 	"\x14ATP_ACTIVITY_SPECIAL\x10\x01\x12 \n" +
@@ -63781,7 +63796,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x1dATP_ACTIVITY_RECALL_STARLIGHT\x102\x12\x1a\n" +
 	"\x16ATP_ACTIVITY_RECALL_BP\x103\x12\x17\n" +
 	"\x13ATP_ACTIVITY_RECALL\x104\x12\x14\n" +
-	"\x10ATP_PRE_DOWNLOAD\x105*X\n" +
+	"\x10ATP_PRE_DOWNLOAD\x105\x12\x15\n" +
+	"\x11ATP_SEASON_SPRINT\x10?*X\n" +
 	"\x15ActivityLoginRequired\x12\x10\n" +
 	"\fALR_LOGIN_QQ\x10\x01\x12\x14\n" +
 	"\x10ALR_LOGIN_WECHAT\x10\x02\x12\x17\n" +

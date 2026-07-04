@@ -468,6 +468,7 @@ type SharedPetInfo struct {
 	ChangedNaturePosAttrType *uint32                `protobuf:"varint,11,opt,name=changed_nature_pos_attr_type,json=changedNaturePosAttrType" json:"changed_nature_pos_attr_type,omitempty"`
 	ChangedNatureNegAttrType *uint32                `protobuf:"varint,12,opt,name=changed_nature_neg_attr_type,json=changedNatureNegAttrType" json:"changed_nature_neg_attr_type,omitempty"`
 	Gid                      *uint64                `protobuf:"varint,13,opt,name=gid" json:"gid,omitempty"`
+	Type                     *PetTypeInfo           `protobuf:"bytes,14,opt,name=type" json:"type,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -591,6 +592,13 @@ func (x *SharedPetInfo) GetGid() uint64 {
 		return *x.Gid
 	}
 	return 0
+}
+
+func (x *SharedPetInfo) GetType() *PetTypeInfo {
+	if x != nil {
+		return x.Type
+	}
+	return nil
 }
 
 type AdjustedPetTeamInfo struct {
@@ -1085,7 +1093,7 @@ const file_com_pet_team_proto_rawDesc = "" +
 	"\tteam_name\x18\x01 \x01(\tR\bteamName\x12\x1b\n" +
 	"\tteam_type\x18\x02 \x01(\rR\bteamType\x12\"\n" +
 	"\rrole_magic_id\x18\x03 \x01(\rR\vroleMagicId\x12'\n" +
-	"\x04pets\x18\x04 \x03(\v2\x13.Next.SharedPetInfoR\x04pets\"\x9d\x04\n" +
+	"\x04pets\x18\x04 \x03(\v2\x13.Next.SharedPetInfoR\x04pets\"\xc4\x04\n" +
 	"\rSharedPetInfo\x12\x1b\n" +
 	"\thp_talent\x18\x01 \x01(\x05R\bhpTalent\x12#\n" +
 	"\rattack_talent\x18\x02 \x01(\x05R\fattackTalent\x122\n" +
@@ -1101,7 +1109,8 @@ const file_com_pet_team_proto_rawDesc = "" +
 	" \x03(\v2\x17.Next.PetSkillEquipInfoR\x06skills\x12>\n" +
 	"\x1cchanged_nature_pos_attr_type\x18\v \x01(\rR\x18changedNaturePosAttrType\x12>\n" +
 	"\x1cchanged_nature_neg_attr_type\x18\f \x01(\rR\x18changedNatureNegAttrType\x12\x10\n" +
-	"\x03gid\x18\r \x01(\x04R\x03gid\"<\n" +
+	"\x03gid\x18\r \x01(\x04R\x03gid\x12%\n" +
+	"\x04type\x18\x0e \x01(\v2\x11.Next.PetTypeInfoR\x04type\"<\n" +
 	"\x13AdjustedPetTeamInfo\x12%\n" +
 	"\x04pets\x18\x01 \x03(\v2\x11.Next.AdjustedPetR\x04pets\"O\n" +
 	"\vAdjustedPet\x12\x10\n" +
@@ -1179,16 +1188,17 @@ var file_com_pet_team_proto_depIdxs = []int32{
 	3,  // 5: Next.PetTeamInfo.synchron:type_name -> Next.PetSynchronInfo
 	6,  // 6: Next.SharedPetTeamInfo.pets:type_name -> Next.SharedPetInfo
 	0,  // 7: Next.SharedPetInfo.skills:type_name -> Next.PetSkillEquipInfo
-	8,  // 8: Next.AdjustedPetTeamInfo.pets:type_name -> Next.AdjustedPet
-	9,  // 9: Next.AdjustedPet.skills:type_name -> Next.AdjustedPetSkill
-	5,  // 10: Next.RecommendPetTeamInfo.pet_team_info:type_name -> Next.SharedPetTeamInfo
-	16, // 11: Next.FriendPetTeamInfo.pets:type_name -> Next.PetData
-	2,  // 12: Next.FriendPetTeamInfo.teams:type_name -> Next.PetTeam
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	14, // 8: Next.SharedPetInfo.type:type_name -> Next.PetTypeInfo
+	8,  // 9: Next.AdjustedPetTeamInfo.pets:type_name -> Next.AdjustedPet
+	9,  // 10: Next.AdjustedPet.skills:type_name -> Next.AdjustedPetSkill
+	5,  // 11: Next.RecommendPetTeamInfo.pet_team_info:type_name -> Next.SharedPetTeamInfo
+	16, // 12: Next.FriendPetTeamInfo.pets:type_name -> Next.PetData
+	2,  // 13: Next.FriendPetTeamInfo.teams:type_name -> Next.PetTeam
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_com_pet_team_proto_init() }
