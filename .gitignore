@@ -11,6 +11,10 @@
 *.db-journal
 *.log
 
+# 自签 TLS 证书(-tls 时自动生成)
+rocom-cert.pem
+rocom-key.pem
+
 # 编译产物(二进制)
 /rocom
 /rocom-capture

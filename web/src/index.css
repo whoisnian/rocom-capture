@@ -135,6 +135,8 @@ img.pet-avatar { object-fit: cover; }
 .gender.male { color: #4ea3ff; }
 .gender.female { color: #ff6fae; }
 .pet-sub { font-size: 12px; color: var(--fg-dim); }
+/* 位置标签整体折行,不在中日韩字符间断开 */
+.pet-sub .loc { white-space: nowrap; }
 /* 固定三列等宽:各宠物的 .six 是独立 grid,用 auto 会让每行列宽随本行数值变化而错位,
    改为定宽让「生命/物攻/物防」三列在所有行间对齐(84px 可容纳「生命 118 ↑+10」级最宽内容)。 */
 .six { display: grid; grid-template-columns: repeat(3, 84px); gap: 1px 10px; font-size: 12px; }
@@ -170,7 +172,12 @@ img.evo-avatar { object-fit: cover; }
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
   border-radius: 10px; background: var(--bg-1);
 }
-.event .event-seq { min-width: 40px; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* 序号/奖章/名称/时间同一行,时间靠右;空间不足时时间换行到下一行仍靠右 */
+.event-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.event-row .pet-name { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.event .event-seq { font-size: 13px; font-variant-numeric: tabular-nums; }
+.event .event-time { margin-left: auto; font-size: 12px; white-space: nowrap; }
 .event.hl { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2a2410; }
 .event .badge { padding: 2px 8px; border-radius: 6px; font-size: 12px; background: var(--bg-3); }
 .event .badge.obtain { background: #133a1e; color: var(--green); }
@@ -249,6 +256,13 @@ img.evo-avatar { object-fit: cover; }
 .debug-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }
 .debug-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); }
 .dir-c2s { color: var(--accent); } .dir-s2c { color: var(--gold); }
+.debug-table td:last-child { width: 1%; text-align: right; padding-right: 6px; }
+.btn-ignore { background: none; border: 0; cursor: pointer; padding: 0 4px; opacity: 0.35; font-size: 12px; }
+.btn-ignore:hover { opacity: 1; }
+
+/* 调试页忽略列表:已忽略 opcode 的可点击胶囊(点击取消) */
+.ignore-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; }
+.ignore-bar .chip { font-family: ui-monospace, monospace; }
 
 .empty { color: var(--fg-dim); text-align: center; padding: 40px; }
 
@@ -276,6 +290,8 @@ img.evo-avatar { object-fit: cover; }
   }
   .card-head { display: flex; align-items: center; gap: 10px; }
   .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 13px; }
+  /* 六维在窄屏铺满等分三列,避免「物攻 235 ↑ +10」挤到两行 */
+  .card .six { grid-template-columns: repeat(3, 1fr); }
   .kv { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(3, 1fr); }
   .detail-wrap { max-width: 100%; }

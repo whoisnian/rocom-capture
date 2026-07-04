@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -24,6 +25,9 @@ func main() {
 	port := flag.Int("port", 8195, "游戏服务器端口")
 	addr := flag.String("addr", ":4939", "Web 服务监听地址")
 	dbPath := flag.String("db", "rocom.db", "SQLite 数据库路径")
+	useTLS := flag.Bool("tls", false, "启用 HTTPS(自签证书;手机经局域网访问以满足屏幕常亮等需 secure context 的 API)")
+	certPath := flag.String("cert", "rocom-cert.pem", "TLS 证书路径(-tls 时不存在则自动生成自签证书)")
+	keyPath := flag.String("key", "rocom-key.pem", "TLS 私钥路径(-tls 时不存在则自动生成)")
 	flag.Parse()
 
 	db, err := gamedata.Load()
@@ -42,6 +46,22 @@ func main() {
 	go consume(eng, st, db, srv)
 
 	go func() {
+		if *useTLS {
+			cert, err := loadOrCreateCert(*certPath, *keyPath)
+			if err != nil {
+				log.Fatalf("准备 TLS 证书失败: %v", err)
+			}
+			hs := &http.Server{
+				Addr:      *addr,
+				Handler:   srv.Handler(),
+				TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}},
+			}
+			log.Printf("Web 界面: https://localhost%s (自签证书,浏览器首次访问需手动信任)", *addr)
+			if err := hs.ListenAndServeTLS("", ""); err != nil {
+				log.Fatalf("HTTPS 服务失败: %v", err)
+			}
+			return
+		}
 		log.Printf("Web 界面: http://localhost%s", *addr)
 		if err := http.ListenAndServe(*addr, srv.Handler()); err != nil {
 			log.Fatalf("HTTP 服务失败: %v", err)
@@ -114,8 +134,9 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		}
 		acc := connAccount[m.Session]
 
-		// debug 页面：广播所有应用层消息(带来源账号,便于多账号排查;account 传 "" 不参与前端过滤)
-		srv.Hub().Broadcast("debug", "", map[string]any{
+		// debug 页面：广播所有应用层消息,按来源账号归属(登录前无法归属的连接消息 acc="" 作全局)。
+		// 订阅端据此只推当前账号的调试流;账号也放进 data 供页面列展示。
+		srv.Hub().Broadcast("debug", acc, map[string]any{
 			"time":    m.Time.Unix(),
 			"dir":     m.Direction.String(),
 			"opcode":  fmt.Sprintf("0x%04x", m.Opcode),

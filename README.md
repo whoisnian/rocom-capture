@@ -62,9 +62,19 @@ sudo ./rocom-capture -iface <网卡> -port 8195 -addr :4939
 
 # 离线回放已抓的 pcap
 ./rocom-capture -pcap ./pcap/xxx.pcap -addr :4939
+
+# 启用 HTTPS(自签证书;手机经局域网访问时用)
+sudo ./rocom-capture -iface <网卡> -tls
 ```
 
 浏览器打开 `http://localhost:4939`。
+
+> **屏幕常亮 / HTTPS**:实时事件页有「屏幕常亮」开关(阻止手机熄屏,方便盯着高亮提醒),
+> 但浏览器仅在 secure context(HTTPS 或 localhost)下提供该能力。手机经 `http://内网IP`
+> 访问时开关会禁用,需加 `-tls`:首次不存在证书时自动生成自签证书(`-cert`/`-key` 指定路径,
+> 默认 `rocom-cert.pem`/`rocom-key.pem`),SAN 覆盖 localhost 与本机所有 IP。手机打开
+> `https://<内网IP>:4939` 点过安全警告后即为 secure context,开关可用。证书会持久化,
+> 信任一次后重启服务仍复用;**网关 IP 变动后删除证书文件让其重新生成**即可。
 
 > 进入游戏前先启动本工具，确保抓到 `0x1002 ACK` 中的会话密钥；
 > 然后在游戏中打开宠物仓库以触发宠物列表下发。

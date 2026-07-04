@@ -203,7 +203,11 @@ export default function PetList() {
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
-  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界${teamLabel(p.team)}` : '')
+  // 盒位/队位均缺失:多为刚捕捉、登录快照之后新增的宠物。游戏「打开盒子」不重传布局,
+  // 位置要等下次登录 / 挪格 / 整理才会经流量落库,故此处标「位置待同步」而非留空。
+  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界${teamLabel(p.team)}` : ' · ⏳位置待同步')
+  // 移动卡片用的紧凑位置标签(队伍去掉「大世界/第」以免窄屏折行;盒子含空格可自然折行)
+  const boxTagShort = (p) => (p.box ? `📦${boxLabel(p.box)}` : p.team ? `🌍${p.team.teamIdx + 1}队${p.team.pos + 1}位` : '⏳位置待同步')
 
   return (
     <div className="list-layout">
@@ -336,7 +340,10 @@ export default function PetList() {
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
                   <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Form form={p.form} /></div>
-                  <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · No.${p.book}` : ""}{boxTag(p)}</div>
+                  <div className="pet-sub">
+                    {p.species} · Lv.{p.level}
+                    {boxTagShort(p) && <> · <span className="loc">{boxTagShort(p)}</span></>}
+                  </div>
                 </div>
                 <Types types={p.types} />
               </div>

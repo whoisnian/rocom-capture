@@ -38,6 +38,8 @@ export default function Events() {
   const [rules, setRules] = useState(loadRules)
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
+  // 屏幕常亮开关(Screen Wake Lock),持久化到 localStorage
+  const [keepAwake, setKeepAwake] = useState(() => localStorage.getItem('keepAwake') === '1')
 
   useEffect(() => {
     // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
@@ -52,6 +54,24 @@ export default function Events() {
   }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
+
+  // 请求屏幕常亮锁,阻止设备熄屏/降亮。仅 secure context(HTTPS/localhost)可用;
+  // 切到后台锁会被系统自动释放,回到前台需重新获取(visibilitychange)。
+  useEffect(() => {
+    localStorage.setItem('keepAwake', keepAwake ? '1' : '0')
+    if (!keepAwake || !('wakeLock' in navigator)) return
+    let lock = null
+    const acquire = async () => {
+      try { lock = await navigator.wakeLock.request('screen') } catch { /* 拒绝/不可用则静默 */ }
+    }
+    const onVis = () => { if (document.visibilityState === 'visible') acquire() }
+    acquire()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      lock?.release().catch(() => {})
+    }
+  }, [keepAwake])
 
   const addRule = () => {
     const field = draft.field
@@ -95,20 +115,26 @@ export default function Events() {
       <div className="event-head">
         <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>累计获得 {total} 只</span></h3>
         <div className="spacer" />
+        {'wakeLock' in navigator
+          ? <button className={'btn' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
+              title="阻止屏幕熄灭/变暗,方便盯着高亮提醒">{keepAwake ? '🔆 常亮中' : '屏幕常亮'}</button>
+          : <button className="btn" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">屏幕常亮</button>}
         <button className="btn" disabled={events.length === 0} onClick={clearAll}>清空</button>
       </div>
       <div className="event-list">
         {events.map((ev, i) => (
           <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules) ? ' hl' : '')}
             onClick={() => ev.gid && setDetailGid(ev.gid)}>
-            <span className="event-seq muted">#{total - i}</span>
-            <span className="badge obtain">{ev.subKind || '获得'}</span>
             <Avatar p={ev.pet} />
-            <div style={{ flex: 1 }}>
-              <div className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} /></div>
+            <div className="event-body">
+              <div className="event-row">
+                <span className="event-seq muted">#{total - i}</span>
+                <span className="badge obtain">{ev.subKind || '获得'}</span>
+                <span className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} /></span>
+                <span className="event-time muted">{fmtTime(ev.time)}</span>
+              </div>
               <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'}</div>
             </div>
-            <span className="muted" style={{ fontSize: 12 }}>{fmtTime(ev.time)}</span>
           </div>
         ))}
         {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}

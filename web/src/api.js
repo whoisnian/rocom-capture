@@ -92,9 +92,11 @@ export async function getPetPage(gid, params) {
 }
 
 // subscribe 订阅 SSE，onMsg 收到 {type, account, data}。返回取消函数。
-// 按账号过滤由各页面自行决定(account 为空的调试/全局消息应放行),故此处不过滤。
-export function subscribe(onMsg) {
-  const es = new EventSource('/api/stream')
+// 服务端按当前 account 过滤(buildQuery 自动带上 ?account=);高频 debug 流仅在 opts.debug 时请求,
+// 其它页面不拉调试数据。返回的取消函数会关闭连接,服务端随之停止推送(真正的暂停/停止)。
+export function subscribe(onMsg, opts = {}) {
+  const q = buildQuery({ debug: opts.debug ? 1 : undefined })
+  const es = new EventSource('/api/stream' + (q ? '?' + q : ''))
   es.onmessage = (e) => {
     try {
       onMsg(JSON.parse(e.data))
