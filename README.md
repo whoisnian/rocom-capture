@@ -39,13 +39,14 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 ## 构建
 
 ```bash
-# 1. (可选)重新生成 proto 与名称表，见 AGENTS.md / docs/data.md
-#    数据源(nrc/all.pb + nrc/bin)已随仓库提交;脚本的 protobuf 依赖经 uv 管理
+# 1. (可选)重新生成 proto / 名称表 / 图片,见「更新游戏数据」与 docs/data.md
+#    配置数据源(nrc/all.pb + nrc/bin)已随仓库提交;脚本依赖经 uv 管理
 uv sync
 uv run python scripts/gen_proto.py     # nrc/all.pb → internal/pb
-uv run python scripts/gen_gamedata.py  # nrc/bin + all.pb → names.json
-# 宠物图片(可选):在 FModel 里把 Common/Icon 的 HeadIcon/BigHeadIcon256/Pet256 以 PNG 导出后
-uv run python scripts/gen_images.py    # FModel PNG → internal/gamedata/data/img 的 webp(embed)
+uv run python scripts/gen_gamedata.py  # nrc/bin + all.pb → names.json(含图标索引)
+# 图片(可选,需先按「更新游戏数据」用 FModel 导出到 ~/Downloads/NRC):
+uv run python scripts/gen_images.py    # 宠物头像/全身图 → img/{HeadIcon,BigHeadIcon256,Pet256} webp
+uv run python scripts/gen_icons.py     # 属性/血脉/奖牌等 UI 图标 → img/{filter,blood,static,medal} webp
 
 # 2. 构建前端到 embed 目录
 cd web && npm install && npm run build && cd ..
@@ -53,6 +54,40 @@ cd web && npm install && npm run build && cd ..
 # 3. 构建单二进制
 go build -o rocom-capture ./cmd/rocom-capture
 ```
+
+## 更新游戏数据
+
+游戏更新后,用 [FModel](https://fmodel.app) 从 Windows 客户端重新提取,按下列**目录 + 导出格式**
+导到一个下载根(默认 `~/Downloads/NRC`,可用环境变量 `IMG_SRC` 覆盖),再跑上面「构建」步骤 1 的
+生成脚本。FModel 里先把 **Texture Export Format 设为 PNG**。配置类随仓库提交进 `nrc/`,图片类转成
+webp 后 embed(详见 [docs/data.md](docs/data.md))。
+
+**Export Raw Data**(原样文件 → `nrc/`)
+```
+Content/ScriptC/Data/Bin/    # 名称表配置(.bytes 数据 + .non schema + BinLocalize/dev_CN 本地化)
+Content/ScriptC/Data/PB/     # 描述符 all.pb(字段号 / opcode / 枚举)
+```
+
+**Save Texture**(整张贴图 → `gen_images.py` / `gen_icons.py` 的 medal 组)
+```
+Content/NewRoco/Modules/System/Common/Icon/BagItem/         # 奖牌小图
+Content/NewRoco/Modules/System/Common/Icon/HeadIcon/        # 宠物小头像
+Content/NewRoco/Modules/System/Common/Icon/BigHeadIcon256/  # 宠物大头像
+Content/NewRoco/Modules/System/Common/Icon/Pet256/          # 全身缩略
+Content/NewRoco/Modules/System/Common/Icon/Pet1024/         # 全身大图(暂不 embed)
+```
+
+**Export Raw Data + Save Texture + Save Properties**(图集精灵 → `gen_icons.py` 按 UV 裁切)
+```
+Content/NewRoco/Modules/System/Common/CommonStatic/         # 搭档标记 + 杂项静态图标
+Content/NewRoco/Modules/System/Common/Icon/Species/         # 系别(属性)图标
+Content/NewRoco/Modules/System/Common/Icon/XueMai/          # 血脉主图标
+Content/NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI/       # 六维属性图标
+```
+
+> 图集精灵(Paper2D PaperSprite)不含像素,需 **Save Texture** 出图集 PNG + **Save Properties** 出精灵
+> UV(`.json`),脚本据此从图集裁出各图标。生成的 webp 保持原始解包文件名,语义键→原名映射写入
+> `names.json`(见 docs/data.md)。
 
 ## 运行
 

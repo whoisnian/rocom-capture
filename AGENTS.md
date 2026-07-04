@@ -14,8 +14,11 @@
 
 - Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(→ internal/pb)、
   `uv run python scripts/gen_gamedata.py`(→ names.json)、`uv run python scripts/gen_images.py`
-  (FModel PNG → internal/gamedata/data/img 的 webp,需先在 FModel 里 PNG 导出 Icon 目录);
-  抓包脚本 `scripts/capture.sh`(bash)。
+  (FModel PNG → internal/gamedata/data/img 的 webp,需先在 FModel 里 PNG 导出 Icon 目录)、
+  `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,medal}:属性/六维/
+  搭档标记、血脉主图标、手挑杂项、奖牌小图;图集精灵从 FModel PaperSprite JSON + 图集 PNG 裁切,
+  奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
+  docs/data.md);抓包脚本 `scripts/capture.sh`(bash)。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,

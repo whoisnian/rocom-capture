@@ -16,7 +16,7 @@
 
 ## 1. 名称表数据来源(`nrc/bin/`)
 
-`nrc/bin/` 下(只收录需要的 8 张表):
+`nrc/bin/` 下(只收录需要的 9 张表):
 
 | 路径 | 内容 |
 | --- | --- |
@@ -34,7 +34,8 @@
 - `AUDIO_NATURE_CONF` — 性格名(`nature_id → name`，内联 `EString`，无需本地化)
 - `MEDAL_CONF` — 奖牌名(`ELocalizedString`)与描述
 - `PET_TALENT_CONF` — 特长名(`speciality_id → name`)
-- `PET_FILTER_CONF` — 系别/天分/标记的 `filter_enum_value → filter_desc`(中文)
+- `PET_FILTER_CONF` — 系别/天分/标记的 `filter_enum_value → filter_desc`(中文);另含筛选图标引用(见 3 节末)
+- `PET_BLOOD_CONF` — 血脉(24 条:18 属性系 + 首领/巨兽/黑魔法/异核/污染/奇异)的主图标 `icon` 引用(见 3 节末)
 - `PETBASE_CONF` + `MODEL_CONF` — 宠物图片引用(`JL_res` 全身图、`model_conf→icon` 头像;见 3 节末)
 - opcode/系别/天分/标记的整数枚举取自 `nrc/all.pb`(`ZoneSvrCmd`/`SkillDamType` 等)
 
@@ -117,6 +118,48 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `Zon
 (避免 3.9/3.10 解析到不同 pillow → 不同 libwebp → 全量图片 diff)。`gen_images.py` 还**默认跳过
 已存在的 webp**:常规重跑零改动,游戏更新只为新增宠编码,libwebp 万一漂移也不动老文件;
 换了 quality 等需整体重编时用 `--force`。
+
+### UI 图标(`gen_icons.py`)
+
+宠物头像/全身图之外的 UI 图标由 `scripts/gen_icons.py` 统一产出到 `internal/gamedata/data/img/<组>/`。
+**webp 一律保持原始解包文件名**并按文件名**去重**(多个枚举值/id 复用同一资产时只存一份,故图标
+数少于语义键数);语义键(enum/id)→ 原名 的映射由 `gen_gamedata.py` 写进 `names.json`。分四组、
+两种资源机制:
+
+| 组 | 数据源 | 内容 | 文件数 |
+| --- | --- | --- | --- |
+| `filter` | `PET_FILTER_CONF.filter_icon` | 系别(属性)18 + 六维 6+6(`AttributeType` 增益类/裸值同图,整数 1-6 即六维编号)+ 搭档标记 10 | 34 |
+| `blood` | `PET_BLOOD_CONF.icon` | 24 条血脉主图标(18 属性系 + 6 特殊;异核/黑魔法共用) | 23 |
+| `static` | 脚本内 `STATIC` 清单 | 人工挑选的杂项(异色/炫彩/污染、伙伴标记外框) | 5 |
+| `medal` | `MEDAL_CONF.icon` | 52 枚奖牌小图(BagItem;部分奖牌共用) | 44 |
+
+**两种机制**:
+- **图集精灵(PaperSprite,`filter`/`blood`/`static`)**——本身不含像素,从图集(`Texture2D`)按 UV
+  裁一块。游戏包是 unversioned cooked 资产,`.uexp` 位打包无标签序列化(手写解析不可靠),故 UV
+  矩形(`BakedSourceUV`/`BakedSourceDimension`)取自 FModel 的 **Save Properties(.json)**;图集本体
+  经 **Save Texture(PNG)**(Frames 的 Save Texture 置灰,但其引用的 `Textures/` 图集可导)。脚本按
+  `icon` 引用的完整路径定位 sprite JSON(`ui_pet_attribute_0N` 在 PetUI/PetSystem 两处同名,故不能只
+  用 basename),再按同名 basename 回退(增益类指向 PetSystem,若只导出 PetUI 则取等价图标)。
+- **整张贴图(`Texture2D`,`medal`)**——Save Texture 出的 PNG 直接转码,无需裁切(同宠物头像)。
+
+前置(FModel,导到下载根,默认 `~/Downloads/NRC`):对 `Common/Icon/Species/Frames`、
+`PetUI/Raw/Atlas/PetUI/Frames`、`Common/CommonStatic/Frames`、`Common/Icon/XueMai/Frames`
+Save Properties(.json)并对各自 `Textures/` 图集 Save Texture(PNG);对 `Common/Icon/BagItem`
+Save Texture(PNG)。webp 转码确定性,默认跳过已存在、`--force` 重编。
+
+**索引/访问**:`gen_gamedata.py` 从 vendored 的 `PET_FILTER_CONF`/`PET_BLOOD_CONF`/`MEDAL_CONF`
+(+ `all.pb` 枚举)生成 `names.json` 的三张「语义键 → 图标原名」索引(纯 vendored 数据、无需图片即可
+重跑),`gamedata` 据此拼 `<组>/<原名>.webp` 并校验确已 embed(缺则返回空串):
+
+| 索引 | 形状 | 访问器 |
+| --- | --- | --- |
+| `filter_icons` | `{组名: {枚举整数值: 原名}}` | `SkillDamTypeIcon` / `AttributeTypeIcon` / `PartnerMarkIcon(v)` |
+| `blood_icons` | `{血脉id: 原名}` | `BloodIcon(id)` |
+| `medal_icons` | `{奖牌id: 原名}` | `MedalIcon(id)` |
+
+`static` 无数据驱动、无 Go 访问器,前端按固定路径 `/img/static/<原名>.webp` 引用;新增往 `STATIC`
+清单加一行并 Save Properties 对应 sprite。经 `//go:embed all:data/img` 收录、`/img/` 提供。血脉的
+`icon_1`/`icon_flower` 等变体、奖牌 `big_icon`(Item190 大图)暂不收录。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
