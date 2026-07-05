@@ -55,6 +55,20 @@ cd web && npm install && npm run build && cd ..
 go build -o rocom-capture ./cmd/rocom-capture
 ```
 
+### 发布构建(amd64 + arm64)
+
+抓包依赖 `gopacket/afpacket`(cgo),无法用 `CGO_ENABLED=0` 直接交叉编译。用 [zig](https://ziglang.org)
+作交叉 C 编译器即可一键出两版**静态**二进制到 `dist/`——zig 自带各架构 musl libc 与 Linux 头,
+**只需装 zig,无需 arm64 库/sysroot**:
+
+```bash
+# 装 zig (以本机 Arch Linux 为例)
+sudo pacman -S zig
+
+make release   # → dist/rocom-capture-linux-amd64、dist/rocom-capture-linux-arm64(均静态、已 strip)
+make clean     # 清理 dist/
+```
+
 ## 更新游戏数据
 
 游戏更新后,用 [FModel](https://fmodel.app) 从 Windows 客户端重新提取,按下列**目录 + 导出格式**
