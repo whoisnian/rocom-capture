@@ -44,6 +44,12 @@ type Pet struct {
 	Nature   string   `json:"nature"` // 性格名
 	Gender   string   `json:"gender"` // ♂ / ♀
 	Types    []string `json:"types"`  // 系别中文(可多系)
+	// 系别图标相对路径(与 Types 一一对应;无图为空串,由前端拼到 /img/ 下)。
+	TypeIcons []string `json:"typeIcons"`
+
+	BloodID   uint32 `json:"bloodId,omitempty"`   // 血脉编号(1-24,PetData.blood_id)
+	Blood     string `json:"blood,omitempty"`     // 血脉中文短名(普通/草/火…)
+	BloodIcon string `json:"bloodIcon,omitempty"` // 血脉主图标相对路径
 
 	HeightM  float64 `json:"heightM"`  // 身高(米)
 	WeightKg float64 `json:"weightKg"` // 体重(千克)
@@ -55,15 +61,17 @@ type Pet struct {
 	WeightMin float64  `json:"weightMin,omitempty"`
 	WeightMax float64  `json:"weightMax,omitempty"`
 	WeightPct *float64 `json:"weightPct,omitempty"`
-	Voice     int32   `json:"voice"` // 声音值
+	Voice     int32    `json:"voice"` // 声音值
 
 	TalentRank      string   `json:"talentRank"` // 天分评价
 	Medal           string   `json:"medal"`      // 佩戴奖牌名
 	MedalDesc       string   `json:"medalDesc"`
+	MedalIcon       string   `json:"medalIcon,omitempty"` // 佩戴奖牌小图相对路径
 	WearMedalConfID uint32   `json:"wearMedalConfId"`
-	MedalIDs        []uint32 `json:"medalIds"`    // 该宠物已拥有的奖牌 id(佩戴+custom+free,去重)
-	PartnerMark     string   `json:"partnerMark"` // 标记
-	Speciality      string   `json:"speciality"`  // 特长
+	MedalIDs        []uint32 `json:"medalIds"`                  // 该宠物已拥有的奖牌 id(佩戴+custom+free,去重)
+	PartnerMark     string   `json:"partnerMark"`               // 标记
+	PartnerMarkIcon string   `json:"partnerMarkIcon,omitempty"` // 搭档标记图标相对路径
+	Speciality      string   `json:"speciality"`                // 特长
 	SpecialityID    uint32   `json:"specialityId"`
 
 	CatchTime int64 `json:"catchTime"` // 捕捉时间(unix 秒)
@@ -88,9 +96,11 @@ type Pet struct {
 // ToPet 把解码后的 PetData 结合名称库转成业务模型。
 func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 	types := make([]string, 0, len(p.GetSkillDamType()))
+	typeIcons := make([]string, 0, len(p.GetSkillDamType()))
 	for _, t := range p.GetSkillDamType() {
 		if name := db.SkillDamType(int32(t)); name != "" {
 			types = append(types, name)
+			typeIcons = append(typeIcons, db.SkillDamTypeIcon(int32(t)))
 		}
 	}
 
@@ -128,13 +138,19 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		Nature:     db.Nature(p.GetNature()),
 		Gender:     gamedata.GenderName(p.GetGender()),
 		Types:      types,
+		TypeIcons:  typeIcons,
+		BloodID:    p.GetBloodId(),
+		Blood:      db.BloodName(p.GetBloodId()),
+		BloodIcon:  db.BloodIcon(p.GetBloodId()),
 		HeightM:    float64(p.GetHeight()) / 100,
 		WeightKg:   float64(p.GetWeight()) / 1000,
 		Voice:      p.GetVoice(),
 
 		TalentRank:      db.TalentRate(p.GetTalentRank()),
 		WearMedalConfID: p.GetWearMedalConfId(),
+		MedalIcon:       db.MedalIcon(p.GetWearMedalConfId()),
 		PartnerMark:     db.PartnerMark(int32(p.GetPartnerMark())),
+		PartnerMarkIcon: db.PartnerMarkIcon(int32(p.GetPartnerMark())),
 		SpecialityID:    p.GetSpecialityId(),
 		Speciality:      db.Speciality(p.GetSpecialityId()),
 
@@ -188,7 +204,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		for i, a := range src {
 			if a != nil {
 				stats[i].Value = int32(a.GetBaseValue())
-				stats[i].TalentLv = a.GetTalentAddValue() // 天分等级(1-10)
+				stats[i].TalentLv = a.GetTalentAddValue() // 天分(1-10)
 			}
 		}
 	}

@@ -27,11 +27,41 @@ type Server struct {
 	db          *gamedata.DB
 	opcodeNames map[uint16]string
 	medals      []gamedata.MedalEntry
+	icons       iconMeta
+}
+
+// iconMeta 是全局固定图标(每只宠物都一样,不随宠物下发):六维属性小图 + 异色/炫彩/污染标记图。
+// 前端一次性拉取(GET /api/icons),供六维栏与标记徽标渲染。
+type iconMeta struct {
+	Stat          map[string]string `json:"stat"` // hp/attack/spAttack/defense/spDefense/speed -> 相对路径
+	Type          map[string]string `json:"type"` // 系别中文名 -> 图标路径(筛选按钮用)
+	Shiny         string            `json:"shiny,omitempty"`
+	Colorful      string            `json:"colorful,omitempty"`
+	ShinyColorful string            `json:"shinyColorful,omitempty"`
+	Pollution     string            `json:"pollution,omitempty"`
+	PartnerFrame  string            `json:"partnerFrame,omitempty"` // 搭档标记徽章橙色外框底(img_collect)
 }
 
 // New 创建 HTTP 服务。
 func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
+	// 六维编号 1-6:1生命 2物攻 3魔攻 4物防 5魔防 6速度(与 pet.ToPet 六维顺序一致)。
+	s.icons = iconMeta{
+		Stat: map[string]string{
+			"hp":        db.AttributeTypeIcon(1),
+			"attack":    db.AttributeTypeIcon(2),
+			"spAttack":  db.AttributeTypeIcon(3),
+			"defense":   db.AttributeTypeIcon(4),
+			"spDefense": db.AttributeTypeIcon(5),
+			"speed":     db.AttributeTypeIcon(6),
+		},
+		Type:          db.SkillDamTypeIcons(),
+		Shiny:         db.StaticIcon("shiny"),
+		Colorful:      db.StaticIcon("colorful"),
+		ShinyColorful: db.StaticIcon("shiny_colorful"),
+		Pollution:     db.StaticIcon("pollution"),
+		PartnerFrame:  db.StaticIcon("partner_frame"),
+	}
 	s.routes()
 	return s
 }
@@ -59,6 +89,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
+	s.mux.HandleFunc("GET /api/icons", s.handleIcons)
 	s.mux.HandleFunc("GET /api/boxes", s.handleBoxes)
 	s.mux.HandleFunc("GET /api/teams", s.handleTeams)
 	s.mux.HandleFunc("GET /api/evolution", s.handleEvolution)
@@ -103,9 +134,14 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, accs)
 }
 
-// handleMedals 返回全部奖牌(id/name/desc),供宠物详情奖牌墙展示。
+// handleMedals 返回全部奖牌(id/name/desc/icon),供宠物详情奖牌墙展示。
 func (s *Server) handleMedals(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.medals)
+}
+
+// handleIcons 返回全局固定图标(六维属性小图 + 异色/炫彩/污染标记图),供前端一次性缓存。
+func (s *Server) handleIcons(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.icons)
 }
 
 // handleBoxes 返回各盒子的槽位布局,供宠物列表左侧盒子示意图。
@@ -121,6 +157,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 // parseFilter 从查询参数构造 store.Filter(handlePets/handlePetPage 共用)。
 func parseFilter(q url.Values) store.Filter {
 	atoi := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return n }
+	atoi64 := func(k string) int64 { n, _ := strconv.ParseInt(q.Get(k), 10, 64); return n }
 	f := store.Filter{
 		Search:      q.Get("search"),
 		Nature:      q.Get("nature"),
@@ -133,6 +170,7 @@ func parseFilter(q url.Values) store.Filter {
 		Colorful:    q.Get("colorful"),
 		Form:        q.Get("form"),
 		Box:         q.Get("box"),
+		CatchAfter:  atoi64("catchAfter"),
 		LevelMin:    atoi("levelMin"),
 		LevelMax:    atoi("levelMax"),
 		Sort:        q.Get("sort"),

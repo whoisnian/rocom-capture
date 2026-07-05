@@ -24,6 +24,7 @@ type Filter struct {
 	Colorful      string // "", "1", "0"
 	Form          string // 地区/季节形态名(精确匹配)
 	Box           string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
+	CatchAfter    int64  // 捕捉时间下限(unix 秒;>0 时筛 catch_time>=该值,由前端按所选区间算)
 	LevelMin      int
 	LevelMax      int
 	Sort          string
@@ -80,6 +81,10 @@ func buildWhere(f Filter, account string) (string, []any) {
 		where = append(where, "colorful=1")
 	} else if f.Colorful == "0" {
 		where = append(where, "colorful=0")
+	}
+	if f.CatchAfter > 0 {
+		where = append(where, "catch_time>=?")
+		args = append(args, f.CatchAfter)
 	}
 	if f.LevelMin > 0 {
 		where = append(where, "level>=?")
