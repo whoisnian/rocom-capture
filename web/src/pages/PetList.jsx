@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
 import { AccountContext, IconsContext } from '../App'
-import { Types, Six, Marks, Gender, Form, Blood, MedalTag, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Form, Blood, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -338,7 +338,7 @@ export default function PetList() {
             <thead>
               <tr>
                 <th onClick={() => sortBy('gid')}>宠物{arrow('gid')}</th>
-                <th>系别</th><th>性格</th><th>特长</th><th className="medal-col">佩戴奖牌</th>
+                <th>系别</th><th>性格</th><th>特长</th><th>佩戴奖牌</th>
                 <th onClick={() => sortBy('voice')}>声音{arrow('voice')}</th>
                 <th onClick={() => sortBy('weight')}>体重{arrow('weight')}</th>
                 <th onClick={() => sortBy('height')}>身高{arrow('height')}</th>
@@ -361,7 +361,7 @@ export default function PetList() {
                   <td><Types types={p.types} icons={p.typeIcons} plain /></td>
                   <td>{p.nature || '-'}</td>
                   <td>{p.speciality || '无'}</td>
-                  <td className="medal-col"><MedalTag icon={p.medalIcon} name={p.medal} /></td>
+                  <td>{p.medal || '-'}</td>
                   <td className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</td>
                   <td className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
                   <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></td>
@@ -391,7 +391,7 @@ export default function PetList() {
               <div className="card-grid">
                 <div>性格：{p.nature || '-'}</div>
                 <div>特长：{p.speciality || '无'}</div>
-                <div className="medal-cell">奖牌：<MedalTag icon={p.medalIcon} name={p.medal} /></div>
+                <div>奖牌：{p.medal || '-'}</div>
                 <div>体重：<span className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
                 <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
                 <div>声音：<span className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</span></div>

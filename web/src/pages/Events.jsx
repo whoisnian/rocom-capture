@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react'
-import { getEvents, getEventCount, clearEvents, subscribe } from '../api'
-import { Types, Blood, MedalTag, Avatar, fmtTime } from '../components/bits'
+import React, { useState, useEffect, useContext, useMemo } from 'react'
+import { getEvents, getEventCount, clearEvents, subscribe, getMedals } from '../api'
+import { Avatar, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 import { AccountContext } from '../App'
 
@@ -17,16 +17,24 @@ function loadRules() {
   try { return JSON.parse(localStorage.getItem('hlRules') || '[]') } catch { return [] }
 }
 
-function matchRule(pet, rule) {
+// ownedMedalNames 返回宠物【拥有】的奖牌名集合(medalIds 经 id→名映射;佩戴+custom+free)。
+function ownedMedalNames(pet, medalById) {
+  const s = new Set()
+  for (const id of pet?.medalIds || []) { const n = medalById.get(id); if (n) s.add(n) }
+  return s
+}
+
+function matchRule(pet, rule, ownedMedals) {
   if (!pet) return false
   if (rule.field === 'type') return (pet.types || []).includes(rule.value)
   if (rule.field === 'shiny') return !!pet.shiny
   if (rule.field === 'colorful') return !!pet.colorful
+  if (rule.field === 'medal') return ownedMedals.has(rule.value) // 检查拥有的奖牌(非仅佩戴)
   return String(pet[rule.field] || '') === rule.value
 }
-// 任一规则命中即高亮(规则内部为精确匹配)。
-function isHighlight(pet, rules) {
-  return rules.length > 0 && rules.some((r) => matchRule(pet, r))
+// 任一规则命中即高亮(规则内部为精确匹配);ownedMedals=该宠物拥有的奖牌名集合。
+function isHighlight(pet, rules, ownedMedals) {
+  return rules.length > 0 && rules.some((r) => matchRule(pet, r, ownedMedals))
 }
 
 export default function Events() {
@@ -36,7 +44,10 @@ export default function Events() {
   // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
   const [total, setTotal] = useState(0)
   const [rules, setRules] = useState(loadRules)
+  const [medals, setMedals] = useState([])
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
+  // 奖牌 id→名映射(供奖牌规则按「拥有」判定;宠物 medalIds 存的是 id)
+  const medalById = useMemo(() => new Map(medals.map((m) => [m.id, m.name])), [medals])
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   // 屏幕常亮开关(Screen Wake Lock),持久化到 localStorage
   const [keepAwake, setKeepAwake] = useState(() => localStorage.getItem('keepAwake') === '1')
@@ -54,6 +65,7 @@ export default function Events() {
   }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
+  useEffect(() => { getMedals().then((m) => setMedals(m || [])).catch(() => {}) }, [])
 
   // 请求屏幕常亮锁,阻止设备熄屏/降亮。仅 secure context(HTTPS/localhost)可用;
   // 切到后台锁会被系统自动释放,回到前台需重新获取(visibilitychange)。
@@ -123,17 +135,16 @@ export default function Events() {
       </div>
       <div className="event-list">
         {events.map((ev, i) => (
-          <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules) ? ' hl' : '')}
+          <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById)) ? ' hl' : '')}
             onClick={() => ev.gid && setDetailGid(ev.gid)}>
             <Avatar p={ev.pet} />
             <div className="event-body">
               <div className="event-row">
                 <span className="event-seq muted">#{total - i}</span>
-                <span className="badge obtain">{ev.subKind || '获得'}</span>
-                <span className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} icons={ev.pet?.typeIcons} plain /> <Blood p={ev.pet} iconOnly /></span>
+                <span className="pet-name">{ev.pet?.name || ev.pet?.species}</span>
                 <span className="event-time muted">{fmtTime(ev.time)}</span>
               </div>
-              <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal ? <MedalTag icon={ev.pet.medalIcon} name={ev.pet.medal} /> : '无奖牌'}</div>
+              <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'}</div>
             </div>
           </div>
         ))}

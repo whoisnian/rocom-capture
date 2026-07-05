@@ -173,10 +173,7 @@ img.pet-avatar { object-fit: cover; }
   margin-left: 4px; font-weight: 600; color: var(--fg); vertical-align: middle; }
 /* 血脉图标与异色/炫彩标记图统一大小(见 .mark-img) */
 .blood-ic { width: 18px; height: 18px; object-fit: contain; }
-/* 奖牌图标(列表/卡片/事件/详情奖牌墙:仅图标,适当增大) */
-.medal-inline { display: inline-flex; align-items: center; }
-/* 列表「佩戴奖牌」列表头与单元格居中 */
-.pets .medal-col { text-align: center; }
+/* 奖牌图标(详情奖牌墙;墙内经 .medals .medal-ic 放大) */
 .medal-ic { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
 .icon-text { display: inline-flex; align-items: center; }
 .up { color: var(--green); } .down { color: var(--red); }
@@ -220,8 +217,8 @@ img.evo-avatar { object-fit: cover; }
 .event .event-seq { font-size: 13px; font-variant-numeric: tabular-nums; }
 .event .event-time { margin-left: auto; font-size: 12px; white-space: nowrap; }
 .event.hl { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2a2410; }
-.event .badge { padding: 2px 8px; border-radius: 6px; font-size: 12px; background: var(--bg-3); }
-.event .badge.obtain { background: #133a1e; color: var(--green); }
+/* 事件行:序号 / 名称 / 时间统一 13px */
+.event-row, .event-row .pet-name, .event .event-seq, .event .event-time { font-size: 13px; }
 .rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-width: 720px; }
 .rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 

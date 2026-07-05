@@ -99,13 +99,6 @@ export function Types({ types, icons, plain }) {
   )
 }
 
-// MedalTag 渲染奖牌图标(仅图标,名称落到 hover title);无奖牌显示 '-',缺图退回名称文字。
-export function MedalTag({ icon, name }) {
-  if (!name) return <span className="muted">-</span>
-  if (!icon) return <span title={name}>{name}</span>
-  return <span className="medal-inline" title={name}><InlineIcon src={icon} className="medal-ic" alt={name} /></span>
-}
-
 // Blood 渲染血脉(主图标 + 中文短名);iconOnly=仅图标(列表用,名称落到 title)。
 export function Blood({ p, iconOnly }) {
   if (!p || !p.blood) return null
