@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useRef, useContext } from 'react'
 import { subscribe } from '../api'
-import { fmtTime } from '../components/bits'
 import { AccountContext } from '../App'
 
 // 默认忽略高频且无分析价值的场景 NPC 位置同步(每秒多条,会淹没事件流)。
 const DEFAULT_IGNORED = ['ZONE_SCENE_SET_NPC_POS_REQ', 'ZONE_SCENE_SET_NPC_POS_RSP', 'ZONE_SCENE_PLAY_ACTS_NOTIFY']
+
+// 实时流事件全在「当下」发生,日期冗余;只显示时:分:秒,省横向宽度(移动端尤甚)。
+const clock = (ts) => {
+  if (!ts) return '-'
+  const d = new Date(ts * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
 
 // 忽略列表持久化:localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
 function loadIgnored() {
@@ -47,7 +54,7 @@ export default function Debug() {
     <div>
       <div className="toolbar">
         <h3 style={{ margin: 0 }}>游戏事件流</h3>
-        <span className="muted">实时展示当前账号的应用层消息(opcode);离开本页或暂停即停止拉取</span>
+        <span className="muted toolbar-hint">实时展示当前账号的应用层消息(opcode);离开本页或暂停即停止拉取</span>
         <div className="spacer" />
         <input className="input" style={{ maxWidth: 220 }} placeholder="过滤名称 / opcode" value={filter} onChange={(e) => setFilter(e.target.value)} />
         <button className="btn" onClick={() => setPaused((p) => !p)}>{paused ? '继续' : '暂停'}</button>
@@ -68,11 +75,11 @@ export default function Debug() {
           <tbody>
             {shown.map((r, i) => (
               <tr key={i}>
-                <td className="muted">{fmtTime(r.time)}</td>
+                <td className="muted dbg-time">{clock(r.time)}</td>
                 <td className={r.dir === 'c2s' ? 'dir-c2s' : 'dir-s2c'}>{r.dir}</td>
-                <td className="muted">{(r.account || '').replace(/^ip:/, '')}</td>
-                <td>{r.opcode}</td>
-                <td>{r.name}</td>
+                <td className="muted dbg-acct">{(r.account || '').replace(/^ip:/, '')}</td>
+                <td className="dbg-op">{r.opcode}</td>
+                <td className="dbg-name">{r.name}</td>
                 <td><button className="btn-ignore" title="忽略该事件" onClick={() => addIgnore(r.name)}>🚫</button></td>
               </tr>
             ))}

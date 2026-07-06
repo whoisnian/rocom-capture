@@ -74,6 +74,7 @@ export default function PetList() {
   const [data, setData] = useState({ total: 0, pets: [] })
   const [options, setOptions] = useState({})
   const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
+  const [sync, setSync] = useState(() => localStorage.getItem('petSync') !== '0') // 实时同步:游戏内操作自动跳转到对应宠物(默认开)
   const [selected, setSelected] = useState(null) // 单击选中的 gid
   const [menu, setMenu] = useState(null)          // 右键/长按菜单 {gid,x,y}
   const [boxes, setBoxes] = useState([])          // 各盒子槽位布局
@@ -85,6 +86,7 @@ export default function PetList() {
   const lpRef = useRef(null)        // 长按定时器
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
+  const syncRef = useRef(sync)      // 供 SSE 回调读取最新同步开关(避免闭包旧值)
 
   const load = useCallback(() => { getPets(withCatch(filter)).then(setData).catch(() => {}) }, [filter])
   const loadBoxes = useCallback(() => {
@@ -117,6 +119,8 @@ export default function PetList() {
   useEffect(() => { filterRef.current = filter }, [filter])
   useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
   useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
+  useEffect(() => { syncRef.current = sync }, [sync])
+  useEffect(() => { localStorage.setItem('petSync', sync ? '1' : '0') }, [sync])
 
   // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(客户端刚调整位置),
   // 自动切到该宠物所在页并选中,示意图跟随展示其盒子/队伍。
@@ -124,8 +128,9 @@ export default function PetList() {
     return subscribe((m) => {
       if (m.type !== 'pet') return
       if (m.account && m.account !== account) return // 只认当前账号的更新
+      // 同步关闭时不自动跳转,避免打断当前筛选(仍走下方防抖刷新,列表静默更新)
       const focus = m.data && m.data.focusGid
-      if (focus) {
+      if (focus && syncRef.current) {
         setSelected(focus)
         // 清掉其它筛选、改按该宠物移动后所在的盒子过滤:既保证被选中的宠物一定在列表中
         // (否则原有筛选可能把它排除),又通过 filter.box 联动让左上角示意图切到该盒。
@@ -241,13 +246,20 @@ export default function PetList() {
 
   return (
     <div className="list-layout">
+      {/* 移动端筛选抽屉的背景遮罩:点击关闭 */}
+      <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={() => setCollapsed(true)} />
       <aside className={'filters' + (collapsed ? ' collapsed' : '')}>
+        {/* 抽屉标题栏(仅移动端显示):关闭入口与打开处的「筛选」按钮同侧 */}
+        <div className="filters-bar">
+          <span className="filters-title">筛选</span>
+          <button className="icon-btn" onClick={() => setCollapsed(true)} aria-label="关闭筛选">✕</button>
+        </div>
         <BoxMap
           container={active} selected={selected} onCell={onCell}
           onPrev={() => setActiveIdx((i) => (i - 1 + containers.length) % containers.length)}
           onNext={() => setActiveIdx((i) => (i + 1) % containers.length)}
         />
-        <div className="filter-group">
+        <div className="filter-group filter-reset">
           <button className="btn" onClick={reset}>重置筛选</button>
         </div>
         <div className="filter-group">
@@ -319,6 +331,11 @@ export default function PetList() {
             </label>
           </div>
         </div>
+        {/* 抽屉底部操作条(仅移动端显示):重置 + 查看结果并关闭 */}
+        <div className="filters-foot">
+          <button className="btn" onClick={reset}>重置</button>
+          <button className="btn primary" onClick={() => setCollapsed(true)}>查看 {data.total} 只</button>
+        </div>
       </aside>
 
       <section>
@@ -329,6 +346,7 @@ export default function PetList() {
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
           <button className="btn" onClick={() => set({ order: filter.order === 'asc' ? 'desc' : 'asc' })}>{filter.order === 'asc' ? '升序' : '降序'}</button>
+          <button className={'btn' + (sync ? ' primary' : '')} title="开启后,游戏内捕捉/移动宠物会自动跳转并选中该宠物;关闭可避免打断当前筛选" onClick={() => setSync((v) => !v)}>同步</button>
           <div className="spacer" />
           <span className="muted">共 {data.total} 只</span>
         </div>
@@ -411,7 +429,7 @@ export default function PetList() {
           <span className="muted">{filter.page} / {pages}</span>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: filter.page + 1 })}>下一页</button>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: pages })}>尾页</button>
-          <select className="select" style={{ width: 110 }} value={filter.pageSize} onChange={(e) => set({ pageSize: +e.target.value })}>
+          <select className="select pager-size" value={filter.pageSize} onChange={(e) => set({ pageSize: +e.target.value })}>
             {[10, 20, 30, 60, 100].map((n) => <option key={n} value={n}>{n} 条/页</option>)}
           </select>
         </div>

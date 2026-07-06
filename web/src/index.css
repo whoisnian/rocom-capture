@@ -56,6 +56,8 @@ button, input, select { font: inherit; color: inherit; }
 }
 .btn:hover { border-color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 单图标按钮:桌面/移动统一,方形观感,含义见 title */
+.btn-icon { font-size: 15px; line-height: 1; padding: 7px 11px; }
 .input, .select {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%;
 }
@@ -100,6 +102,8 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
 }
 .filter-group { display: flex; flex-direction: column; gap: 7px; }
+/* 筛选抽屉的标题栏/底部条/遮罩:仅移动端显示,桌面隐藏 */
+.filters-bar, .filters-foot, .filters-backdrop { display: none; }
 
 /* 盒子位置示意图 */
 .boxmap { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
@@ -212,6 +216,7 @@ img.evo-avatar { object-fit: cover; }
 
 /* 分页 */
 .pager { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.pager-size { width: 110px; }
 
 /* ---- 事件页 ---- */
 .event-head { display: flex; align-items: center; gap: 10px; max-width: 720px; }
@@ -231,6 +236,11 @@ img.evo-avatar { object-fit: cover; }
 .event-row, .event-row .pet-name, .event .event-seq, .event .event-time { font-size: 13px; }
 .rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-width: 720px; }
 .rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* 高亮规则可折叠头:标题 + 收起/编辑开关,整行可点击 */
+.rules-head { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.rules-head h3 { margin: 0; flex: 1; min-width: 0; }
+.btn.small { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+.muted.small { font-weight: 400; font-size: 13px; }
 
 /* ---- 详情页 ---- */
 /* 列表选中(移动卡片) */
@@ -366,8 +376,52 @@ img.evo-avatar { object-fit: cover; }
   .content { padding: 12px; padding-bottom: 70px; }
 
   .list-layout { grid-template-columns: 1fr; }
-  .filters { position: static; max-height: none; }
+  /* 筛选面板改为左侧抽屉:盖在内容上而非把列表推下去,关闭入口始终在顶部 */
+  .filters {
+    position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
+    max-height: none; margin: 0; z-index: 40; border-radius: 0;
+    border: none; border-right: 1px solid var(--line); box-shadow: var(--shadow);
+    overflow-y: auto; padding: 0 14px 14px;
+    transform: translateX(-100%); transition: transform .25s ease;
+  }
+  .filters:not(.collapsed) { transform: none; }
+  /* 标题栏吸顶、底部条吸底,长面板滚动时始终可见 */
+  .filters-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  }
+  .filters-title { font-weight: 700; font-size: 15px; }
+  .icon-btn {
+    width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px;
+    background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; color: var(--fg);
+  }
+  .filters-foot {
+    display: flex; gap: 10px; position: sticky; bottom: 0; background: var(--bg-1);
+    padding: 10px 0 2px; margin-top: 4px; border-top: 1px solid var(--line);
+  }
+  .filters-foot .btn { flex: 1; }
+  /* 底部条已有重置,隐藏面板内那颗独立「重置筛选」 */
+  .filter-reset { display: none; }
+  .filters-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45);
+    opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
+  }
+  .filters-backdrop.show { opacity: 1; visibility: visible; }
   .table-wrap { display: none; }
+  /* 调试页(表格用内联 display:block 覆盖上面的隐藏):移动端精简为「时间/方向/名称」,
+     隐藏说明文字、账号列与冗长的 opcode 列,名称长词换行,避免横向溢出 */
+  .toolbar-hint { display: none; }
+  .debug-table .dbg-acct, .debug-table .dbg-op { display: none; }
+  .debug-table td { padding: 5px 8px; }
+  .debug-table .dbg-name { word-break: break-all; }
+  /* 分页栏单行显示:收紧按钮/间距、缩窄档位下拉,不再换行 */
+  .pager { flex-wrap: nowrap; justify-content: center; gap: 6px; margin-top: 14px; }
+  .pager .btn { padding: 6px 8px; font-size: 13px; white-space: nowrap; }
+  .pager .muted { font-size: 13px; white-space: nowrap; }
+  .pager-size { width: 104px; flex: none; font-size: 13px; padding-left: 8px; padding-right: 6px; }
+  /* 事件页头部:窄屏收紧按钮间距(按钮本身已是图标,标题「共 N 只」不再被挤到两行) */
+  .event-head { gap: 8px; }
   .cards { display: flex; flex-direction: column; gap: 10px; }
   .card {
     border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1); padding: 12px;
@@ -394,5 +448,4 @@ img.evo-avatar { object-fit: cover; }
 .filter-toggle { display: none; }
 @media (max-width: 760px) {
   .filter-toggle { display: inline-flex; }
-  .filters.collapsed { display: none; }
 }

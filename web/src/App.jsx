@@ -1,5 +1,5 @@
 import React, { useEffect, useState, createContext } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 
 const NAV = [
@@ -21,6 +21,11 @@ export default function App() {
   const [accounts, setAccounts] = useState([])
   const [account, setAccount] = useState(getCurrentAccount())
   const [icons, setIcons] = useState({ stat: {} })
+  const location = useLocation()
+  // 双击当前激活的导航项:平滑滚动回页面顶部(非激活项照常跳转,不滚动)
+  const onNavDoubleClick = (to) => () => {
+    if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -58,7 +63,8 @@ export default function App() {
           <div className="brand">洛克助手 <span className="brand-sub">宠物统计</span></div>
           <nav className="topnav">
             {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to} className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
+              <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
+                className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
                 <span className="nav-icon">{n.icon}</span>
                 <span className="nav-label">{n.label}</span>
               </NavLink>
@@ -83,7 +89,8 @@ export default function App() {
 
         <nav className="bottomnav">
           {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>
+            <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
+              className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>
               <span className="tab-icon">{n.icon}</span>
               <span className="tab-label">{n.label}</span>
             </NavLink>

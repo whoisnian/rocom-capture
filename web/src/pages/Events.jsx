@@ -47,6 +47,11 @@ export default function Events() {
   // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
   const [total, setTotal] = useState(0)
   const [rules, setRules] = useState(loadRules)
+  // 高亮规则编辑区折叠态:配好规则后收起,把纵向空间让给事件流(首次无规则时默认展开)
+  const [rulesOpen, setRulesOpen] = useState(() => {
+    const s = localStorage.getItem('hlOpen')
+    return s == null ? loadRules().length === 0 : s === '1'
+  })
   const [medals, setMedals] = useState([])
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
   // 奖牌 id→名映射(供奖牌规则按「拥有」判定;宠物 medalIds 存的是 id)
@@ -70,6 +75,7 @@ export default function Events() {
   }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
+  useEffect(() => { localStorage.setItem('hlOpen', rulesOpen ? '1' : '0') }, [rulesOpen])
   useEffect(() => { localStorage.setItem('onlyHl', onlyHl ? '1' : '0') }, [onlyHl])
   useEffect(() => { getMedals().then((m) => setMedals(m || [])).catch(() => {}) }, [])
 
@@ -107,39 +113,49 @@ export default function Events() {
 
   return (
     <div>
-      <h3>高亮规则 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>满足任一规则的事件将高亮提醒</span></h3>
       <div className="rules">
-        <div className="rule-row">
-          <select className="select" style={{ width: 120 }} value={draft.field} onChange={(e) => setDraft({ field: e.target.value, value: '' })}>
-            {FIELDS.map((f) => <option key={f.k} value={f.k}>{f.label}</option>)}
-          </select>
-          {draft.field !== 'shiny' && (
-            <input className="input" style={{ maxWidth: 200 }} placeholder="例如 固执 / 大块头 / 火"
-              value={draft.value} onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
-              onKeyDown={(e) => e.key === 'Enter' && addRule()} />
-          )}
-          <button className="btn primary" onClick={addRule}>添加</button>
+        <div className="rules-head" onClick={() => setRulesOpen((v) => !v)}>
+          <h3>高亮规则 <span className="muted small">满足任一规则的事件将高亮提醒</span></h3>
+          <button className="btn small" onClick={(e) => { e.stopPropagation(); setRulesOpen((v) => !v) }}>
+            {rulesOpen ? '收起 ▲' : `编辑${rules.length ? ` (${rules.length})` : ''} ▼`}
+          </button>
         </div>
-        <div className="chips">
-          {rules.map((r, i) => (
-            <span key={i} className="chip on" onClick={() => delRule(i)}>
-              {FIELDS.find((f) => f.k === r.field)?.label}: {r.field === 'shiny' ? '是' : r.value} ✕
-            </span>
-          ))}
-          {rules.length === 0 && <span className="muted">未设置规则</span>}
-        </div>
+        {rulesOpen && (
+          <div className="rule-row">
+            <select className="select" style={{ width: 120 }} value={draft.field} onChange={(e) => setDraft({ field: e.target.value, value: '' })}>
+              {FIELDS.map((f) => <option key={f.k} value={f.k}>{f.label}</option>)}
+            </select>
+            {draft.field !== 'shiny' && (
+              <input className="input" style={{ maxWidth: 200 }} placeholder="例如 固执 / 大块头 / 火"
+                value={draft.value} onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && addRule()} />
+            )}
+            <button className="btn primary" onClick={addRule}>添加</button>
+          </div>
+        )}
+        {(rules.length > 0 || rulesOpen) && (
+          <div className="chips">
+            {rules.map((r, i) => (
+              <span key={i} className="chip on" onClick={() => delRule(i)}>
+                {FIELDS.find((f) => f.k === r.field)?.label}: {r.field === 'shiny' ? '是' : r.value} ✕
+              </span>
+            ))}
+            {rules.length === 0 && <span className="muted">未设置规则</span>}
+          </div>
+        )}
       </div>
 
       <div className="event-head">
-        <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>累计获得 {total} 只</span></h3>
+        <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>共 {total} 只</span></h3>
         <div className="spacer" />
-        <button className={'btn' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
-          title="仅展示命中高亮规则的事件">{onlyHl ? '★ 仅看高亮' : '仅看高亮'}</button>
+        {/* 三个操作统一为单图标,含义见各自 title */}
+        <button className={'btn btn-icon' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
+          title="仅展示命中高亮规则的事件">{onlyHl ? '★' : '☆'}</button>
         {'wakeLock' in navigator
-          ? <button className={'btn' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
-              title="阻止屏幕熄灭/变暗,方便盯着高亮提醒">{keepAwake ? '🔆 常亮中' : '屏幕常亮'}</button>
-          : <button className="btn" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">屏幕常亮</button>}
-        <button className="btn" disabled={events.length === 0} onClick={clearAll}>清空</button>
+          ? <button className={'btn btn-icon' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
+              title="阻止屏幕熄灭,方便盯着高亮提醒">☀</button>
+          : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
+        <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
       </div>
       <div className="event-list">
         {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
