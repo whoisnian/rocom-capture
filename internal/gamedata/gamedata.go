@@ -63,6 +63,14 @@ type PetBaseInfo struct {
 	HeightHigh uint32
 	WeightLow  uint32
 	WeightHigh uint32
+	EggGroups  []uint32 // 蛋组(繁殖组)编号,1~2 个,对应 EggGroup.ID
+}
+
+// EggGroup 是蛋组(繁殖组)信息:社区流行名 + 官方描述(源自 PET_LIKE_ELEMENT_CONF)。
+type EggGroup struct {
+	ID   uint32 `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
 }
 
 // DB 是只读名称查找库。
@@ -79,6 +87,7 @@ type DB struct {
 	images       map[string]imageEntry  // petbase_id -> 文件名
 	imageBase    map[string]string      // conf_id -> petbase_id(base==自身者不入表)
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
+	eggGroup     map[uint32]EggGroup    // 蛋组id(1-15) -> 社区名/描述
 	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
 	imgFiles     map[string]bool        // 实际 embed 的图片相对路径(异色图缺失时回退普通)
 	// UI 图标索引: 语义键 -> 图标原始文件名(webp 保持原名),Go 侧拼 <组>/<原名>.webp。
@@ -114,16 +123,18 @@ func Load() (*DB, error) {
 		StaticIcons  map[string]string            `json:"static_icons"`
 		Images       map[string]imageEntry        `json:"images"`
 		ImageBase    map[string]uint32            `json:"image_base"`
+		EggGroup     map[string]EggGroup          `json:"egg_group"`
 		Petbase      map[string]struct {
-			N  string `json:"n"`
-			B  uint32 `json:"b"`
-			F  string `json:"f"`
-			S  uint32 `json:"s"`
-			E  uint32 `json:"e"`
-			HL uint32 `json:"hl"`
-			HH uint32 `json:"hh"`
-			WL uint32 `json:"wl"`
-			WH uint32 `json:"wh"`
+			N  string   `json:"n"`
+			B  uint32   `json:"b"`
+			F  string   `json:"f"`
+			S  uint32   `json:"s"`
+			E  uint32   `json:"e"`
+			Eg []uint32 `json:"eg"`
+			HL uint32   `json:"hl"`
+			HH uint32   `json:"hh"`
+			WL uint32   `json:"wl"`
+			WH uint32   `json:"wh"`
 		} `json:"petbase"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
@@ -147,11 +158,17 @@ func Load() (*DB, error) {
 			continue
 		}
 		petbase[uint32(id)] = PetBaseInfo{
-			Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E,
+			Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E, EggGroups: v.Eg,
 			HeightLow: v.HL, HeightHigh: v.HH, WeightLow: v.WL, WeightHigh: v.WH,
 		}
 		if v.E != 0 {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
+		}
+	}
+	eggGroup := make(map[uint32]EggGroup, len(raw.EggGroup))
+	for k, v := range raw.EggGroup {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			eggGroup[uint32(id)] = EggGroup{ID: uint32(id), Name: v.Name, Desc: v.Desc}
 		}
 	}
 	// embed 的图片清单:异色图未导出时据此回退普通图,避免空图标。
@@ -180,6 +197,7 @@ func Load() (*DB, error) {
 		images:       raw.Images,
 		imageBase:    imageBase,
 		petbase:      petbase,
+		eggGroup:     eggGroup,
 		evoIndex:     evoIndex,
 		imgFiles:     imgFiles,
 	}, nil
@@ -238,6 +256,21 @@ func (db *DB) imageOf(petbaseID string, shiny bool) PetImage {
 func (db *DB) PetBase(petbaseID uint32) (PetBaseInfo, bool) {
 	v, ok := db.petbase[petbaseID]
 	return v, ok
+}
+
+// PetEggGroups 返回某 petbase 形态的蛋组列表(社区名+描述,按配置顺序);无则返回 nil。
+func (db *DB) PetEggGroups(petbaseID uint32) []EggGroup {
+	info, ok := db.petbase[petbaseID]
+	if !ok || len(info.EggGroups) == 0 {
+		return nil
+	}
+	out := make([]EggGroup, 0, len(info.EggGroups))
+	for _, id := range info.EggGroups {
+		if g, ok := db.eggGroup[id]; ok {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // ChainStep 是进化链上的一个形态(按阶段升序)。

@@ -36,6 +36,11 @@
 - `PET_TALENT_CONF` — 特长名(`speciality_id → name`)
 - `PET_FILTER_CONF` — 系别/天分/标记的 `filter_enum_value → filter_desc`(中文);另含筛选图标引用(见 3 节末)
 - `PET_BLOOD_CONF` — 血脉(24 条:18 属性系 + 首领/巨兽/黑魔法/异核/污染/奇异)的主图标 `icon` 引用(见 3 节末)
+- `PET_LIKE_ELEMENT_CONF` — 蛋组(繁殖组)。`id`(1~15)即 `PETBASE_CONF.egg_group` 列表里的编号,
+  `pet_like_reason` 对应 `all.pb` 的 `PetEggGroup` 枚举 `PEG_*`;`editor_name1` 为策划编辑器标签
+  (「名称:描述」格式,官方 Bin 字段而非本地化 UI 串),取「:」后作蛋组描述保留。显示名不用其内定名,
+  改用社区更流行的叫法(未发现/巨灵/两栖/昆虫/天空/动物/妖精/植物/拟人/软体/大地/魔力/海洋/龙/机械,
+  硬编码于 `gen_gamedata.py` 的 `EGG_GROUP_NAMES`)。id 16+ 为繁殖组合标记,忽略。
 - `PETBASE_CONF` + `MODEL_CONF` — 宠物图片引用(`JL_res` 全身图、`model_conf→icon` 头像;见 3 节末)
 - opcode/系别/天分/标记的整数枚举取自 `nrc/all.pb`(`ZoneSvrCmd`/`SkillDamType` 等)
 
@@ -284,5 +289,5 @@ s2c 0x1346 DATA 明文 body
   协议里虽存在 `DELETE_REQ(397)`,但无对应 UI 入口、玩家不可触发,故无需接入。
 
 待校准(多数需含相应事件/宠物的新样本)：
-- **咕噜球/蛋组/技能名**本地化尚未梳理;
+- **咕噜球/技能名**本地化尚未梳理(蛋组已接入 `PET_LIKE_ELEMENT_CONF`,见上);
 - **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。

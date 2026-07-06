@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals, getEvolution } from '../api'
-import { Types, Marks, Gender, Form, Blood, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
+import { Types, Marks, Gender, Form, Blood, EggGroups, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
 
 // 路由页:直接访问 /pets/:gid 或从其他页跳转时,以弹窗形式呈现,关闭即返回上一页。
 export default function PetDetail() {
@@ -92,7 +92,7 @@ export function PetDetailModal({ gid, onClose }) {
 
         <div className="detail-body">
           <div className="rule-row">
-            {pet.talentRank && <span className="pill">{pet.talentRank}</span>}
+            {pet.talentRank && <span className={'pill' + (pet.talentRank === '了不起的天分' ? ' pill-gold' : '')}>{pet.talentRank}</span>}
             <Types types={pet.types} icons={pet.typeIcons} plain />
             <Blood p={pet} />
           </div>
@@ -102,16 +102,12 @@ export function PetDetailModal({ gid, onClose }) {
           <div className="kv">
             <Item k="性格" v={pet.nature} />
             <Item k="特长" v={pet.speciality || '无'} />
+            <Item k="蛋组" v={pet.eggGroups?.length ? <EggGroups groups={pet.eggGroups} /> : '未知'} />
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
             <Item k="体重" v={<StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" />} />
             <Item k="声音" v={pet.voice} />
-            <Item k="标记" v={pet.partnerMark && pet.partnerMark !== '无' && pet.partnerMarkIcon
-              ? <span title={pet.partnerMark}><InlineIcon src={pet.partnerMarkIcon} className="mark-detail-ic" alt={pet.partnerMark} /></span>
-              : '-'} />
             <Item k="位置" v={locText(pet)} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} />
-            <Item k="异色" v={pet.shiny ? '是' : '否'} />
-            <Item k="炫彩" v={pet.colorful ? '是' : '否'} />
           </div>
 
           {chain.length > 1 && (

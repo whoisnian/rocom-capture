@@ -237,6 +237,9 @@ for pid, p in _petbase.items():
         e["s"] = p["stage"]
     if int(pid) in chain_group:
         e["e"] = chain_group[int(pid)]
+    eg = p.get("egg_group")
+    if eg:  # 蛋组编号列表(1~2 个),对应 egg_group 表的 id
+        e["eg"] = eg
     for src, dst in (("height_low", "hl"), ("height_high", "hh"),
                      ("weight_low", "wl"), ("weight_high", "wh")):
         if p.get(src):
@@ -259,8 +262,28 @@ for k, v in rows("AUDIO_NATURE_CONF.json").items():
         pos, neg = NATURE_TABLE[v["name"]]
         nature_effect[k] = {"pos": pos, "neg": neg}
 
+# 蛋组(繁殖组):PETBASE_CONF.egg_group 存编号列表,编号即 PET_LIKE_ELEMENT_CONF 的 id
+#   (id 1~15 的 pet_like_reason 对应 all.pb 的 PetEggGroup 枚举 PEG_*;16+ 为繁殖组合标记,忽略)。
+# 显示名用社区更流行的叫法(下表),游戏配置里的 editor_name1(策划编辑器标签,「名称:描述」格式)
+#   仅取「:」后半作为描述保留。editor_name1 本身是官方 Bin 字段,非本地化 UI 串。
+EGG_GROUP_NAMES = {
+    1: "未发现", 2: "巨灵", 3: "两栖", 4: "昆虫", 5: "天空",
+    6: "动物", 7: "妖精", 8: "植物", 9: "拟人", 10: "软体",
+    11: "大地", 12: "魔力", 13: "海洋", 14: "龙", 15: "机械",
+}
+egg_group = {}
+for k, v in rows("PET_LIKE_ELEMENT_CONF.json").items():
+    gid = v.get("id")
+    if gid not in EGG_GROUP_NAMES:  # 只收录 15 个正式蛋组
+        continue
+    raw = v.get("editor_name1") or ""
+    desc = raw.split("：", 1)[1] if "：" in raw else raw  # 「名称:描述」取描述半
+    egg_group[str(gid)] = {"name": EGG_GROUP_NAMES[gid], "desc": desc}
+
 data = {
     "species": species,
+    # 蛋组: id -> {name:社区流行名, desc:官方描述}。petbase[].eg 引用这些 id。
+    "egg_group": egg_group,
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
     "nature_effect": nature_effect,
     "skill_dam_type": enum_dim("SkillDamType"),

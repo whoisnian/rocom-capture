@@ -19,6 +19,7 @@ type Filter struct {
 	TalentRank    string
 	Medal         string
 	Speciality    string
+	EggGroup      string // 蛋组名(精确匹配组名,含该组即命中)
 	PartnerMark   string
 	Shiny         string // "", "1", "0"
 	Colorful      string // "", "1", "0"
@@ -97,6 +98,10 @@ func buildWhere(f Filter, account string) (string, []any) {
 	for _, t := range f.Types { // types 存为 JSON 数组，用 LIKE 匹配带引号的元素
 		where = append(where, "types LIKE ?")
 		args = append(args, "%\""+t+"\"%")
+	}
+	if f.EggGroup != "" { // egg_groups 亦为 JSON 组名数组,LIKE 匹配含该组的宠物
+		where = append(where, "egg_groups LIKE ?")
+		args = append(args, "%\""+f.EggGroup+"\"%")
 	}
 	if f.Box != "" { // 取前导整数为 box_id,关联 pet_box 表(限本账号)
 		idStr := f.Box

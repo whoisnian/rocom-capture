@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS pets (
   catch_time INTEGER, shiny INTEGER, colorful INTEGER,
   hp INTEGER, attack INTEGER, defense INTEGER,
   sp_attack INTEGER, sp_defense INTEGER, speed INTEGER,
-  form TEXT,
+  form TEXT, egg_groups TEXT,
   data TEXT, updated_at INTEGER,
   PRIMARY KEY(account, gid)
 );
@@ -104,7 +104,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   conn_id TEXT PRIMARY KEY, key BLOB, account TEXT, updated_at INTEGER
 );
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	// 为早于该列的旧库补列(CREATE TABLE IF NOT EXISTS 不会新增列);已存在则忽略错误。
+	s.db.Exec(`ALTER TABLE pets ADD COLUMN egg_groups TEXT`)
+	return nil
 }
 
 // SessionTTL 是持久化会话(密钥/账号归属)的有效期:超过此时长的连接不再复用,
@@ -524,11 +529,17 @@ func (sc *Scoped) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 
 	data, _ := json.Marshal(p)
 	types, _ := json.Marshal(p.Types)
+	// 蛋组存组名 JSON 数组(与 types 同法),供 egg_groups LIKE '%"名"%' 过滤。
+	eggNames := make([]string, 0, len(p.EggGroups))
+	for _, g := range p.EggGroups {
+		eggNames = append(eggNames, g.Name)
+	}
+	eggGroups, _ := json.Marshal(eggNames)
 	_, err = sc.db.Exec(`
 INSERT INTO pets(account,gid,conf_id,species,name,level,nature_id,nature,gender,types,
   height,weight,voice,talent_rank,medal,medal_id,partner_mark,speciality,speciality_id,
-  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,data,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,egg_groups,data,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(account,gid) DO UPDATE SET
   conf_id=excluded.conf_id,species=excluded.species,name=excluded.name,level=excluded.level,
   nature_id=excluded.nature_id,nature=excluded.nature,gender=excluded.gender,types=excluded.types,
@@ -537,12 +548,12 @@ ON CONFLICT(account,gid) DO UPDATE SET
   speciality=excluded.speciality,speciality_id=excluded.speciality_id,catch_time=excluded.catch_time,
   shiny=excluded.shiny,colorful=excluded.colorful,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
   sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,form=excluded.form,
-  data=excluded.data,updated_at=excluded.updated_at`,
+  egg_groups=excluded.egg_groups,data=excluded.data,updated_at=excluded.updated_at`,
 		sc.account, p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
 		p.HeightM, p.WeightKg, p.Voice, p.TalentRank, p.Medal, p.WearMedalConfID, p.PartnerMark,
 		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny), b2i(p.Colorful),
 		p.HP.Value, p.Attack.Value, p.Defense.Value, p.SpAttack.Value, p.SpDefense.Value, p.Speed.Value,
-		p.Form, string(data), time.Now().Unix())
+		p.Form, string(eggGroups), string(data), time.Now().Unix())
 	return isNew, err
 }
 

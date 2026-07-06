@@ -51,6 +51,8 @@ type Pet struct {
 	Blood     string `json:"blood,omitempty"`     // 血脉中文短名(普通/草/火…)
 	BloodIcon string `json:"bloodIcon,omitempty"` // 血脉主图标相对路径
 
+	EggGroups []gamedata.EggGroup `json:"eggGroups,omitempty"` // 蛋组(繁殖组),1~2 个,name 社区名 + desc 官方描述
+
 	HeightM  float64 `json:"heightM"`  // 身高(米)
 	WeightKg float64 `json:"weightKg"` // 体重(千克)
 	// 当前形态的身高/体重取值范围(米/千克)与当前值在范围内的百分位(0-100);
@@ -142,6 +144,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		BloodID:    p.GetBloodId(),
 		Blood:      db.BloodName(p.GetBloodId()),
 		BloodIcon:  db.BloodIcon(p.GetBloodId()),
+		EggGroups:  db.PetEggGroups(base),
 		HeightM:    float64(p.GetHeight()) / 100,
 		WeightKg:   float64(p.GetWeight()) / 1000,
 		Voice:      p.GetVoice(),

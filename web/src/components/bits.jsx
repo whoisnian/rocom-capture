@@ -76,6 +76,7 @@ export function Portrait({ p }) {
   React.useEffect(() => setBad(false), [src])
   return (
     <div className="detail-hero">
+      <PetMark p={p} />
       {src && !bad
         ? <img src={imgURL(src)} alt={p.species} onError={() => setBad(true)} />
         : <span>{p.shiny ? '✨' : '🐾'}</span>}
@@ -247,6 +248,18 @@ export function Gender({ g }) {
 export function Form({ form }) {
   if (!form) return null
   return <span className="mark mark-form" title="形态">{form}</span>
+}
+
+// EggGroups 展示宠物蛋组(繁殖组)标签,每个组名 hover 显示官方描述;无蛋组返回 null。
+export function EggGroups({ groups }) {
+  if (!groups || !groups.length) return null
+  return (
+    <span className="egg-groups">
+      {groups.map((g) => (
+        <span key={g.id} className="egg-group" title={g.desc ? `蛋组 · ${g.desc}` : '蛋组'}>{g.name}</span>
+      ))}
+    </span>
+  )
 }
 
 // ImgAvatar 按图片相对路径渲染一个头像(进化链等无 pet 对象处用);缺图回退 emoji。

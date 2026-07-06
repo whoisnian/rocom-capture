@@ -69,6 +69,8 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pill { padding: 2px 8px; border-radius: 6px; background: #6c6c6c; font-size: 12px; }
+/* 最高档天分「了不起的天分」用金色高亮 */
+.pill-gold { background: var(--gold); color: #1a1400; font-weight: 700; }
 .muted { color: var(--fg-dim); }
 /* 极值高亮(声音 |v|>=96 / 体重百分位 <=2% 或 >=98%) */
 .val-hot { color: var(--gold); font-weight: 700; }
@@ -152,7 +154,10 @@ img.pet-avatar { object-fit: cover; }
 .pet-mark-frame { top: 0; left: 0; width: 100%; height: 100%; }
 /* 白色标记符号居中叠在橙色外框上 */
 .pet-mark-ic { top: 50%; left: 50%; width: 58%; height: 58%; transform: translate(-50%, -50%); }
-.pet-name { font-weight: 600; }
+/* 名称 + 性别/异色/血脉/形态/蛋组等徽标同行:用 flex 垂直居中,消除各元素高度不一造成的错位 */
+.pet-name { font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+/* flex 下改由 gap 统一间距,清掉徽标行内布局用的 margin-left,避免间距叠加不均 */
+.pet-name > .mark, .pet-name > .mark-img { margin-left: 0; }
 .gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
 .gender.male { color: #4ea3ff; }
 .gender.female { color: #ff6fae; }
@@ -185,6 +190,11 @@ img.pet-avatar { object-fit: cover; }
 .mark-shiny { background: #3a2f6b; color: #c9b6ff; }
 .mark-colorful { background: #6b2f50; color: #ffb6e0; }
 .mark-form { background: #2f4a3a; color: #a8e6c0; font-weight: 500; }
+
+/* 蛋组(繁殖组)标签:多个组名并排,hover 显示官方描述 */
+.egg-groups { display: inline-flex; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
+.egg-group { font-size: 11px; padding: 0 6px; border-radius: 5px; line-height: 18px;
+  background: #2f3f57; color: #b9ccef; white-space: nowrap; cursor: default; }
 
 /* 进化链(详情页):头像横向排列,当前形态高亮 */
 .evo-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
@@ -250,8 +260,11 @@ img.evo-avatar { object-fit: cover; }
 }
 .detail-head { padding: 16px; display: flex; justify-content: space-between; align-items: baseline; }
 .detail-no { color: var(--fg-dim); }
-.detail-hero { height: 180px; display: grid; place-items: center; font-size: 72px; background: radial-gradient(circle at 50% 30%, #38415a, transparent 70%); }
-.detail-hero img { height: 168px; object-fit: contain; }
+.detail-hero { position: relative; height: 180px; display: grid; place-items: center; font-size: 72px; background: radial-gradient(circle at 50% 30%, #38415a, transparent 70%); }
+/* 仅约束全身图(直接子 img),避免波及角标里的搭档标记图 */
+.detail-hero > img { height: 168px; object-fit: contain; }
+/* 复用头像的 PetMark(橙框+白标记),在 hero 左上角放大内移;开启 hover 提示 */
+.detail-hero .pet-mark { top: 12px; left: 12px; width: 34px; height: 34px; pointer-events: auto; }
 .detail-title { display: flex; align-items: center; gap: 10px; padding: 0 16px; }
 .detail-title h2 { margin: 0; }
 .lv { background: var(--bg-3); padding: 2px 10px; border-radius: 999px; font-size: 13px; }

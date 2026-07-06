@@ -165,6 +165,7 @@ func parseFilter(q url.Values) store.Filter {
 		TalentRank:  q.Get("talentRank"),
 		Medal:       q.Get("medal"),
 		Speciality:  q.Get("speciality"),
+		EggGroup:    q.Get("eggGroup"),
 		PartnerMark: q.Get("partnerMark"),
 		Shiny:       q.Get("shiny"),
 		Colorful:    q.Get("colorful"),

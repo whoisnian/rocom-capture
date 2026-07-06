@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
-import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
+import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES, ALL_EGG_GROUPS } from '../api'
 import { AccountContext, IconsContext } from '../App'
-import { Types, Six, Marks, Gender, Form, Blood, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Form, Blood, EggGroups, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -288,6 +288,7 @@ export default function PetList() {
         </div>
         <Select label="天分" opts={options.talentRank} value={filter.talentRank} onChange={(v) => set({ talentRank: v })} />
         <Select label="特长" opts={options.speciality} value={filter.speciality} onChange={(v) => set({ speciality: v })} />
+        <Select label="蛋组" opts={ALL_EGG_GROUPS} value={filter.eggGroup} onChange={(v) => set({ eggGroup: v })} />
         <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
         <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
@@ -353,7 +354,7 @@ export default function PetList() {
                     <div className="pet-cell">
                       <Avatar p={p} />
                       <div>
-                        <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Blood p={p} iconOnly /> <Form form={p.form} /></div>
+                        <div className="pet-name">{p.name || p.species}<Gender g={p.gender} /><Marks p={p} /><Blood p={p} iconOnly /><Form form={p.form} /><EggGroups groups={p.eggGroups} /></div>
                         <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · #${p.book}` : ""}{boxTag(p)}</div>
                       </div>
                     </div>
@@ -380,7 +381,7 @@ export default function PetList() {
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
-                  <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Blood p={p} iconOnly /> <Form form={p.form} /></div>
+                  <div className="pet-name">{p.name || p.species}<Gender g={p.gender} /><Marks p={p} /><Blood p={p} iconOnly /><Form form={p.form} /></div>
                   <div className="pet-sub">
                     {p.species} · Lv.{p.level}
                     {boxTagShort(p) && <> · <span className="loc">{boxTagShort(p)}</span></>}
@@ -392,6 +393,7 @@ export default function PetList() {
                 <div>性格：{p.nature || '-'}</div>
                 <div>特长：{p.speciality || '无'}</div>
                 <div>奖牌：{p.medal || '-'}</div>
+                {p.eggGroups?.length > 0 && <div className="egg-cell">蛋组：<EggGroups groups={p.eggGroups} /></div>}
                 <div>体重：<span className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
                 <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
                 <div>声音：<span className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</span></div>

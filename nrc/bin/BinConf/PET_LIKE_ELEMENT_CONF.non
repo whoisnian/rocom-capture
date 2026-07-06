@@ -1,0 +1,54 @@
+{
+    "Name": "PET_LIKE_ELEMENT_CONF",
+    "Type": "EStruct",
+    "UniqueKey": "id",
+    "Properties": [
+        {
+            "Name": "id",
+            "Type": "EUint32",
+            "Offset": 0,
+            "Size": 4
+        },
+        {
+            "Name": "pet_like_reason",
+            "Type": "EString",
+            "Offset": 4,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "editor_name1",
+            "Type": "EString",
+            "Offset": 8,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "editor_name2",
+            "Type": "EString",
+            "Offset": 12,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "like_elements",
+            "Type": "EStruct",
+            "Offset": 16,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 15,
+            "Struct": {
+                "Name": "PET_LIKE_ELEMENT_CONF.like_elements",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "pet_like_elements",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4
+                    }
+                ]
+            }
+        }
+    ]
+}
