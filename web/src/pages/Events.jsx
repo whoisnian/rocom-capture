@@ -12,12 +12,14 @@ const FIELDS = [
   { k: 'nature', label: '性格' },
   { k: 'medal', label: '奖牌' },
   { k: 'type', label: '系别' },
-  { k: 'shiny', label: '异色', fixed: '1' },
-  { k: 'colorful', label: '炫彩', fixed: '1' },
 ]
 
+// 异色/炫彩始终高亮(不再作为可配规则),读取时顺手剔除历史遗留的这两类规则。
 function loadRules() {
-  try { return JSON.parse(localStorage.getItem('hlRules') || '[]') } catch { return [] }
+  try {
+    const r = JSON.parse(localStorage.getItem('hlRules') || '[]')
+    return Array.isArray(r) ? r.filter((x) => x.field !== 'shiny' && x.field !== 'colorful') : []
+  } catch { return [] }
 }
 
 // ownedMedalNames 返回宠物【拥有】的奖牌名集合(medalIds 经 id→名映射;佩戴+custom+free)。
@@ -30,14 +32,15 @@ function ownedMedalNames(pet, medalById) {
 function matchRule(pet, rule, ownedMedals) {
   if (!pet) return false
   if (rule.field === 'type') return (pet.types || []).includes(rule.value)
-  if (rule.field === 'shiny') return !!pet.shiny
-  if (rule.field === 'colorful') return !!pet.colorful
   if (rule.field === 'medal') return ownedMedals.has(rule.value) // 检查拥有的奖牌(非仅佩戴)
   return String(pet[rule.field] || '') === rule.value
 }
-// 任一规则命中即高亮(规则内部为精确匹配);ownedMedals=该宠物拥有的奖牌名集合。
+// 异色/炫彩始终高亮;此外任一规则命中即高亮(规则内部为精确匹配)。
+// ownedMedals=该宠物拥有的奖牌名集合。
 function isHighlight(pet, rules, ownedMedals) {
-  return rules.length > 0 && rules.some((r) => matchRule(pet, r, ownedMedals))
+  if (!pet) return false
+  if (pet.shiny || pet.colorful) return true
+  return rules.some((r) => matchRule(pet, r, ownedMedals))
 }
 
 export default function Events() {
@@ -98,11 +101,10 @@ export default function Events() {
   }, [keepAwake])
 
   const addRule = () => {
-    const field = draft.field
-    const value = field === 'shiny' ? '1' : draft.value.trim()
-    if (field !== 'shiny' && !value) return
-    setRules((r) => [...r, { field, value }])
-    setDraft({ field, value: '' })
+    const value = draft.value.trim()
+    if (!value) return
+    setRules((r) => [...r, { field: draft.field, value }])
+    setDraft({ field: draft.field, value: '' })
   }
   const delRule = (i) => setRules((r) => r.filter((_, idx) => idx !== i))
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
@@ -115,21 +117,22 @@ export default function Events() {
     <div>
       <div className="rules">
         <div className="rules-head" onClick={() => setRulesOpen((v) => !v)}>
-          <h3>高亮规则 <span className="muted small">满足任一规则的事件将高亮提醒</span></h3>
+          <h3>高亮规则</h3>
           <button className="btn small" onClick={(e) => { e.stopPropagation(); setRulesOpen((v) => !v) }}>
             {rulesOpen ? '收起 ▲' : `编辑${rules.length ? ` (${rules.length})` : ''} ▼`}
           </button>
         </div>
         {rulesOpen && (
+          <div className="muted small">满足任一规则的事件将高亮，异色/炫彩始终高亮</div>
+        )}
+        {rulesOpen && (
           <div className="rule-row">
             <select className="select" style={{ width: 120 }} value={draft.field} onChange={(e) => setDraft({ field: e.target.value, value: '' })}>
               {FIELDS.map((f) => <option key={f.k} value={f.k}>{f.label}</option>)}
             </select>
-            {draft.field !== 'shiny' && (
-              <input className="input" style={{ maxWidth: 200 }} placeholder="例如 固执 / 大块头 / 火"
-                value={draft.value} onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && addRule()} />
-            )}
+            <input className="input" style={{ maxWidth: 200 }} placeholder="例如 固执 / 大块头 / 火"
+              value={draft.value} onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && addRule()} />
             <button className="btn primary" onClick={addRule}>添加</button>
           </div>
         )}
@@ -137,7 +140,7 @@ export default function Events() {
           <div className="chips">
             {rules.map((r, i) => (
               <span key={i} className="chip on" onClick={() => delRule(i)}>
-                {FIELDS.find((f) => f.k === r.field)?.label}: {r.field === 'shiny' ? '是' : r.value} ✕
+                {FIELDS.find((f) => f.k === r.field)?.label}: {r.value} ✕
               </span>
             ))}
             {rules.length === 0 && <span className="muted">未设置规则</span>}

@@ -75,6 +75,8 @@ export default function PetList() {
   const [options, setOptions] = useState({})
   const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
   const [sync, setSync] = useState(() => localStorage.getItem('petSync') !== '0') // 实时同步:游戏内操作自动跳转到对应宠物(默认开)
+  // 网页全屏态(Fullscreen API):初值取当前实际全屏状态,避免切走再切回时按钮误显示为未全屏
+  const [isFull, setIsFull] = useState(() => !!(document.fullscreenElement || document.webkitFullscreenElement))
   const [selected, setSelected] = useState(null) // 单击选中的 gid
   const [menu, setMenu] = useState(null)          // 右键/长按菜单 {gid,x,y}
   const [boxes, setBoxes] = useState([])          // 各盒子槽位布局
@@ -121,6 +123,16 @@ export default function PetList() {
   useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
   useEffect(() => { syncRef.current = sync }, [sync])
   useEffect(() => { localStorage.setItem('petSync', sync ? '1' : '0') }, [sync])
+  // 网页全屏:监听状态变化(含浏览器 UI/ESC 退出)以同步按钮文案
+  useEffect(() => {
+    const onFs = () => setIsFull(!!(document.fullscreenElement || document.webkitFullscreenElement))
+    document.addEventListener('fullscreenchange', onFs)
+    document.addEventListener('webkitfullscreenchange', onFs)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs)
+      document.removeEventListener('webkitfullscreenchange', onFs)
+    }
+  }, [])
 
   // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(客户端刚调整位置),
   // 自动切到该宠物所在页并选中,示意图跟随展示其盒子/队伍。
@@ -172,6 +184,19 @@ export default function PetList() {
   }
   // 重置:清空所有过滤条件,保留排序与每页档位
   const reset = () => setFilter((f) => ({ page: 1, pageSize: f.pageSize, sort: f.sort, order: f.order }))
+
+  // 网页全屏:对整页文档切换(带 webkit 前缀兼容);不支持的环境隐藏按钮
+  const fsSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)
+  const toggleFull = () => {
+    const el = document.documentElement
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen
+      exit.call(document)?.catch(() => {})
+    } else {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen
+      req.call(el)?.catch(() => {})
+    }
+  }
 
   // 右键/长按菜单:选中并在 (x,y) 弹出(限制不溢出视口),菜单内带上宠物用于"筛选相同…"
   const openMenu = (p, x, y) => {
@@ -339,14 +364,17 @@ export default function PetList() {
       </aside>
 
       <section>
-        <div className="toolbar">
+        <div className="toolbar list-toolbar">
           <button className="btn filter-toggle" onClick={() => setCollapsed((c) => !c)}>筛选</button>
           <input className="input" placeholder="搜索昵称 / 种类" value={filter.search || ''} onChange={(e) => set({ search: e.target.value })} />
-          <select className="select" style={{ maxWidth: 130 }} value={filter.sort} onChange={(e) => set({ sort: e.target.value })}>
+          <select className="select sort-select" value={filter.sort} onChange={(e) => set({ sort: e.target.value })}>
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
           <button className="btn" onClick={() => set({ order: filter.order === 'asc' ? 'desc' : 'asc' })}>{filter.order === 'asc' ? '升序' : '降序'}</button>
           <button className={'btn' + (sync ? ' primary' : '')} title="开启后,游戏内捕捉/移动宠物会自动跳转并选中该宠物;关闭可避免打断当前筛选" onClick={() => setSync((v) => !v)}>同步</button>
+          {fsSupported && (
+            <button className={'btn' + (isFull ? ' primary' : '')} title={isFull ? '退出网页全屏' : '网页全屏'} onClick={toggleFull}>全屏</button>
+          )}
           <div className="spacer" />
           <span className="muted">共 {data.total} 只</span>
         </div>

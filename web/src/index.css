@@ -137,6 +137,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .toolbar .input { max-width: 280px; }
+.sort-select { max-width: 130px; }
 .spacer { flex: 1; }
 
 /* 桌面表格 */
@@ -235,7 +236,11 @@ img.evo-avatar { object-fit: cover; }
 /* 事件行:序号 / 名称 / 时间统一 13px */
 .event-row, .event-row .pet-name, .event .event-seq, .event .event-time { font-size: 13px; }
 .rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-width: 720px; }
-.rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* 规则编辑行固定单行:下拉/按钮不缩,输入框弹性填充并可收缩(min-width:0) */
+.rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+.rule-row .select { flex: none; }
+.rule-row .input { flex: 1 1 auto; min-width: 0; }
+.rule-row .btn { flex: none; white-space: nowrap; }
 /* 高亮规则可折叠头:标题 + 收起/编辑开关,整行可点击 */
 .rules-head { display: flex; align-items: center; gap: 12px; cursor: pointer; }
 .rules-head h3 { margin: 0; flex: 1; min-width: 0; }
@@ -376,6 +381,12 @@ img.evo-avatar { object-fit: cover; }
   .content { padding: 12px; padding-bottom: 70px; }
 
   .list-layout { grid-template-columns: 1fr; }
+  /* 宠物列表工具栏:窄屏去掉弹性占位、收紧间距并缩窄排序下拉,让「共 N 只」并回按钮行而非独占一行
+     (用专属 .list-toolbar 类,避免波及嵌在列表内的详情弹窗 .toolbar) */
+  .list-toolbar { gap: 8px; }
+  .list-toolbar .spacer { display: none; }
+  .list-toolbar .btn { padding: 7px 10px; }
+  .sort-select { max-width: 104px; }
   /* 筛选面板改为左侧抽屉:盖在内容上而非把列表推下去,关闭入口始终在顶部 */
   .filters {
     position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
