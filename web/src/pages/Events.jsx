@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react'
 import { getEvents, getEventCount, clearEvents, subscribe, getMedals } from '../api'
-import { Avatar, fmtTime } from '../components/bits'
+import { Avatar, Marks, Blood, locTag, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 import { AccountContext } from '../App'
+
+// 事件流里值得单独标出的稀有血脉(元素系血脉几乎人人有,不展示以免刷屏)
+const NOTABLE_BLOODS = ['污染', '奇异']
 
 const FIELDS = [
   { k: 'species', label: '种类' },
@@ -49,6 +52,8 @@ export default function Events() {
   // 奖牌 id→名映射(供奖牌规则按「拥有」判定;宠物 medalIds 存的是 id)
   const medalById = useMemo(() => new Map(medals.map((m) => [m.id, m.name])), [medals])
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
+  // 仅展示命中高亮规则的事件,持久化到 localStorage
+  const [onlyHl, setOnlyHl] = useState(() => localStorage.getItem('onlyHl') === '1')
   // 屏幕常亮开关(Screen Wake Lock),持久化到 localStorage
   const [keepAwake, setKeepAwake] = useState(() => localStorage.getItem('keepAwake') === '1')
 
@@ -65,6 +70,7 @@ export default function Events() {
   }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
+  useEffect(() => { localStorage.setItem('onlyHl', onlyHl ? '1' : '0') }, [onlyHl])
   useEffect(() => { getMedals().then((m) => setMedals(m || [])).catch(() => {}) }, [])
 
   // 请求屏幕常亮锁,阻止设备熄屏/降亮。仅 secure context(HTTPS/localhost)可用;
@@ -127,6 +133,8 @@ export default function Events() {
       <div className="event-head">
         <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>累计获得 {total} 只</span></h3>
         <div className="spacer" />
+        <button className={'btn' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
+          title="仅展示命中高亮规则的事件">{onlyHl ? '★ 仅看高亮' : '仅看高亮'}</button>
         {'wakeLock' in navigator
           ? <button className={'btn' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
               title="阻止屏幕熄灭/变暗,方便盯着高亮提醒">{keepAwake ? '🔆 常亮中' : '屏幕常亮'}</button>
@@ -134,21 +142,31 @@ export default function Events() {
         <button className="btn" disabled={events.length === 0} onClick={clearAll}>清空</button>
       </div>
       <div className="event-list">
-        {events.map((ev, i) => (
-          <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById)) ? ' hl' : '')}
-            onClick={() => ev.gid && setDetailGid(ev.gid)}>
-            <Avatar p={ev.pet} />
-            <div className="event-body">
-              <div className="event-row">
-                <span className="event-seq muted">#{total - i}</span>
-                <span className="pet-name">{ev.pet?.name || ev.pet?.species}</span>
-                <span className="event-time muted">{fmtTime(ev.time)}</span>
+        {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
+        {events
+          .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById)) }))
+          .filter(({ hl }) => !onlyHl || hl)
+          .map(({ ev, i, hl }) => (
+            <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (hl ? ' hl' : '')}
+              onClick={() => ev.gid && setDetailGid(ev.gid)}>
+              <Avatar p={ev.pet} />
+              <div className="event-body">
+                <div className="event-row">
+                  <span className="event-seq muted">#{total - i}</span>
+                  <span className="pet-name">
+                    {ev.pet?.name || ev.pet?.species}
+                    <Marks p={ev.pet} />
+                    {NOTABLE_BLOODS.includes(ev.pet?.blood) && <Blood p={ev.pet} iconOnly />}
+                  </span>
+                  <span className="event-time muted">{fmtTime(ev.time)}</span>
+                </div>
+                <div className="pet-sub">Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'} · {locTag(ev.pet)}</div>
               </div>
-              <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'}</div>
             </div>
-          </div>
-        ))}
+          ))}
         {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
+        {events.length > 0 && onlyHl && !events.some((ev) => isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById))) &&
+          <div className="empty">当前没有命中高亮规则的事件。{rules.length === 0 ? '请先添加高亮规则。' : ''}</div>}
       </div>
 
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals, getEvolution } from '../api'
-import { Types, Marks, Gender, Form, Blood, EggGroups, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
+import { Types, Marks, Gender, Form, Blood, EggGroups, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locTag, fmtTime } from '../components/bits'
 
 // 路由页:直接访问 /pets/:gid 或从其他页跳转时,以弹窗形式呈现,关闭即返回上一页。
 export default function PetDetail() {
@@ -106,8 +106,8 @@ export function PetDetailModal({ gid, onClose }) {
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
             <Item k="体重" v={<StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" />} />
             <Item k="声音" v={pet.voice} />
-            <Item k="位置" v={locText(pet)} />
-            <Item k="捕捉时间" v={fmtTime(pet.catchTime)} />
+            <Item k="位置" v={locTag(pet)} />
+            <Item k="捕捉时间" v={fmtTime(pet.catchTime)} title={fmtTime(pet.catchTime)} />
           </div>
 
           {chain.length > 1 && (
@@ -176,11 +176,11 @@ function evoStages(chain) {
   return stages
 }
 
-function Item({ k, v }) {
+function Item({ k, v, title }) {
   return (
     <div className="item">
       <div className="k">{k}</div>
-      <div className="v">{v ?? '-'}</div>
+      <div className="v" title={title}>{v ?? '-'}</div>
     </div>
   )
 }

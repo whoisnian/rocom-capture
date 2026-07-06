@@ -33,16 +33,12 @@ export function teamLabel(team) {
   return `${team.teamIdx + 1}-${team.pos + 1}`
 }
 
-// locText 返回宠物位置的【完整描述】(详情页用,保留「第X排第Y格 / 第X队第Y位」);
-// 列表用短式见 boxLabel/teamLabel。
-export function locText(pet) {
-  if (pet.box) {
-    const b = pet.box
-    const name = b.boxName || `盒${b.boxId}`
-    return `${b.boxId}-${name} 第${Math.floor(b.slot / 6) + 1}排第${b.slot % 6 + 1}格`
-  }
-  if (pet.team) return `大世界 第${pet.team.teamIdx + 1}队第${pet.team.pos + 1}位`
-  return '-'
+// locTag 返回宠物位置的【简化文案】,列表/事件/详情统一使用(单一权威格式):
+// 盒子 📦盒号-盒名 排-格 / 大世界 🌍大世界 队-位 / 尚未落位 ⏳位置待同步。
+export function locTag(pet) {
+  if (pet?.box) return `📦${boxLabel(pet.box)}`
+  if (pet?.team) return `🌍大世界 ${teamLabel(pet.team)}`
+  return '⏳位置待同步'
 }
 
 // PetMark 渲染搭档标记徽章(橙色外框底 img_collect + 白色标记符号),叠在头像左上角;

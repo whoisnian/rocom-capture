@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES, ALL_EGG_GROUPS } from '../api'
 import { AccountContext, IconsContext } from '../App'
-import { Types, Six, Marks, Gender, Form, Blood, EggGroups, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Form, Blood, EggGroups, Avatar, StatRange, InlineIcon, locTag, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -235,9 +235,9 @@ export default function PetList() {
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
   // 盒位/队位均缺失:多为刚捕捉、登录快照之后新增的宠物。游戏「打开盒子」不重传布局,
   // 位置要等下次登录 / 挪格 / 整理才会经流量落库,故此处标「位置待同步」而非留空。
-  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界 ${teamLabel(p.team)}` : ' · ⏳位置待同步')
-  // 移动卡片用的紧凑位置标签(队伍去掉「大世界」以免窄屏折行;盒子含空格可自然折行)
-  const boxTagShort = (p) => (p.box ? `📦${boxLabel(p.box)}` : p.team ? `🌍${teamLabel(p.team)}` : '⏳位置待同步')
+  const boxTag = (p) => ` · ${locTag(p)}`
+  // 移动卡片用的紧凑位置标签(与桌面同一 locTag 权威格式,统一带「大世界」)
+  const boxTagShort = (p) => locTag(p)
 
   return (
     <div className="list-layout">

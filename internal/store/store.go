@@ -595,6 +595,11 @@ func (sc *Scoped) GetPet(gid uint32) (*pet.Pet, error) {
 
 // AddEvent 写入本账号一条事件。
 func (sc *Scoped) AddEvent(e *Event) error {
+	// 注入盒位/队位(捕捉回包常同时携带落位,此时已 ApplyBoxMoves),使实时广播的事件即带位置。
+	if e.Pet != nil {
+		e.Pet.Box = sc.boxLocFor(e.Pet.Gid)
+		e.Pet.Team = sc.teamLocFor(e.Pet.Gid)
+	}
 	data, _ := json.Marshal(e.Pet)
 	res, err := sc.db.Exec(`INSERT INTO events(account,time,sub_kind,gid,species,nature,medal,shiny,data)
 VALUES(?,?,?,?,?,?,?,?,?)`,
@@ -640,12 +645,12 @@ func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []*Event
 	for rows.Next() {
 		var e Event
 		var data string
 		if err := rows.Scan(&e.ID, &e.Time, &e.SubKind, &e.Gid, &data); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		var p pet.Pet
@@ -654,7 +659,19 @@ func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
 		}
 		out = append(out, &e)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close() // 先关闭结果集再发后续查询:SetMaxOpenConns(1) 下迭代中嵌套查询会死锁
+	// 注入当前盒位/队位(与宠物列表一致,反映该宠物现在所处位置;已放生则为空)
+	for _, e := range out {
+		if e.Pet != nil {
+			e.Pet.Box = sc.boxLocFor(e.Gid)
+			e.Pet.Team = sc.teamLocFor(e.Gid)
+		}
+	}
+	return out, nil
 }
 
 func b2i(b bool) int {

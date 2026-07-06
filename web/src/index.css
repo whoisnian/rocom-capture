@@ -270,9 +270,10 @@ img.evo-avatar { object-fit: cover; }
 .lv { background: var(--bg-3); padding: 2px 10px; border-radius: 999px; font-size: 13px; }
 .detail-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .kv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.kv .item { background: var(--bg-2); border-radius: 10px; padding: 8px 12px; }
+.kv .item { background: var(--bg-2); border-radius: 10px; padding: 8px 12px; min-width: 0; }
 .kv .item .k { font-size: 12px; color: var(--fg-dim); }
-.kv .item .v { font-weight: 600; margin-top: 2px; }
+/* 值单行显示、禁止换行;过长在两列 grid 下截断省略(min-width:0 使 item 可收缩) */
+.kv .item .v { font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat { background: var(--bg-2); border-radius: 10px; padding: 8px; text-align: center; }
 .stat .n { font-size: 18px; font-weight: 700; }
@@ -376,7 +377,15 @@ img.evo-avatar { object-fit: cover; }
   .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 13px; }
   /* 六维在窄屏铺满等分三列,避免「物攻 235 ↑ +10」挤到两行 */
   .card .six { grid-template-columns: repeat(3, 1fr); }
+  /* 竖屏卡片窄、六维占两行使单卡过高,竖屏隐藏(横屏更宽则保留);详情页仍可查看 */
+  @media (orientation: portrait) {
+    .card .six { display: none; }
+  }
   .kv { grid-template-columns: 1fr; }
+  /* 竖屏详情用两列铺 kv,减少总高度(横屏保持单列) */
+  @media (orientation: portrait) {
+    .kv { grid-template-columns: repeat(2, 1fr); }
+  }
   .stats { grid-template-columns: repeat(3, 1fr); }
   .detail-wrap { max-width: 100%; }
 }
