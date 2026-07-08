@@ -74,8 +74,9 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 /* 最高档天分「了不起的天分」用金色高亮 */
 .pill-gold { background: var(--gold); color: #1a1400; font-weight: 700; }
 .muted { color: var(--fg-dim); }
-/* 极值高亮(声音 |v|>=96 / 体重百分位 <=2% 或 >=98%) */
-.val-hot { color: var(--gold); font-weight: 700; }
+/* 极值高亮(声音 |v|>=96 / 体重百分位 <=2% 或 >=98%):按边界方向分色,上=金、下=蓝 */
+.val-hot-hi { color: var(--gold); font-weight: 700; }
+.val-hot-lo { color: var(--accent); font-weight: 700; }
 
 /* ---- 系别色 ---- */
 .type {
@@ -220,7 +221,9 @@ img.evo-avatar { object-fit: cover; }
 .pager-size { width: 110px; }
 
 /* ---- 事件页 ---- */
-.event-head { display: flex; align-items: center; gap: 10px; max-width: 720px; }
+/* 顶部工具条复用 .toolbar/.list-toolbar,仅补最大宽度;不再用 h3,避免标题行过高、内容下移 */
+.event-head { max-width: 720px; }
+.event-title { font-weight: 700; font-size: 15px; }
 .event-list { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
 .event {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
@@ -235,15 +238,21 @@ img.evo-avatar { object-fit: cover; }
 .event.hl { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2a2410; }
 /* 事件行:序号 / 名称 / 时间统一 13px */
 .event-row, .event-row .pet-name, .event .event-seq, .event .event-time { font-size: 13px; }
-.rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-width: 720px; }
-/* 规则编辑行固定单行:下拉/按钮不缩,输入框弹性填充并可收缩(min-width:0) */
-.rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
-.rule-row .select { flex: none; }
-.rule-row .input { flex: 1 1 auto; min-width: 0; }
-.rule-row .btn { flex: none; white-space: nowrap; }
-/* 高亮规则可折叠头:标题 + 收起/编辑开关,整行可点击 */
-.rules-head { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-.rules-head h3 { margin: 0; flex: 1; min-width: 0; }
+/* 高亮规则侧边栏标题行:标题在左、AND/OR 切换靠右;✕ 关闭仅移动端抽屉显示 */
+.rules-header { display: flex; align-items: center; gap: 10px; }
+.rules-title { margin: 0; font-size: 15px; }
+.rules-close { display: none; }
+/* 规则编辑:各维度纵向堆叠,label 在上、chip 换行在下(同宠物列表筛选条件) */
+.rule-groups { display: flex; flex-direction: column; gap: 12px; }
+/* 「种类」自由输入:输入框弹性填充、按钮不缩 */
+.rule-species-add { display: flex; gap: 8px; }
+.rule-species-add .input { flex: 1 1 auto; min-width: 0; max-width: 240px; }
+.rule-species-add .btn { flex: none; white-space: nowrap; }
+/* 详情页天分/系别/血脉标签行(原先复用 .rule-row,拆出独立类) */
+.detail-tags { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+/* 多规则联合逻辑:说明文字 + AND/OR 切换,两端对齐 */
+.rule-logic { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rule-logic-toggle { display: flex; gap: 4px; margin-left: auto; }
 .btn.small { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
 .muted.small { font-weight: 400; font-size: 13px; }
 
@@ -396,6 +405,12 @@ img.evo-avatar { object-fit: cover; }
     transform: translateX(-100%); transition: transform .25s ease;
   }
   .filters:not(.collapsed) { transform: none; }
+  /* 移动端抽屉:标题行吸顶,✕ 关闭显示(标题与 AND/OR 同行,靠右) */
+  .rules-header {
+    position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  }
+  .rules-close { display: grid; place-items: center; }
   /* 标题栏吸顶、底部条吸底,长面板滚动时始终可见 */
   .filters-bar {
     display: flex; align-items: center; justify-content: space-between;

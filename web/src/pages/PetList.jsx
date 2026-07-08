@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES, ALL_EGG_GROUPS } from '../api'
 import { AccountContext, IconsContext } from '../App'
-import { Types, Six, Marks, Gender, Form, Blood, EggGroups, Avatar, StatRange, InlineIcon, locTag, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Gender, Form, Blood, EggGroups, Avatar, StatRange, InlineIcon, locTag, fmtTime, voiceHot, pctHot } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -15,21 +15,18 @@ const HOT_NATURES = [
   ['沉默', '生命↑物攻↓'],
   ['急躁', '速度↑物防↓'],
 ]
-const HOT_NAMES = HOT_NATURES.map((n) => n[0])
+export const HOT_NAMES = HOT_NATURES.map((n) => n[0])
 
 const SORTS = [
   { key: 'gid', label: '编号' },
   { key: 'boxpos', label: '盒子位置' },
   { key: 'level', label: '等级' },
-  { key: 'weight', label: '体重' },
-  { key: 'height', label: '身高' },
+  { key: 'weight', label: '体重(百分位)' },
+  { key: 'height', label: '身高(百分位)' },
   { key: 'voice', label: '声音' },
   { key: 'catchTime', label: '捕捉时间' },
 ]
 
-// 极值高亮阈值:声音 |v|>=96(接近 ±100 极值);体重百分位 <=2% 或 >=98%(接近该形态上下限)。
-const voiceHot = (v) => Math.abs(v) >= 96
-const pctHot = (pct) => pct != null && (pct <= 2 || pct >= 98)
 
 // 捕捉时间区间选项(键存入 filter,查询时按本地时间实时算出 catch_time 下限,避免持久化的时间戳过期)。
 const CATCH_RANGES = [
@@ -387,8 +384,8 @@ export default function PetList() {
                 <th onClick={() => sortBy('gid')}>宠物{arrow('gid')}</th>
                 <th>系别</th><th>性格</th><th>特长</th><th>佩戴奖牌</th>
                 <th onClick={() => sortBy('voice')}>声音{arrow('voice')}</th>
-                <th onClick={() => sortBy('weight')}>体重{arrow('weight')}</th>
-                <th onClick={() => sortBy('height')}>身高{arrow('height')}</th>
+                <th title="按百分位排序" onClick={() => sortBy('weight')}>体重{arrow('weight')}</th>
+                <th title="按百分位排序" onClick={() => sortBy('height')}>身高{arrow('height')}</th>
                 <th>六维</th>
                 <th onClick={() => sortBy('catchTime')}>捕捉时间{arrow('catchTime')}</th>
               </tr>
@@ -409,8 +406,8 @@ export default function PetList() {
                   <td>{p.nature || '-'}</td>
                   <td>{p.speciality || '无'}</td>
                   <td>{p.medal || '-'}</td>
-                  <td className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</td>
-                  <td className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
+                  <td className={voiceHot(p.voice)}>{p.voice}</td>
+                  <td className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
                   <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></td>
                   <td><Six p={p} /></td>
                   <td className="muted">{fmtTime(p.catchTime)}</td>
@@ -440,9 +437,9 @@ export default function PetList() {
                 <div>特长：{p.speciality || '无'}</div>
                 <div>奖牌：{p.medal || '-'}</div>
                 {p.eggGroups?.length > 0 && <div className="egg-cell">蛋组：<EggGroups groups={p.eggGroups} /></div>}
-                <div>体重：<span className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
+                <div>体重：<span className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
                 <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
-                <div>声音：<span className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</span></div>
+                <div>声音：<span className={voiceHot(p.voice)}>{p.voice}</span></div>
               </div>
               <Six p={p} />
             </div>

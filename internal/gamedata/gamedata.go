@@ -412,6 +412,36 @@ func (db *DB) AllMedals() []MedalEntry {
 	return out
 }
 
+// AllSpecialities 返回全部特长名(按 id 升序去重),供前端高亮规则点选。
+func (db *DB) AllSpecialities() []string { return sortedNames(db.speciality) }
+
+// sortedNames 把 id(字符串)→名 的映射按数值 id 升序取名、去空去重。
+func sortedNames(m map[string]string) []string {
+	type kv struct {
+		id   uint64
+		name string
+	}
+	arr := make([]kv, 0, len(m))
+	for k, v := range m {
+		if v == "" {
+			continue
+		}
+		id, _ := strconv.ParseUint(k, 10, 64)
+		arr = append(arr, kv{id, v})
+	}
+	sort.Slice(arr, func(i, j int) bool { return arr[i].id < arr[j].id })
+	out := make([]string, 0, len(arr))
+	seen := map[string]bool{}
+	for _, e := range arr {
+		if seen[e.name] {
+			continue
+		}
+		seen[e.name] = true
+		out = append(out, e.name)
+	}
+	return out
+}
+
 // GenderName 返回性别符号。
 func GenderName(g uint32) string {
 	switch g {

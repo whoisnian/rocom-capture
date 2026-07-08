@@ -36,7 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("加载名称库失败: %v", err)
 	}
-	st, err := store.New(*dbPath)
+	st, err := store.New(*dbPath, db)
 	if err != nil {
 		log.Fatalf("打开数据库失败: %v", err)
 	}

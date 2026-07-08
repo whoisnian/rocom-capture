@@ -27,6 +27,7 @@ type Server struct {
 	db          *gamedata.DB
 	opcodeNames map[uint16]string
 	medals      []gamedata.MedalEntry
+	medalIDs    map[string][]uint32 // 奖牌名 -> id 列表(同名多枚时全含),用于把筛选名解析为 id
 	icons       iconMeta
 }
 
@@ -45,6 +46,10 @@ type iconMeta struct {
 // New 创建 HTTP 服务。
 func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
+	s.medalIDs = map[string][]uint32{}
+	for _, m := range s.medals {
+		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
+	}
 	// 六维编号 1-6:1生命 2物攻 3魔攻 4物防 5魔防 6速度(与 pet.ToPet 六维顺序一致)。
 	s.icons = iconMeta{
 		Stat: map[string]string{
@@ -89,6 +94,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
+	s.mux.HandleFunc("GET /api/name-options", s.handleNameOptions)
 	s.mux.HandleFunc("GET /api/icons", s.handleIcons)
 	s.mux.HandleFunc("GET /api/boxes", s.handleBoxes)
 	s.mux.HandleFunc("GET /api/teams", s.handleTeams)
@@ -139,6 +145,11 @@ func (s *Server) handleMedals(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.medals)
 }
 
+// handleNameOptions 返回全量特长名(gamedata 全表,非按账号),供事件页高亮规则点选。
+func (s *Server) handleNameOptions(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string][]string{"speciality": s.db.AllSpecialities()})
+}
+
 // handleIcons 返回全局固定图标(六维属性小图 + 异色/炫彩/污染标记图),供前端一次性缓存。
 func (s *Server) handleIcons(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.icons)
@@ -155,7 +166,8 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 // parseFilter 从查询参数构造 store.Filter(handlePets/handlePetPage 共用)。
-func parseFilter(q url.Values) store.Filter {
+// 奖牌按名筛选,这里将奖牌名解析为 id 列表(pet_medal 存 id),同名多枚时全含。
+func (s *Server) parseFilter(q url.Values) store.Filter {
 	atoi := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return n }
 	atoi64 := func(k string) int64 { n, _ := strconv.ParseInt(q.Get(k), 10, 64); return n }
 	f := store.Filter{
@@ -163,7 +175,7 @@ func parseFilter(q url.Values) store.Filter {
 		Nature:      q.Get("nature"),
 		Gender:      q.Get("gender"),
 		TalentRank:  q.Get("talentRank"),
-		Medal:       q.Get("medal"),
+		MedalIDs:    s.medalIDs[q.Get("medal")],
 		Speciality:  q.Get("speciality"),
 		EggGroup:    q.Get("eggGroup"),
 		PartnerMark: q.Get("partnerMark"),
@@ -206,12 +218,12 @@ func (s *Server) handleEvolution(w http.ResponseWriter, r *http.Request) {
 // handlePetPage 返回某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页。
 func (s *Server) handlePetPage(w http.ResponseWriter, r *http.Request) {
 	gid, _ := strconv.ParseUint(r.URL.Query().Get("gid"), 10, 32)
-	page := s.store.For(s.acct(r)).PetPage(uint32(gid), parseFilter(r.URL.Query()))
+	page := s.store.For(s.acct(r)).PetPage(uint32(gid), s.parseFilter(r.URL.Query()))
 	writeJSON(w, map[string]int{"page": page})
 }
 
 func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
-	f := parseFilter(r.URL.Query())
+	f := s.parseFilter(r.URL.Query())
 	pets, total, err := s.store.For(s.acct(r)).ListPets(f)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -251,6 +263,12 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if events == nil {
 		events = []*store.Event{}
 	}
+	// 补注体重/身高百分位(供事件页体重/声音高亮规则按百分位判定;历史事件也据当前 gamedata 刷新)。
+	for _, ev := range events {
+		if ev.Pet != nil {
+			pet.FillSizePercentile(s.db, ev.Pet)
+		}
+	}
 	writeJSON(w, events)
 }
 
@@ -274,7 +292,19 @@ func (s *Server) handleClearEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleFilterOptions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, s.store.For(s.acct(r)).FilterOptions())
+	sc := s.store.For(s.acct(r))
+	opts := sc.FilterOptions()
+	// 奖牌下拉:按「拥有」筛选,列出本账号宠物拥有过的奖牌名(id→名,去重,保持 id 升序)。
+	var names []string
+	seen := map[string]bool{}
+	for _, id := range sc.OwnedMedalIDs() {
+		if m, ok := s.db.Medal(id); ok && m.Name != "" && !seen[m.Name] {
+			seen[m.Name] = true
+			names = append(names, m.Name)
+		}
+	}
+	opts["medal"] = names
+	writeJSON(w, opts)
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,11 @@ import { IconsContext } from '../App'
 
 const imgURL = (path) => '/img/' + path
 
+// 极值高亮:声音接近 ±100、体重百分位接近上下限时按边界方向着色(列表/事件/详情统一)。
+// 返回 val-hot-hi(接近上边界)/ val-hot-lo(接近下边界)/ undefined。
+export const voiceHot = (v) => v >= 96 ? 'val-hot-hi' : v <= -96 ? 'val-hot-lo' : undefined
+export const pctHot = (pct) => pct == null ? undefined : pct >= 98 ? 'val-hot-hi' : pct <= 2 ? 'val-hot-lo' : undefined
+
 // InlineIcon 渲染文字前的小图标(系别/六维/血脉等);无路径或加载失败则不占位(留文字)。
 export function InlineIcon({ src, className = 'inline-ic', alt = '' }) {
   const [bad, setBad] = React.useState(false)

@@ -11,6 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 )
 
@@ -24,26 +25,31 @@ type Event struct {
 }
 
 // Store 封装 SQLite 连接。跨账号操作(migrate/accounts 表)挂在此。
-type Store struct{ db *sql.DB }
+// gd 用于在写入时把身高/体重换算成形态内百分位并落列,支撑跨种族的百分位排序。
+type Store struct {
+	db *sql.DB
+	gd *gamedata.DB
+}
 
 // Scoped 是绑定了某个 account 的 Store 视图:所有按账号隔离的读写都经它进行,
 // account 由 For 注入,方法内部不再显式接收 account,避免漏传导致跨账号串数据。
 type Scoped struct {
 	db      *sql.DB
+	gd      *gamedata.DB
 	account string
 }
 
 // For 返回绑定指定 account 的视图。
-func (s *Store) For(account string) *Scoped { return &Scoped{db: s.db, account: account} }
+func (s *Store) For(account string) *Scoped { return &Scoped{db: s.db, gd: s.gd, account: account} }
 
-// New 打开(或创建)数据库并建表。
-func New(path string) (*Store, error) {
+// New 打开(或创建)数据库并建表。gd 供写入时计算身高/体重百分位排序列。
+func New(path string, gd *gamedata.DB) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite 写入串行化，避免 database is locked
-	s := &Store{db: db}
+	s := &Store{db: db, gd: gd}
 	if err := s.migrate(); err != nil {
 		return nil, err
 	}
@@ -109,6 +115,11 @@ CREATE TABLE IF NOT EXISTS sessions (
 	}
 	// 为早于该列的旧库补列(CREATE TABLE IF NOT EXISTS 不会新增列);已存在则忽略错误。
 	s.db.Exec(`ALTER TABLE pets ADD COLUMN egg_groups TEXT`)
+	// 身高/体重在当前形态取值范围内的百分位(0-100),写入时按 gamedata 计算并落列,
+	// 供跨种族按「相对自身范围偏大/偏小」排序(见 buildOrder);范围缺失或旧库未回填时为
+	// NULL(排序排末尾),清库重登后即补齐。
+	s.db.Exec(`ALTER TABLE pets ADD COLUMN weight_pct REAL`)
+	s.db.Exec(`ALTER TABLE pets ADD COLUMN height_pct REAL`)
 	return nil
 }
 
@@ -527,6 +538,10 @@ func (sc *Scoped) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 		return false, err
 	}
 
+	// 计算身高/体重在当前形态范围内的百分位并落列(排序键);同时写入 data JSON(读取时会再刷新,无害)。
+	pet.FillSizePercentile(sc.gd, p)
+	weightPct, heightPct := nullPct(p.WeightPct), nullPct(p.HeightPct)
+
 	data, _ := json.Marshal(p)
 	types, _ := json.Marshal(p.Types)
 	// 蛋组存组名 JSON 数组(与 types 同法),供 egg_groups LIKE '%"名"%' 过滤。
@@ -538,8 +553,9 @@ func (sc *Scoped) UpsertPet(p *pet.Pet) (isNew bool, err error) {
 	_, err = sc.db.Exec(`
 INSERT INTO pets(account,gid,conf_id,species,name,level,nature_id,nature,gender,types,
   height,weight,voice,talent_rank,medal,medal_id,partner_mark,speciality,speciality_id,
-  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,egg_groups,data,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  catch_time,shiny,colorful,hp,attack,defense,sp_attack,sp_defense,speed,form,egg_groups,
+  weight_pct,height_pct,data,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(account,gid) DO UPDATE SET
   conf_id=excluded.conf_id,species=excluded.species,name=excluded.name,level=excluded.level,
   nature_id=excluded.nature_id,nature=excluded.nature,gender=excluded.gender,types=excluded.types,
@@ -548,13 +564,22 @@ ON CONFLICT(account,gid) DO UPDATE SET
   speciality=excluded.speciality,speciality_id=excluded.speciality_id,catch_time=excluded.catch_time,
   shiny=excluded.shiny,colorful=excluded.colorful,hp=excluded.hp,attack=excluded.attack,defense=excluded.defense,
   sp_attack=excluded.sp_attack,sp_defense=excluded.sp_defense,speed=excluded.speed,form=excluded.form,
-  egg_groups=excluded.egg_groups,data=excluded.data,updated_at=excluded.updated_at`,
+  egg_groups=excluded.egg_groups,weight_pct=excluded.weight_pct,height_pct=excluded.height_pct,
+  data=excluded.data,updated_at=excluded.updated_at`,
 		sc.account, p.Gid, p.ConfID, p.Species, p.Name, p.Level, p.NatureID, p.Nature, p.Gender, string(types),
 		p.HeightM, p.WeightKg, p.Voice, p.TalentRank, p.Medal, p.WearMedalConfID, p.PartnerMark,
 		p.Speciality, p.SpecialityID, p.CatchTime, b2i(p.Shiny), b2i(p.Colorful),
 		p.HP.Value, p.Attack.Value, p.Defense.Value, p.SpAttack.Value, p.SpDefense.Value, p.Speed.Value,
-		p.Form, string(eggGroups), string(data), time.Now().Unix())
+		p.Form, string(eggGroups), weightPct, heightPct, string(data), time.Now().Unix())
 	return isNew, err
+}
+
+// nullPct 把可空百分位指针转为可绑定的 sql.NullFloat64(nil→NULL)。
+func nullPct(v *float64) sql.NullFloat64 {
+	if v == nil {
+		return sql.NullFloat64{}
+	}
+	return sql.NullFloat64{Float64: *v, Valid: true}
 }
 
 // RemovePet 删除本账号宠物，返回被删除的快照(若存在)。

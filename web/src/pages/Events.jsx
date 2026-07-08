@@ -1,46 +1,65 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react'
-import { getEvents, getEventCount, clearEvents, subscribe, getMedals } from '../api'
-import { Avatar, Marks, Blood, locTag, fmtTime } from '../components/bits'
+import React, { useState, useEffect, useContext } from 'react'
+import { getEvents, getEventCount, clearEvents, subscribe, getNameOptions } from '../api'
+import { Avatar, Marks, Blood, locTag, fmtTime, voiceHot, pctHot } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
+import { HOT_NAMES } from './PetList'
 import { AccountContext } from '../App'
 
 // 事件流里值得单独标出的稀有血脉(元素系血脉几乎人人有,不展示以免刷屏)
 const NOTABLE_BLOODS = ['污染', '奇异']
 
+// 高亮规则维度。仅「种类」为自由输入(种类繁多且无全表点选),其余点选条目。
 const FIELDS = [
   { k: 'species', label: '种类' },
   { k: 'nature', label: '性格' },
-  { k: 'medal', label: '奖牌' },
-  { k: 'type', label: '系别' },
+  { k: 'speciality', label: '特长' },
+  { k: 'weight', label: '体重' },
+  { k: 'voice', label: '声音' },
 ]
+// 体重/声音按「在自身范围内的百分位」判定(非奖牌拥有):体重百分位 weightPct(0-100)、
+// 声音 voice(-100~100)。阈值与宠物列表的极值高亮一致。大块头=体型最大、小不点=最小;
+// 婉转声=声音最高昂、粗嗓门=最低沉(见奖牌定义)。
+const WEIGHT_OPTS = ['大块头', '小不点']
+const VOICE_OPTS = ['婉转声', '粗嗓门']
 
-// 异色/炫彩始终高亮(不再作为可配规则),读取时顺手剔除历史遗留的这两类规则。
+// 异色/炫彩始终高亮、系别与奖牌已废弃,读取时顺手剔除这些历史遗留规则。
 function loadRules() {
   try {
     const r = JSON.parse(localStorage.getItem('hlRules') || '[]')
-    return Array.isArray(r) ? r.filter((x) => x.field !== 'shiny' && x.field !== 'colorful') : []
+    const dropped = ['shiny', 'colorful', 'type', 'medal']
+    return Array.isArray(r) ? r.filter((x) => !dropped.includes(x.field)) : []
   } catch { return [] }
 }
 
-// ownedMedalNames 返回宠物【拥有】的奖牌名集合(medalIds 经 id→名映射;佩戴+custom+free)。
-function ownedMedalNames(pet, medalById) {
-  const s = new Set()
-  for (const id of pet?.medalIds || []) { const n = medalById.get(id); if (n) s.add(n) }
-  return s
-}
-
-function matchRule(pet, rule, ownedMedals) {
+function matchRule(pet, rule) {
   if (!pet) return false
-  if (rule.field === 'type') return (pet.types || []).includes(rule.value)
-  if (rule.field === 'medal') return ownedMedals.has(rule.value) // 检查拥有的奖牌(非仅佩戴)
+  // 体重/声音按百分位实际判定,不依赖奖牌是否已获得。
+  if (rule.field === 'weight') {
+    const p = pet.weightPct // 0-100:接近上/下限即体型最大/最小
+    return p != null && (rule.value === '大块头' ? p >= 98 : p <= 2)
+  }
+  if (rule.field === 'voice') {
+    const v = pet.voice // -100~100:最高昂/最低沉
+    return v != null && (rule.value === '婉转声' ? v >= 96 : v <= -96)
+  }
   return String(pet[rule.field] || '') === rule.value
 }
-// 异色/炫彩始终高亮;此外任一规则命中即高亮(规则内部为精确匹配)。
-// ownedMedals=该宠物拥有的奖牌名集合。
-function isHighlight(pet, rules, ownedMedals) {
+// 异色/炫彩始终高亮;此外按维度分组:同维度内任一条目命中即算该维度命中(OR),
+// 维度之间按 mode 组合——'and'=每个维度都命中、'or'=任一维度命中(等价于任一规则命中)。
+// 各维度均为单值(体重/声音取百分位区间),同维度取或可避免同选两极永不命中。
+// 无规则时仅异色/炫彩高亮(避免 and 下 every([]) 恒真把全部点亮)。
+function isHighlight(pet, rules, mode) {
   if (!pet) return false
   if (pet.shiny || pet.colorful) return true
-  return rules.some((r) => matchRule(pet, r, ownedMedals))
+  if (rules.length === 0) return false
+  const groups = new Map() // field -> rules[]
+  for (const r of rules) {
+    if (!groups.has(r.field)) groups.set(r.field, [])
+    groups.get(r.field).push(r)
+  }
+  const groupHit = (rs) => rs.some((r) => matchRule(pet, r))
+  const g = [...groups.values()]
+  return mode === 'or' ? g.some(groupHit) : g.every(groupHit)
 }
 
 export default function Events() {
@@ -50,15 +69,12 @@ export default function Events() {
   // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
   const [total, setTotal] = useState(0)
   const [rules, setRules] = useState(loadRules)
-  // 高亮规则编辑区折叠态:配好规则后收起,把纵向空间让给事件流(首次无规则时默认展开)
-  const [rulesOpen, setRulesOpen] = useState(() => {
-    const s = localStorage.getItem('hlOpen')
-    return s == null ? loadRules().length === 0 : s === '1'
-  })
-  const [medals, setMedals] = useState([])
-  const [draft, setDraft] = useState({ field: 'nature', value: '' })
-  // 奖牌 id→名映射(供奖牌规则按「拥有」判定;宠物 medalIds 存的是 id)
-  const medalById = useMemo(() => new Map(medals.map((m) => [m.id, m.name])), [medals])
+  // 多规则联合逻辑:'and'=需全部命中(默认)、'or'=任一命中
+  const [mode, setMode] = useState(() => localStorage.getItem('hlMode') === 'or' ? 'or' : 'and')
+  // 高亮规则侧边栏:桌面常驻左栏,移动端为抽屉;collapsed 仅控制移动端抽屉开合(默认收起)
+  const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('hlCollapsed') !== '0')
+  const [nameOpts, setNameOpts] = useState({ speciality: [] }) // 全量特长点选条目
+  const [speciesDraft, setSpeciesDraft] = useState('') // 「种类」自由输入框内容
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   // 仅展示命中高亮规则的事件,持久化到 localStorage
   const [onlyHl, setOnlyHl] = useState(() => localStorage.getItem('onlyHl') === '1')
@@ -78,9 +94,24 @@ export default function Events() {
   }, [account])
 
   useEffect(() => { localStorage.setItem('hlRules', JSON.stringify(rules)) }, [rules])
-  useEffect(() => { localStorage.setItem('hlOpen', rulesOpen ? '1' : '0') }, [rulesOpen])
+  useEffect(() => { localStorage.setItem('hlMode', mode) }, [mode])
+  useEffect(() => { sessionStorage.setItem('hlCollapsed', collapsed ? '1' : '0') }, [collapsed])
   useEffect(() => { localStorage.setItem('onlyHl', onlyHl ? '1' : '0') }, [onlyHl])
-  useEffect(() => { getMedals().then((m) => setMedals(m || [])).catch(() => {}) }, [])
+  useEffect(() => { getNameOptions().then((o) => setNameOpts(o || { speciality: [] })).catch(() => {}) }, [])
+
+  // 某维度下可点选的条目:性格取宠物列表常用项、特长取全表、体重/声音取两极标签。
+  const paletteFor = (field) => {
+    if (field === 'nature') return HOT_NAMES
+    if (field === 'speciality') return (nameOpts.speciality || []).filter((v) => v !== '无') // 「无特长」不作高亮项
+    if (field === 'weight') return WEIGHT_OPTS
+    if (field === 'voice') return VOICE_OPTS
+    return []
+  }
+  const hasRule = (field, value) => rules.some((r) => r.field === field && r.value === value)
+  // 点选条目:已选则移除、未选则添加(即时生效,无需「添加」按钮)。
+  const toggleRule = (field, value) => setRules((r) => hasRule(field, value)
+    ? r.filter((x) => !(x.field === field && x.value === value))
+    : [...r, { field, value }])
 
   // 请求屏幕常亮锁,阻止设备熄屏/降亮。仅 secure context(HTTPS/localhost)可用;
   // 切到后台锁会被系统自动释放,回到前台需重新获取(visibilitychange)。
@@ -100,13 +131,13 @@ export default function Events() {
     }
   }, [keepAwake])
 
-  const addRule = () => {
-    const value = draft.value.trim()
-    if (!value) return
-    setRules((r) => [...r, { field: draft.field, value }])
-    setDraft({ field: draft.field, value: '' })
+  // 种类为自由输入,回车/点「添加」落规则(去重)。
+  const addSpecies = () => {
+    const value = speciesDraft.trim()
+    if (value && !hasRule('species', value)) setRules((r) => [...r, { field: 'species', value }])
+    setSpeciesDraft('')
   }
-  const delRule = (i) => setRules((r) => r.filter((_, idx) => idx !== i))
+  const speciesRules = rules.filter((r) => r.field === 'species')
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
   const clearAll = () => {
     if (!window.confirm('确定清空所有事件历史?计数将从头开始。')) return
@@ -114,56 +145,76 @@ export default function Events() {
   }
 
   return (
-    <div>
-      <div className="rules">
-        <div className="rules-head" onClick={() => setRulesOpen((v) => !v)}>
-          <h3>高亮规则</h3>
-          <button className="btn small" onClick={(e) => { e.stopPropagation(); setRulesOpen((v) => !v) }}>
-            {rulesOpen ? '收起 ▲' : `编辑${rules.length ? ` (${rules.length})` : ''} ▼`}
-          </button>
+    <div className="list-layout">
+      {/* 移动端规则抽屉的背景遮罩:点击关闭 */}
+      <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={() => setCollapsed(true)} />
+      <aside className={'filters' + (collapsed ? ' collapsed' : '')}>
+        {/* 标题行:标题在左,AND/OR 切换靠右;✕ 关闭仅移动端抽屉显示 */}
+        <div className="rules-header">
+          <h3 className="rules-title">高亮规则</h3>
+          <div className="rule-logic-toggle">
+            <button className={'btn small' + (mode === 'and' ? ' primary' : '')} onClick={() => setMode('and')}>AND</button>
+            <button className={'btn small' + (mode === 'or' ? ' primary' : '')} onClick={() => setMode('or')}>OR</button>
+          </div>
+          <button className="icon-btn rules-close" onClick={() => setCollapsed(true)} aria-label="关闭规则">✕</button>
         </div>
-        {rulesOpen && (
-          <div className="muted small">满足任一规则的事件将高亮，异色/炫彩始终高亮</div>
-        )}
-        {rulesOpen && (
-          <div className="rule-row">
-            <select className="select" style={{ width: 120 }} value={draft.field} onChange={(e) => setDraft({ field: e.target.value, value: '' })}>
-              {FIELDS.map((f) => <option key={f.k} value={f.k}>{f.label}</option>)}
-            </select>
-            <input className="input" style={{ maxWidth: 200 }} placeholder="例如 固执 / 大块头 / 火"
-              value={draft.value} onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
-              onKeyDown={(e) => e.key === 'Enter' && addRule()} />
-            <button className="btn primary" onClick={addRule}>添加</button>
-          </div>
-        )}
-        {(rules.length > 0 || rulesOpen) && (
-          <div className="chips">
-            {rules.map((r, i) => (
-              <span key={i} className="chip on" onClick={() => delRule(i)}>
-                {FIELDS.find((f) => f.k === r.field)?.label}: {r.value} ✕
-              </span>
-            ))}
-            {rules.length === 0 && <span className="muted">未设置规则</span>}
-          </div>
-        )}
-      </div>
+        <div className="rule-logic">
+          <span className="muted small" title="AND:各维度都要命中(同维度内任一条目即可)。OR:任一条目命中即可。体重/声音按百分位判定。异色/炫彩始终高亮。">
+            {mode === 'and' ? '同时满足所选条件' : '任一条件命中'}即高亮，异色/炫彩始终高亮
+          </span>
+        </div>
+        <div className="rule-groups">
+          {FIELDS.map((f) => (
+            <div className="filter-group" key={f.k}>
+              <label>{f.label}</label>
+              {f.k === 'species' ? (
+                <>
+                  <div className="rule-species-add">
+                    <input className="input" placeholder="输入种类名，如 鸭吉吉"
+                      value={speciesDraft} onChange={(e) => setSpeciesDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addSpecies()} />
+                    <button className="btn primary" onClick={addSpecies}>添加</button>
+                  </div>
+                  {speciesRules.length > 0 && (
+                    <div className="chips">
+                      {speciesRules.map((r) => (
+                        <span key={r.value} className="chip on" onClick={() => toggleRule('species', r.value)}>{r.value} ✕</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="chips">
+                  {paletteFor(f.k).map((v) => (
+                    <span key={v} className={'chip' + (hasRule(f.k, v) ? ' on' : '')} onClick={() => toggleRule(f.k, v)}>{v}</span>
+                  ))}
+                  {paletteFor(f.k).length === 0 && <span className="muted">暂无可选条目</span>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </aside>
 
-      <div className="event-head">
-        <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>共 {total} 只</span></h3>
-        <div className="spacer" />
-        {/* 三个操作统一为单图标,含义见各自 title */}
-        <button className={'btn btn-icon' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
-          title="仅展示命中高亮规则的事件">{onlyHl ? '★' : '☆'}</button>
-        {'wakeLock' in navigator
-          ? <button className={'btn btn-icon' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
-              title="阻止屏幕熄灭,方便盯着高亮提醒">☀</button>
-          : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
-        <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
-      </div>
-      <div className="event-list">
+      <section>
+        <div className="toolbar list-toolbar event-head">
+          <button className="btn filter-toggle" onClick={() => setCollapsed(false)}>规则{rules.length ? ` (${rules.length})` : ''}</button>
+          <strong className="event-title">实时事件</strong>
+          <span className="muted">共 {total} 只</span>
+          <div className="spacer" />
+          {/* 三个操作统一为单图标,含义见各自 title */}
+          <button className={'btn btn-icon' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
+            title="仅展示命中高亮规则的事件">{onlyHl ? '★' : '☆'}</button>
+          {'wakeLock' in navigator
+            ? <button className={'btn btn-icon' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
+                title="阻止屏幕熄灭,方便盯着高亮提醒">☀</button>
+            : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
+          <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
+        </div>
+        <div className="event-list">
         {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
         {events
-          .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById)) }))
+          .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, mode) }))
           .filter(({ hl }) => !onlyHl || hl)
           .map(({ ev, i, hl }) => (
             <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (hl ? ' hl' : '')}
@@ -179,14 +230,21 @@ export default function Events() {
                   </span>
                   <span className="event-time muted">{fmtTime(ev.time)}</span>
                 </div>
-                <div className="pet-sub">Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'} · {locTag(ev.pet)}</div>
+                <div className="pet-sub">
+                  {ev.pet?.nature}
+                  {ev.pet?.speciality && ev.pet.speciality !== '无' ? ` · ${ev.pet.speciality}` : ''}
+                  {' · W '}<span className={pctHot(ev.pet?.weightPct)}>{ev.pet?.weightPct != null ? `${Math.round(ev.pet.weightPct)}%` : '-'}</span>
+                  {' · V '}<span className={voiceHot(ev.pet?.voice)}>{ev.pet?.voice ?? '-'}</span>
+                  {' · '}{locTag(ev.pet)}
+                </div>
               </div>
             </div>
           ))}
-        {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
-        {events.length > 0 && onlyHl && !events.some((ev) => isHighlight(ev.pet, rules, ownedMedalNames(ev.pet, medalById))) &&
-          <div className="empty">当前没有命中高亮规则的事件。{rules.length === 0 ? '请先添加高亮规则。' : ''}</div>}
-      </div>
+          {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
+          {events.length > 0 && onlyHl && !events.some((ev) => isHighlight(ev.pet, rules, mode)) &&
+            <div className="empty">当前没有命中高亮规则的事件。{rules.length === 0 ? '请先添加高亮规则。' : ''}</div>}
+        </div>
+      </section>
 
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>

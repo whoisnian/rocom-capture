@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
-import { getPet, getMedals, getEvolution } from '../api'
-import { Types, Marks, Gender, Form, Blood, EggGroups, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locTag, fmtTime } from '../components/bits'
+import { getPet, getMedals, getEvolution, subscribe } from '../api'
+import { Types, Marks, Gender, Form, Blood, EggGroups, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locTag, fmtTime, voiceHot, pctHot } from '../components/bits'
 
 // 路由页:直接访问 /pets/:gid 或从其他页跳转时,以弹窗形式呈现,关闭即返回上一页。
 export default function PetDetail() {
@@ -27,6 +27,15 @@ export function PetDetailModal({ gid, onClose }) {
     getPet(gid).then(setPet).catch(() => setErr(true))
   }, [gid])
   useEffect(() => { getMedals().then(setMedals).catch(() => {}) }, [])
+  // 实时:进化/换牌/改标记等就地更新会广播完整宠物(带 gid,已按账号过滤),
+  // 命中当前详情 gid 时静默重拉,弹窗内容随之刷新(不置 null,避免闪烁)。
+  useEffect(() => {
+    return subscribe((m) => {
+      if (m.type === 'pet' && m.data && String(m.data.gid) === String(gid)) {
+        getPet(gid).then(setPet).catch(() => {})
+      }
+    })
+  }, [gid])
   // 进化链:按当前形态 petbase(base_conf_id)拉取整条链
   useEffect(() => {
     if (pet && pet.baseConfId) getEvolution(pet.baseConfId).then((c) => setChain(c || [])).catch(() => {})
@@ -91,7 +100,7 @@ export function PetDetailModal({ gid, onClose }) {
         </div>
 
         <div className="detail-body">
-          <div className="rule-row">
+          <div className="detail-tags">
             {pet.talentRank && <span className={'pill' + (pet.talentRank === '了不起的天分' ? ' pill-gold' : '')}>{pet.talentRank}</span>}
             <Types types={pet.types} icons={pet.typeIcons} plain />
             <Blood p={pet} />
@@ -104,8 +113,8 @@ export function PetDetailModal({ gid, onClose }) {
             <Item k="特长" v={pet.speciality || '无'} />
             <Item k="蛋组" v={pet.eggGroups?.length ? <EggGroups groups={pet.eggGroups} /> : '未知'} />
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
-            <Item k="体重" v={<StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" />} />
-            <Item k="声音" v={pet.voice} />
+            <Item k="体重" v={<span className={pctHot(pet.weightPct)}><StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" /></span>} />
+            <Item k="声音" v={<span className={voiceHot(pet.voice)}>{pet.voice}</span>} />
             <Item k="位置" v={locTag(pet)} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} title={fmtTime(pet.catchTime)} />
           </div>

@@ -63,6 +63,12 @@ export async function getMedals() {
   return r.json()
 }
 
+// getNameOptions 返回全量性格/特长名({nature, speciality}),供事件页高亮规则点选。
+export async function getNameOptions() {
+  const r = await fetch('/api/name-options')
+  return r.ok ? r.json() : { nature: [], speciality: [] }
+}
+
 // getIcons 返回全局固定图标(六维属性小图 stat.{hp,attack,...} + 异色/炫彩/污染标记图);
 // 不随宠物/账号变化,App 启动时拉一次经 IconsContext 分发。
 export async function getIcons() {

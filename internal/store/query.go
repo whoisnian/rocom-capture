@@ -17,7 +17,7 @@ type Filter struct {
 	NatureExclude []string // 性格"其他":排除这些热门性格
 	Gender        string
 	TalentRank    string
-	Medal         string
+	MedalIDs      []uint32 // 拥有该奖牌(pet_medal 里含任一 id)即命中;由服务层将奖牌名解析为 id
 	Speciality    string
 	EggGroup      string // 蛋组名(精确匹配组名,含该组即命中)
 	PartnerMark   string
@@ -36,7 +36,8 @@ type Filter struct {
 
 var sortColumns = map[string]string{
 	"gid": "gid", "level": "level", "catchTime": "catch_time",
-	"weight": "weight", "height": "height", "voice": "voice",
+	// 体重/身高按「形态范围内百分位」排序,便于跨种族找相对自身偏大/偏小的宠物(缺范围者排末尾)。
+	"weight": "weight_pct", "height": "height_pct", "voice": "voice",
 	"hp": "hp", "attack": "attack", "defense": "defense",
 	"spAttack": "sp_attack", "spDefense": "sp_defense", "speed": "speed",
 	"name": "name", "species": "species",
@@ -69,7 +70,6 @@ func buildWhere(f Filter, account string) (string, []any) {
 	}
 	addEq("gender", f.Gender)
 	addEq("talent_rank", f.TalentRank)
-	addEq("medal", f.Medal)
 	addEq("speciality", f.Speciality)
 	addEq("partner_mark", f.PartnerMark)
 	addEq("form", f.Form)
@@ -103,6 +103,14 @@ func buildWhere(f Filter, account string) (string, []any) {
 		where = append(where, "egg_groups LIKE ?")
 		args = append(args, "%\""+f.EggGroup+"\"%")
 	}
+	if len(f.MedalIDs) > 0 { // 拥有任一目标奖牌即命中(关联 pet_medal,限本账号)
+		ph := make([]string, len(f.MedalIDs))
+		for i, id := range f.MedalIDs {
+			ph[i] = "?"
+			args = append(args, id)
+		}
+		where = append(where, "gid IN (SELECT gid FROM pet_medal WHERE medal_id IN ("+strings.Join(ph, ",")+") AND account=pets.account)")
+	}
 	if f.Box != "" { // 取前导整数为 box_id,关联 pet_box 表(限本账号)
 		idStr := f.Box
 		if i := strings.IndexByte(idStr, '-'); i >= 0 {
@@ -134,6 +142,10 @@ func buildOrder(f Filter) string {
 	col := sortColumns[f.Sort]
 	if col == "" {
 		col = "gid"
+	}
+	// 百分位列可空(缺形态范围),用 `col IS NULL` 前置把 NULL 无论升降都排到末尾。
+	if strings.HasSuffix(col, "_pct") {
+		return col + " IS NULL, " + col + " " + dir + ", gid"
 	}
 	return col + " " + dir + ", gid"
 }
@@ -272,12 +284,29 @@ func (sc *Scoped) CountPets() (int, error) {
 	return n, err
 }
 
+// OwnedMedalIDs 返回本账号所有宠物拥有过的奖牌 id(去重升序),供服务层映射为名称做筛选下拉。
+func (sc *Scoped) OwnedMedalIDs() []uint32 {
+	rows, err := sc.db.Query(`SELECT DISTINCT medal_id FROM pet_medal WHERE account=? ORDER BY medal_id`, sc.account)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []uint32
+	for rows.Next() {
+		var id uint32
+		if rows.Scan(&id) == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // FilterOptions 返回本账号各维度的可选值(用于前端筛选下拉)。
 func (sc *Scoped) FilterOptions() map[string][]string {
 	out := map[string][]string{}
 	for key, col := range map[string]string{
 		"nature": "nature", "talentRank": "talent_rank",
-		"medal": "medal", "speciality": "speciality", "partnerMark": "partner_mark",
+		"speciality": "speciality", "partnerMark": "partner_mark",
 		"form": "form",
 	} {
 		rows, err := sc.db.Query("SELECT DISTINCT "+col+" FROM pets WHERE account=? AND "+col+"!='' ORDER BY "+col, sc.account)
