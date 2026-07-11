@@ -218,8 +218,8 @@ func (s *Server) handleEvolution(w http.ResponseWriter, r *http.Request) {
 // handlePetPage 返回某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页。
 func (s *Server) handlePetPage(w http.ResponseWriter, r *http.Request) {
 	gid, _ := strconv.ParseUint(r.URL.Query().Get("gid"), 10, 32)
-	page := s.store.For(s.acct(r)).PetPage(uint32(gid), s.parseFilter(r.URL.Query()))
-	writeJSON(w, map[string]int{"page": page})
+	page, found := s.store.For(s.acct(r)).PetPage(uint32(gid), s.parseFilter(r.URL.Query()))
+	writeJSON(w, map[string]any{"page": page, "found": found})
 }
 
 func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {

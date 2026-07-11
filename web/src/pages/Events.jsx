@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { getEvents, getEventCount, clearEvents, subscribe, getNameOptions } from '../api'
-import { Avatar, Marks, Blood, locTag, fmtTime, voiceHot, pctHot } from '../components/bits'
+import { Avatar, Marks, Blood, Gender, locTag, fmtTime, voiceHot, pctHot } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 import { HOT_NAMES } from './PetList'
 import { AccountContext } from '../App'
@@ -225,6 +225,7 @@ export default function Events() {
                   <span className="event-seq muted">#{total - i}</span>
                   <span className="pet-name">
                     {ev.pet?.name || ev.pet?.species}
+                    <Gender g={ev.pet?.gender} />
                     <Marks p={ev.pet} />
                     {NOTABLE_BLOODS.includes(ev.pet?.blood) && <Blood p={ev.pet} iconOnly />}
                   </span>

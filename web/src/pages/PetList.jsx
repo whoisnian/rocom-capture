@@ -229,17 +229,24 @@ export default function PetList() {
     else if (p.box) { const i = boxIdxById(p.box.boxId); if (i >= 0) setActiveIdx(i) }
   }
   // 点击示意图格子:选中该宠物,并跳到列表里它所在页(超过一页时切页)。
-  // 清掉其它筛选条件(仅保留排序/每页档位),确保目标宠物一定在列表中,
-  // 否则原有筛选可能把它排除导致跳转落空。盒子格→筛到该盒;队伍格→不限盒。
+  // 优先在「当前筛选」下定位:命中则仅切页、保留用户已设的筛选条件;
+  // 仅当该宠物被当前筛选排除(或查询失败)时,才回退清空其它条件(仅保留排序/每页档位),
+  // 确保目标宠物一定落在列表中。盒子格→筛到该盒;队伍格→不限盒。
   const onCell = (gid, container) => {
     setSelected(gid)
-    const cleared = { pageSize: filter.pageSize, sort: filter.sort, order: filter.order }
-    const base = container.type === 'box'
-      ? { ...cleared, box: `${container.id}-${container.name}` }
-      : { ...cleared }
-    getPetPage(gid, base)
-      .then((r) => setFilter({ ...base, page: (r && r.page) || 1 }))
-      .catch(() => setFilter({ ...base, page: 1 }))
+    // 回退:清空其它筛选,仅保留排序/每页;盒子格附带该盒过滤,联动示意图。
+    const fallback = () => {
+      const cleared = { pageSize: filter.pageSize, sort: filter.sort, order: filter.order }
+      const base = container.type === 'box'
+        ? { ...cleared, box: `${container.id}-${container.name}` }
+        : { ...cleared }
+      getPetPage(gid, base)
+        .then((r) => setFilter({ ...base, page: (r && r.page) || 1 }))
+        .catch(() => setFilter({ ...base, page: 1 }))
+    }
+    getPetPage(gid, withCatch(filter))
+      .then((r) => { if (r && r.found) setFilter((f) => ({ ...f, page: r.page || 1 })); else fallback() })
+      .catch(fallback)
   }
 
   // 列表项交互:单击选中、右键(桌面)/长按(移动)弹菜单

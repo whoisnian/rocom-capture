@@ -157,12 +157,13 @@ func clampPageSize(n int) int {
 	return n
 }
 
-// PetPage 返回 gid 在本账号当前筛选+排序下所处的页码(1 起,未命中返回 1)。
-func (sc *Scoped) PetPage(gid uint32, f Filter) int {
+// PetPage 返回 gid 在本账号当前筛选+排序下所处的页码(1 起)及是否命中筛选。
+// found=false 表示该宠物不在当前筛选结果内(此时 page 退回 1,调用方可据此决定是否清空筛选)。
+func (sc *Scoped) PetPage(gid uint32, f Filter) (page int, found bool) {
 	whereSQL, args := buildWhere(f, sc.account)
 	rows, err := sc.db.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
 	if err != nil {
-		return 1
+		return 1, false
 	}
 	defer rows.Close()
 	idx := 0
@@ -170,12 +171,12 @@ func (sc *Scoped) PetPage(gid uint32, f Filter) int {
 		var g uint32
 		if rows.Scan(&g) == nil {
 			if g == gid {
-				return idx/clampPageSize(f.PageSize) + 1
+				return idx/clampPageSize(f.PageSize) + 1, true
 			}
 			idx++
 		}
 	}
-	return 1
+	return 1, false
 }
 
 // ListPets 按筛选条件返回本账号宠物列表与命中总数。
