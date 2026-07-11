@@ -9,6 +9,8 @@
 # 运行时数据
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.log
 
 # 自签 TLS 证书(-tls 时自动生成)

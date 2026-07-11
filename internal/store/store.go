@@ -49,6 +49,21 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite 写入串行化，避免 database is locked
+	// 性能:默认 rollback 日志 + synchronous=FULL 会对每次自动提交 fsync,登录后全量宠物分页
+	// 逐只 UpsertPet(数百次独立提交)时磁盘上每只≈16ms、每页(50 只)≈800ms,整轮拖到近 10s,
+	// 处理速度赶不上抓包到达速度而积压。改 WAL + synchronous=NORMAL:提交不再逐次 fsync
+	// (仅 checkpoint 时落盘),被动抓包丢库即便宕机最多丢尾部若干条、可经下次登录快照重建,
+	// 该取舍安全。busy_timeout 兜底避免偶发 database is locked。
+	for _, pragma := range []string{
+		`PRAGMA journal_mode=WAL`,
+		`PRAGMA synchronous=NORMAL`,
+		`PRAGMA busy_timeout=5000`,
+	} {
+		if _, err := db.Exec(pragma); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	s := &Store{db: db, gd: gd}
 	if err := s.migrate(); err != nil {
 		return nil, err
@@ -594,6 +609,37 @@ func (sc *Scoped) RemovePet(gid uint32) (*pet.Pet, error) {
 	sc.db.Exec(`DELETE FROM pet_team WHERE account=? AND gid=?`, sc.account, gid)
 	sc.db.Exec(`DELETE FROM pet_medal WHERE account=? AND gid=?`, sc.account, gid)
 	return p, err
+}
+
+// PruneMissingPets 删除本账号中 gid 不在 keep 集合内的宠物(及其盒位/队位/奖牌关联),
+// 返回被删除的 gid。用于分页宠物列表全量下发后对账:玩家在别处放生/赠送的宠物不会出现在
+// 快照里,若不清除则会以"位置待同步"残留在列表(登录快照只做增改、从不删)。
+// before 为本轮对账开始时刻:仅清除此前就已存在(updated_at < before)的宠物,从而放过对账
+// 期间刚捕获/更新(updated_at≥before)却未落入快照的宠物,避免误删刚入库的新宠。
+func (sc *Scoped) PruneMissingPets(keep map[uint32]bool, before int64) ([]uint32, error) {
+	// 先收齐待删 gid 再执行删除:SetMaxOpenConns(1) 下遍历结果集时嵌套写会死锁。
+	rows, err := sc.db.Query(`SELECT gid FROM pets WHERE account=? AND (updated_at IS NULL OR updated_at < ?)`, sc.account, before)
+	if err != nil {
+		return nil, err
+	}
+	var stale []uint32
+	for rows.Next() {
+		var g uint32
+		if rows.Scan(&g) == nil && !keep[g] {
+			stale = append(stale, g)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, g := range stale {
+		sc.db.Exec(`DELETE FROM pets WHERE account=? AND gid=?`, sc.account, g)
+		sc.db.Exec(`DELETE FROM pet_box WHERE account=? AND gid=?`, sc.account, g)
+		sc.db.Exec(`DELETE FROM pet_team WHERE account=? AND gid=?`, sc.account, g)
+		sc.db.Exec(`DELETE FROM pet_medal WHERE account=? AND gid=?`, sc.account, g)
+	}
+	return stale, nil
 }
 
 // GetPet 按 gid 返回本账号宠物。

@@ -59,6 +59,6 @@ func ignoreSelfIPs(e *Engine, iface string) {
 		}
 	}
 	if len(ips) > 0 {
-		log.Printf("单臂网关去重:忽略本机 %s 的 IP %v(排除 SNAT 后的重复流量)", iface, ips)
+		log.Printf("单臂网关去重: 忽略本机 %s 的 IP %v", iface, ips)
 	}
 }

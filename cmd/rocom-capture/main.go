@@ -108,6 +108,17 @@ func main() {
 	}
 }
 
+// petSweep 累积一轮分页宠物列表全量下发。客户端登录/打开仓库时会连续请求 page 1..TotalPage,
+// 在末页据完整快照对账:库中存在却不在快照里的 gid,即玩家在别处放生/赠送的宠物,予以清除。
+// 仅当 1..TotalPage 连续到达才对账(nextPage 校验),乱序或单独请求某页不触发,避免误删。
+type petSweep struct {
+	gids     map[uint32]bool // 本轮各页出现过的 gid
+	nextPage uint32          // 期望的下一页号(保证连续)
+	valid    bool            // 自 page 1 起连续累积至今(否则不对账)
+	start    time.Time       // 本轮起始(page 1 到达):对账时据此放过其后刚入库的新宠;并计全量请求耗时
+	proc     time.Duration   // 累计实际解析+入库(+末页对账)耗时,排除等待客户端下一页的空档,用于暴露处理瓶颈
+}
+
 // consume 消费解密后的消息流：更新宠物库、产生事件、广播实时消息。
 func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.Server) {
 	// add_time 早于此刻的宠物视为初始仓库快照，不产生“获得”事件；
@@ -124,6 +135,9 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		connAccount = saved
 	}
 
+	// sweeps: 账号 → 正在累积的分页宠物列表快照(见 petSweep)。末页到达即对账清除别处放生/赠送的残留。
+	sweeps := map[string]*petSweep{}
+
 	for m := range eng.Out {
 		// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面 resolve acc 之前)。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp {
@@ -134,7 +148,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 					nick = "?"
 				}
 				if connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志并落盘映射
-					log.Printf("用户 %s (UID:%d) 登录成功 [%s]", nick, id, m.Session)
+					log.Printf("用户 %s (%s) 登录成功 [%s]", acc, nick, m.Session)
 					st.SaveSessionAccount(m.Session, acc)
 				}
 				connAccount[m.Session] = acc
@@ -312,9 +326,19 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		if m.Direction != gcp.S2C || m.Opcode != pet.OpGetPetInfoByPageRsp {
 			continue
 		}
+		pageT0 := time.Now() // 本页处理起点(解析+入库),累计入 sw.proc 以衡量实际处理耗时
 		res := pet.ParsePetListRsp(m.AppBody)
+		// 本页页号取 req_page(响应回显所请求页,登录时依次为 1..TotalPage);
+		// page_num 实为每页容量(实测恒为 50),不是页序,不能用作累积接续判据。
+		page := res.ReqPage
+		sw := sweeps[acc]
+		if sw == nil || !sw.valid || page != sw.nextPage { // 无法接续上一页则从本页重开(仅 page 1 起算有效)
+			sw = &petSweep{gids: map[uint32]bool{}, valid: page <= 1, start: pageT0}
+			sweeps[acc] = sw
+		}
 		for _, pd := range res.Pets {
 			p := pet.ToPet(pd, db)
+			sw.gids[p.Gid] = true // 无论 upsert 成败都视为"仍拥有",避免对账误删
 			isNew, err := sc.UpsertPet(p)
 			if err != nil {
 				continue
@@ -332,6 +356,22 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 					srv.Hub().Broadcast("event", acc, ev)
 				}
 			}
+		}
+		sw.nextPage = page + 1
+		sw.proc += time.Since(pageT0) // 累计本页实际处理耗时(不含等待客户端下一页的空档)
+		// 末页:先据完整快照清除库中已不存在(玩家在别处放生/赠送)的宠物(否则残留为"位置待同步"),
+		// 再汇总本轮:请求耗时=首页到末页的墙钟跨度(含客户端分页节奏),解析耗时=纯处理累计。
+		// 二者背离即暴露问题:处理耗时接近/超过请求跨度,说明处理速度赶不上抓包到达而积压。
+		if sw.valid && res.TotalPage > 0 && page >= res.TotalPage {
+			pruneT0 := time.Now()
+			if stale, err := sc.PruneMissingPets(sw.gids, sw.start.Unix()); err == nil && len(stale) > 0 {
+				log.Printf("用户 %s 对账清除 %d 只已不在仓库的宠物", acc, len(stale))
+				srv.Hub().Broadcast("pet", acc, map[string]any{"locUpdate": true})
+			}
+			sw.proc += time.Since(pruneT0)
+			log.Printf("用户 %s 宠物同步完成: %d 只 %d 页, 请求耗时 %v, 解析耗时 %v",
+				acc, len(sw.gids), res.TotalPage, time.Since(sw.start), sw.proc)
+			delete(sweeps, acc) // 本轮结束,防止后续单独请求某页复用旧累积
 		}
 	}
 }
