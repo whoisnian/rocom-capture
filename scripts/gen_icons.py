@@ -11,15 +11,17 @@
 `filter_icons`/`blood_icons`/`medal_icons`;本脚本只产图,不涉及 enum/id。
 
 各组数据源:
-  - filter:  PET_FILTER_CONF.filter_icon(系别/六维/搭档标记的精灵)   → img/filter/
-  - blood:   PET_BLOOD_CONF.icon(24 血脉主图标精灵)                  → img/blood/
-  - static:  下方 STATIC 清单(人工挑选的杂项精灵)                    → img/static/
-  - medal:   MEDAL_CONF.icon(BagItem 奖牌小图,整张贴图)             → img/medal/
+  - filter:   PET_FILTER_CONF.filter_icon(系别/六维/搭档标记的精灵)  → img/filter/
+  - blood:    PET_BLOOD_CONF.icon(24 血脉主图标精灵)                 → img/blood/
+  - static:   下方 STATIC 清单(人工挑选的杂项精灵)                   → img/static/
+  - worldmap: 下方 WORLDMAP 清单(人工挑选的大地图 POI 精灵)          → img/worldmap/
+  - medal:    MEDAL_CONF.icon(BagItem 奖牌小图,整张贴图)            → img/medal/
 
 webp 转码确定性(同 libwebp 下同源字节一致),默认跳过已存在;--force 强制重编(见 gen_images.py)。
 前置(FModel,导到下载根 SRC):
   - Save Properties(.json)+ Save Texture(图集 PNG):Common/Icon/Species/Frames、
-    PetUI/Raw/Atlas/PetUI/Frames、Common/CommonStatic/Frames、Common/Icon/XueMai/Frames 及各 Textures/。
+    PetUI/Raw/Atlas/PetUI/Frames、Common/CommonStatic/Frames、Common/Icon/XueMai/Frames、
+    System/BigMap/Raw/Atlas/WorldMapNpc/Frames 及各 Textures/。
   - Save Texture(PNG):Common/Icon/BagItem(奖牌小图)。
 运行(需 uv 管理的 pillow):
     uv run python scripts/gen_icons.py [下载根目录] [--force]
@@ -47,6 +49,24 @@ STATIC = {
     "img_yisetubian_png":  "异色图标",
     "img_bolitubian_png":  "炫彩图标",
     "img_yisexuancai_png": "异色炫彩图标",
+}
+
+# worldmap 组:人工挑选的大地图 POI 精灵,均在 System/BigMap/Raw/Atlas/WorldMapNpc 图集。
+# 该图集的 Frames 下混着两类资产:数字名(00102 等)是独立 Texture2D(NPC 头像),
+# 语义名的才是 PaperSprite;这里只挑后者,故与 static 同走 crop_sprite。
+# 眠枭的两张「之星」资产名把拼音写反了(mianxiao / miaoxian),同一图两色,非笔误勿改。
+WORLDMAP = {
+    "Alchemy_png":                          "炼金釜",
+    "Interestplace_Campinglan_png":         "魔力之源",
+    "Interestplace_Underground_Unlock_png": "守护地",
+    "img_MapIcon_Ore_png":                  "矿石标记",
+    "img_MapIcon_PetPlant_png":             "植物标记",
+    "img_dijimianxiao_weifangman_png":      "小型眠枭庇护所",
+    "img_gaojimianxiao_weifangman_png":     "大型眠枭庇护所",
+    "img_mianxiaozhixing_huang_png":        "黄色眠枭之星",
+    "img_miaoxianzhixing_lan_png":          "蓝色眠枭之星",
+    "owl_worldmap_fruit_A1_png":            "蓝色精灵果实",
+    "owl_worldmap_fruit_A2_png":            "黄色精灵果实",
 }
 
 
@@ -164,6 +184,7 @@ def main():
     total += gen_group("filter", icon_refs("PET_FILTER_CONF", "filter_icon"), crop_sprite)
     total += gen_group("blood", icon_refs("PET_BLOOD_CONF", "icon"), crop_sprite)
     total += gen_group("static", list(STATIC), crop_sprite)
+    total += gen_group("worldmap", list(WORLDMAP), crop_sprite)
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
