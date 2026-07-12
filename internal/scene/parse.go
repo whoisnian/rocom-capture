@@ -28,6 +28,7 @@ type Position struct {
 // MoveReq 是一条自己移动上报(ZoneSceneMoveReq)里做地图定位所需的字段。
 type MoveReq struct {
 	Pos        Position // to_pos(field 2)
+	Yaw        int32    // to_rot.z(field 3 的 z),朝向角×10(0.1 度单位);朝向角(度)=Yaw/10
 	SceneCfgID int32    // scene_cfg_id(field 17);一个 cfg 可对应多个 res,故仅作校验,定位用当前 res
 	StopMove   bool     // stop_move(field 8),停下时上报
 	TimeStamp  uint64   // time_stamp(field 1),服务器时钟
@@ -113,6 +114,15 @@ loop:
 			}
 			mr.Pos, gotPos = p, true
 			next = next[m:]
+		case 3: // to_rot(旋转,Position 形状:x=Roll y=Pitch z=Yaw);只取 z=朝向角×10
+			sub, m := protowire.ConsumeBytes(next)
+			if m < 0 {
+				return mr, consumed, gotPos
+			}
+			if p, ok := parsePosition(sub); ok {
+				mr.Yaw = p.Z
+			}
+			next = next[m:]
 		case 8:
 			v, m := protowire.ConsumeVarint(next)
 			if m < 0 {
@@ -168,9 +178,10 @@ func parsePosition(b []byte) (Position, bool) {
 	return p, true
 }
 
-// ParseEnterScene 从 s2c ZoneEnterSceneRsp 的 protobuf body 取 scene_cfg_id(field 2)与
-// scene_res_cfg_id(field 3)。ret_info(field 1)非零表示失败,则返回 ok=false。
-func ParseEnterScene(body []byte) (cfgID, resID int32, ok bool) {
+// ParseEnterScene 从 s2c ZoneEnterSceneRsp 的 protobuf body 取 scene_cfg_id(field 2)、
+// scene_res_cfg_id(field 3)与 home_room_level(field 5,家园室内底图按此分层选图)。
+// ret_info(field 1)非零表示失败,则返回 ok=false。
+func ParseEnterScene(body []byte) (cfgID, resID, room int32, ok bool) {
 	fail := false
 	scanFields(body, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
 		switch {
@@ -182,23 +193,27 @@ func ParseEnterScene(body []byte) (cfgID, resID int32, ok bool) {
 			cfgID = int32(v)
 		case num == 3 && typ == protowire.VarintType:
 			resID = int32(v)
+		case num == 5 && typ == protowire.VarintType:
+			room = int32(v)
 		}
 	})
-	return cfgID, resID, !fail && resID != 0
+	return cfgID, resID, room, !fail && resID != 0
 }
 
-// ParseTeleport 从 s2c ZoneSceneTeleportNotify 的 protobuf body 取 to_scene_cfg_id(field 11)
-// 与 to_scene_res_cfg_id(field 12)。
-func ParseTeleport(body []byte) (cfgID, resID int32, ok bool) {
+// ParseTeleport 从 s2c ZoneSceneTeleportNotify 的 protobuf body 取 to_scene_cfg_id(field 11)、
+// to_scene_res_cfg_id(field 12)与 home_room_level(field 31)。
+func ParseTeleport(body []byte) (cfgID, resID, room int32, ok bool) {
 	scanFields(body, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
 		switch {
 		case num == 11 && typ == protowire.VarintType:
 			cfgID = int32(v)
 		case num == 12 && typ == protowire.VarintType:
 			resID = int32(v)
+		case num == 31 && typ == protowire.VarintType:
+			room = int32(v)
 		}
 	})
-	return cfgID, resID, resID != 0
+	return cfgID, resID, room, resID != 0
 }
 
 // retFailed 判断 RetInfo 子消息是否表示失败(field 1 = ret_code,非 0 即失败)。

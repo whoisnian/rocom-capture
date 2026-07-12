@@ -92,6 +92,13 @@ export async function getAccounts() {
   return r.json()
 }
 
+// getPosition 返回当前账号最近一次实时位置(实时地图页加载即时回显);无记录返回 null。
+// 形如 {sceneResId,sceneName,x,y,z,u,v,stop,ts};u,v 仅当该场景有底图时存在。
+export async function getPosition() {
+  const r = await fetch('/api/position?' + buildQuery())
+  return r.ok ? r.json() : null
+}
+
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export async function getEvolution(base) {
   const r = await fetch('/api/evolution?base=' + base)

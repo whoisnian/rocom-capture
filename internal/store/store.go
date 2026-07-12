@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 		return err
 	}
 	// 为早于该列的旧库补列(CREATE TABLE IF NOT EXISTS 不会新增列);已存在则忽略错误。
+	s.db.Exec(`ALTER TABLE sessions ADD COLUMN scene_res INTEGER`) // 实时地图:当前场景 res,供重启恢复
+	s.db.Exec(`ALTER TABLE sessions ADD COLUMN home_room INTEGER`) // 家园室内房屋等级(选分层底图)
 	s.db.Exec(`ALTER TABLE pets ADD COLUMN egg_groups TEXT`)
 	// 身高/体重在当前形态取值范围内的百分位(0-100),写入时按 gamedata 计算并落列,
 	// 供跨种族按「相对自身范围偏大/偏小」排序(见 buildOrder);范围缺失或旧库未回填时为
@@ -175,6 +177,42 @@ INSERT INTO sessions(conn_id,account,updated_at) VALUES(?,?,?)
 ON CONFLICT(conn_id) DO UPDATE SET account=excluded.account, updated_at=excluded.updated_at`,
 		connID, account, time.Now().Unix())
 	return err
+}
+
+// SessionScene 是一个连接缓存的场景态:当前 scene_res 与家园房屋等级(非家园为 0)。
+type SessionScene struct {
+	Res  int32
+	Room int32
+}
+
+// SaveSessionScene 持久化某连接当前所在的 scene_res_cfg_id 与家园房屋等级(实时地图页用)。
+// 场景 res 只在进入/传送时下发,游戏中途不再重发,故须落盘以便抓包服务重启后恢复地图定位
+// (移动包只带 scene_cfg_id,单靠它无法区分同 cfg 下的多个 res)。key/account 列保持不变。
+func (s *Store) SaveSessionScene(connID string, res, room int32) error {
+	_, err := s.db.Exec(`
+INSERT INTO sessions(conn_id,scene_res,home_room,updated_at) VALUES(?,?,?,?)
+ON CONFLICT(conn_id) DO UPDATE SET scene_res=excluded.scene_res, home_room=excluded.home_room, updated_at=excluded.updated_at`,
+		connID, res, room, time.Now().Unix())
+	return err
+}
+
+// LoadSessionScenes 读取近 SessionTTL 内的 conn_id→场景态映射(重启预热用)。
+func (s *Store) LoadSessionScenes() (map[string]SessionScene, error) {
+	rows, err := s.db.Query(`SELECT conn_id,scene_res,COALESCE(home_room,0) FROM sessions WHERE scene_res IS NOT NULL AND scene_res<>0 AND updated_at>=?`,
+		time.Now().Add(-SessionTTL).Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]SessionScene{}
+	for rows.Next() {
+		var connID string
+		var sc SessionScene
+		if rows.Scan(&connID, &sc.Res, &sc.Room) == nil {
+			out[connID] = sc
+		}
+	}
+	return out, rows.Err()
 }
 
 // LoadSessionAccounts 读取近 SessionTTL 内的 conn_id→account 映射(重启预热用),

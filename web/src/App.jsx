@@ -5,6 +5,7 @@ import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './a
 const NAV = [
   { to: '/pets', label: '宠物列表', icon: '🐾' },
   { to: '/events', label: '实时事件', icon: '🔔' },
+  { to: '/map', label: '实时地图', icon: '🗺️' },
   { to: '/debug', label: '调试', icon: '🐞' },
 ]
 

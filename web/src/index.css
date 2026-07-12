@@ -388,6 +388,9 @@ img.evo-avatar { object-fit: cover; }
   .tab-icon { font-size: 18px; }
   .tab-label { font-size: 11px; }
   .content { padding: 12px; padding-bottom: 70px; }
+  /* 地图页占满高度:底部导航为 sticky(在流内),content 的 flex:1 已停在其上方,
+     故去掉为滚动页预留的额外 70px 底距,只留与两侧一致的 12px。 */
+  .content:has(.map-page) { padding-bottom: 12px; }
 
   .list-layout { grid-template-columns: 1fr; }
   /* 宠物列表工具栏:窄屏去掉弹性占位、收紧间距并缩窄排序下拉,让「共 N 只」并回按钮行而非独占一行
@@ -475,3 +478,48 @@ img.evo-avatar { object-fit: cover; }
 @media (max-width: 760px) {
   .filter-toggle { display: inline-flex; }
 }
+
+/* ── 实时地图页 ── */
+.map-loc { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+/* 地图页占满 .content 剩余高度:纯 flex 逐层撑满(不用百分比高度,避免 flex 项高度对百分比
+   子元素不算「确定高度」导致塌陷)。仅地图页把 .content 变 flex 列(:has 作用域,不影响他页)。 */
+.content:has(.map-page) { display: flex; flex-direction: column; }
+.map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.map-page .toolbar { flex: none; }
+/* 视口:地图软件式窗口,内部地图层可平移缩放;flex:1 填满剩余高度。 */
+.map-vp {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  touch-action: none;         /* 自行处理平移/捏合,禁用浏览器默认手势 */
+  cursor: grab;
+  box-shadow: var(--shadow);
+}
+.map-vp:active { cursor: grabbing; }
+.map-world { position: absolute; will-change: left, top, width, height; }
+.map-base { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+/* 方向箭头:恒定屏幕尺寸,随朝向旋转,不随地图缩放。 */
+.map-arrow { position: absolute; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.map-arrow svg { display: block; }
+/* 缩放/回中控件 */
+.map-ctrl { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.map-btn {
+  width: 38px; height: 38px; border-radius: 8px;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--fg);
+  font-size: 18px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.map-btn:hover { border-color: var(--accent); }
+.map-btn.on { color: var(--accent); border-color: var(--accent); }
+
+.map-nomap {
+  max-width: 760px; margin: 0 auto; padding: 40px 20px; text-align: center;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px;
+}
+.map-nomap-name { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.map-coords { margin-top: 14px; font-family: ui-monospace, monospace; font-size: 15px; color: var(--fg); }

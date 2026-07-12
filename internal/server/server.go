@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
@@ -29,6 +30,9 @@ type Server struct {
 	medals      []gamedata.MedalEntry
 	medalIDs    map[string][]uint32 // 奖牌名 -> id 列表(同名多枚时全含),用于把筛选名解析为 id
 	icons       iconMeta
+
+	posMu   sync.Mutex                // 保护 lastPos
+	lastPos map[string]map[string]any // 账号 -> 最近一次位置(实时地图页加载时即时回显,不必等下一次移动)
 }
 
 // iconMeta 是全局固定图标(每只宠物都一样,不随宠物下发):六维属性小图 + 异色/炫彩/污染标记图。
@@ -46,6 +50,7 @@ type iconMeta struct {
 // New 创建 HTTP 服务。
 func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
+	s.lastPos = map[string]map[string]any{}
 	s.medalIDs = map[string][]uint32{}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
@@ -101,6 +106,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/evolution", s.handleEvolution)
 	s.mux.HandleFunc("GET /api/pet-page", s.handlePetPage)
 	s.mux.HandleFunc("GET /api/accounts", s.handleAccounts)
+	s.mux.HandleFunc("GET /api/position", s.handlePosition)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
 	imgFS := http.FileServerFS(gamedata.ImageFS())
@@ -125,6 +131,27 @@ func (s *Server) acct(r *http.Request) string {
 		return accs[0].Account // ListAccounts 按 updated_at 倒序,取最近
 	}
 	return ""
+}
+
+// SetLastPosition 缓存某账号最近一次实时位置(由抓包消费循环在广播 position 时调用),
+// 供实时地图页加载时经 GET /api/position 即时回显,不必等玩家下一次移动。
+func (s *Server) SetLastPosition(account string, pos map[string]any) {
+	if account == "" {
+		return
+	}
+	s.posMu.Lock()
+	s.lastPos[account] = pos
+	s.posMu.Unlock()
+}
+
+// handlePosition 返回当前账号最近一次位置(实时地图页初始定位);无记录返回 null。
+func (s *Server) handlePosition(w http.ResponseWriter, r *http.Request) {
+	acc := s.acct(r)
+	s.posMu.Lock()
+	pos := s.lastPos[acc]
+	s.posMu.Unlock()
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(pos) // pos 为 nil 时输出 null
 }
 
 // handleAccounts 返回已知账号列表(account/name/petCount),供前端账号切换下拉。

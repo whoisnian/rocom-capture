@@ -288,6 +288,11 @@ for k, v in rows("PET_LIKE_ELEMENT_CONF.json").items():
 # 只有 4 个场景配了大地图(卡洛西亚大陆/魔法学院/家园室内/家园种植园),其余场景(副本、洞穴、
 # 室内小场景)无底图,实时地图页只能显示场景名 + 原始坐标。
 scenes = {k: v["scene_name"] for k, v in rows("SCENE_CONF.json").items() if v.get("scene_name")}
+# scene_default_res: scene_cfg_id -> 该场景默认 scene_res_id(SCENE_CONF 主行)。移动包只带
+# scene_cfg_id,当无法从进入/传送通知得知精确 res 时(如中途开抓、或旧库无缓存),据此兜底定位
+# 底图。同 cfg 下的子场景(如魔法学院 10018 属 cfg 103)仍以通知/缓存的精确 res 为准。
+scene_default_res = {k: int(v["scene_res_id"]) for k, v in rows("SCENE_CONF.json").items()
+                     if v.get("scene_res_id")}
 scene_res = {}
 for k, v in rows("SCENE_RES_CONF.json").items():
     e = {"n": v.get("scene_res_name") or v.get("editor_name") or ""}
@@ -354,6 +359,7 @@ data = {
     # 场景名与大地图投影参数(见上)。底图 webp 由 gen_bigmap.py 生成,文件名即 scene_res_cfg_id
     # (家园室内为 30001_<房屋等级>),Go 侧拼 bigmap/<名>.webp。
     "scenes": scenes,
+    "scene_default_res": scene_default_res,
     "scene_res": scene_res,
     "maps": maps,
     # 分层地图(洞穴/地下层):层id -> {名称,组,scene_res,层图,cave前缀,投影 ox/oy/side}。见上。

@@ -47,6 +47,9 @@ func TestParseMoveReq(t *testing.T) {
 	if mr.SceneCfgID != 103 {
 		t.Errorf("SceneCfgID = %d, 期望 103", mr.SceneCfgID)
 	}
+	if mr.Yaw != 1800 { // to_rot 的 z(朝向角×10)
+		t.Errorf("Yaw = %d, 期望 1800", mr.Yaw)
+	}
 	if !mr.StopMove {
 		t.Error("StopMove 应为 true")
 	}
@@ -74,11 +77,13 @@ func TestParseEnterScene(t *testing.T) {
 	body = protowire.AppendVarint(body, 103)
 	body = protowire.AppendTag(body, 3, protowire.VarintType)
 	body = protowire.AppendVarint(body, 10018)
+	body = protowire.AppendTag(body, 5, protowire.VarintType) // home_room_level
+	body = protowire.AppendVarint(body, 3)
 	body = append(body, []byte("tsf4g")...)
 
-	cfg, res, ok := ParseEnterScene(body)
-	if !ok || cfg != 103 || res != 10018 {
-		t.Fatalf("ParseEnterScene = (%d,%d,%v), 期望 (103,10018,true)", cfg, res, ok)
+	cfg, res, room, ok := ParseEnterScene(body)
+	if !ok || cfg != 103 || res != 10018 || room != 3 {
+		t.Fatalf("ParseEnterScene = (%d,%d,%d,%v), 期望 (103,10018,3,true)", cfg, res, room, ok)
 	}
 }
 
@@ -92,7 +97,7 @@ func TestParseEnterSceneFail(t *testing.T) {
 	body = protowire.AppendBytes(body, ret)
 	body = protowire.AppendTag(body, 3, protowire.VarintType)
 	body = protowire.AppendVarint(body, 10018)
-	if _, _, ok := ParseEnterScene(body); ok {
+	if _, _, _, ok := ParseEnterScene(body); ok {
 		t.Fatal("ret_code != 0 时应返回 ok=false")
 	}
 }
@@ -105,9 +110,11 @@ func TestParseTeleport(t *testing.T) {
 	body = protowire.AppendVarint(body, 103)
 	body = protowire.AppendTag(body, 12, protowire.VarintType)
 	body = protowire.AppendVarint(body, 10003)
+	body = protowire.AppendTag(body, 31, protowire.VarintType) // home_room_level
+	body = protowire.AppendVarint(body, 2)
 
-	cfg, res, ok := ParseTeleport(body)
-	if !ok || cfg != 103 || res != 10003 {
-		t.Fatalf("ParseTeleport = (%d,%d,%v), 期望 (103,10003,true)", cfg, res, ok)
+	cfg, res, room, ok := ParseTeleport(body)
+	if !ok || cfg != 103 || res != 10003 || room != 2 {
+		t.Fatalf("ParseTeleport = (%d,%d,%d,%v), 期望 (103,10003,2,true)", cfg, res, room, ok)
 	}
 }

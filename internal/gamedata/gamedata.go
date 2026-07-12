@@ -97,10 +97,11 @@ type DB struct {
 	medalIcons  map[string]string            // 奖牌id -> 原名(medal/)
 	staticIcons map[string]string            // 语义键 -> 原名(static/:异色/炫彩/污染等)
 	// 场景与大地图(实时地图页):见 docs/data.md 3.1、3.2。
-	scenes   map[string]string   // scene_cfg_id -> 场景名(SCENE_CONF)
-	sceneRes map[string]sceneRes // scene_res_cfg_id -> {名称, 所属 scene_cfg_id}
-	maps     map[uint32]MapInfo  // 有大地图底图的 scene_res_cfg_id -> 投影参数
-	layers   []LayerInfo         // 分层地图(洞穴/地下层),按 cave_name 前缀/位置定位
+	scenes      map[string]string   // scene_cfg_id -> 场景名(SCENE_CONF)
+	sceneDefRes map[string]int32    // scene_cfg_id -> 默认 scene_res_id(res 未知时兜底定位)
+	sceneRes    map[string]sceneRes // scene_res_cfg_id -> {名称, 所属 scene_cfg_id}
+	maps        map[uint32]MapInfo  // 有大地图底图的 scene_res_cfg_id -> 投影参数
+	layers      []LayerInfo         // 分层地图(洞穴/地下层),按 cave_name 前缀/位置定位
 }
 
 // sceneRes 是一个场景资源(scene_res_cfg_id)的名称与所属场景(scene_cfg_id)。
@@ -173,9 +174,10 @@ func Load() (*DB, error) {
 			WL uint32   `json:"wl"`
 			WH uint32   `json:"wh"`
 		} `json:"petbase"`
-		Scenes   map[string]string   `json:"scenes"`
-		SceneRes map[string]sceneRes `json:"scene_res"`
-		Maps     map[string]struct {
+		Scenes          map[string]string   `json:"scenes"`
+		SceneDefaultRes map[string]int32    `json:"scene_default_res"`
+		SceneRes        map[string]sceneRes `json:"scene_res"`
+		Maps            map[string]struct {
 			N     string `json:"n"`
 			OX    int32  `json:"ox"`
 			OY    int32  `json:"oy"`
@@ -254,6 +256,7 @@ func Load() (*DB, error) {
 	sort.Slice(layers, func(i, j int) bool { return layers[i].ID < layers[j].ID })
 	return &DB{
 		scenes:       raw.Scenes,
+		sceneDefRes:  raw.SceneDefaultRes,
 		sceneRes:     raw.SceneRes,
 		maps:         maps,
 		layers:       layers,
@@ -400,8 +403,33 @@ func (db *DB) SceneResName(resID int32) string {
 	return db.sceneRes[strconv.FormatInt(int64(resID), 10)].N
 }
 
+// DefaultSceneRes 返回某 scene_cfg_id 的默认 scene_res_id(SCENE_CONF 主行);无则 0。
+// 当无法从进入/传送通知得知精确 res 时(中途开抓/无缓存),据此兜底定位底图。
+func (db *DB) DefaultSceneRes(cfgID int32) int32 {
+	return db.sceneDefRes[strconv.FormatInt(int64(cfgID), 10)]
+}
+
 // MapInfo 返回某 scene_res_cfg_id 的大地图投影参数;第二返回值表示该场景是否有底图。
 func (db *DB) MapInfo(resID uint32) (MapInfo, bool) { m, ok := db.maps[resID]; return m, ok }
+
+// MapImage 返回某场景底图的 webp 文件名(不含扩展名),前端拼 /img/bigmap/<名>.webp;无底图返回 ""。
+// 家园室内(Rooms>0)按房屋等级分图 <res>_<level>(level 越界则夹取,未知按 1);其余场景为 <res>。
+func (db *DB) MapImage(resID uint32, room int32) string {
+	m, ok := db.maps[resID]
+	if !ok {
+		return ""
+	}
+	if m.Rooms > 0 {
+		if room < 1 {
+			room = 1
+		}
+		if int(room) > m.Rooms {
+			room = int32(m.Rooms)
+		}
+		return strconv.FormatInt(int64(resID), 10) + "_" + strconv.FormatInt(int64(room), 10)
+	}
+	return strconv.FormatInt(int64(resID), 10)
+}
 
 // Project 把场景世界坐标(厘米)投影为底图归一化坐标 u,v∈[0,1](复刻客户端
 // BigMapUtils.ScenePosToImagePosF)。该 scene_res 无底图时 ok=false。u,v 可能越界

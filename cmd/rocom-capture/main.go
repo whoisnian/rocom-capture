@@ -142,7 +142,16 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	// 实时地图(仅自己):按连接维护当前 scene_res_cfg_id(s2c 进入/传送更新),
 	// c2s 移动包结合当前场景投影成地图坐标推给前端。移动包高频(~100-200ms/次,客户端
 	// Roco.Move.ReqInterval),故按账号节流,stop_move(停下)必推。
-	sceneByConn := map[string]int32{}     // connID -> 当前 scene_res_cfg_id
+	// 从库预热:进入/传送通知只在切场景时下发,游戏中途不重发,故须像会话密钥一样从缓存恢复,
+	// 否则重启后虽能解密移动包,却因不知当前 res 而无法定位底图(移动包只带 scene_cfg_id)。
+	sceneByConn := map[string]int32{} // connID -> 当前 scene_res_cfg_id
+	roomByConn := map[string]int32{}  // connID -> 家园房屋等级(家园室内选分层底图,非家园为 0)
+	if saved, err := st.LoadSessionScenes(); err == nil {
+		for id, s := range saved {
+			sceneByConn[id] = s.Res
+			roomByConn[id] = s.Room
+		}
+	}
 	lastPosSent := map[string]time.Time{} // 账号 -> 上次位置推送时刻(节流)
 	const posThrottle = 150 * time.Millisecond
 
@@ -186,13 +195,15 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		// 实时地图(仅自己):s2c 进入/传送更新当前场景 res;c2s 移动包按当前场景投影后推送。
 		switch {
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpEnterSceneRsp:
-			if _, res, ok := scene.ParseEnterScene(m.AppBody); ok {
-				sceneByConn[m.Session] = res
+			if _, res, room, ok := scene.ParseEnterScene(m.AppBody); ok {
+				sceneByConn[m.Session], roomByConn[m.Session] = res, room
+				st.SaveSessionScene(m.Session, res, room) // 落盘供重启恢复
 			}
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpTeleportNotify:
-			if _, res, ok := scene.ParseTeleport(m.AppBody); ok {
-				sceneByConn[m.Session] = res
+			if _, res, room, ok := scene.ParseTeleport(m.AppBody); ok {
+				sceneByConn[m.Session], roomByConn[m.Session] = res, room
+				st.SaveSessionScene(m.Session, res, room)
 			}
 			continue
 		case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
@@ -206,20 +217,26 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			}
 			lastPosSent[acc] = m.Time
 			res := sceneByConn[m.Session]
+			if res == 0 { // 未知 res(中途开抓/无缓存):用移动包的 scene_cfg_id 兜底默认 res
+				res = db.DefaultSceneRes(mr.SceneCfgID)
+			}
 			pos := map[string]any{
 				"account":    acc,
 				"sceneResId": res,
 				"sceneCfgId": mr.SceneCfgID,
 				"sceneName":  sceneDisplayName(db, res, mr.SceneCfgID),
+				"img":        db.MapImage(uint32(res), roomByConn[m.Session]), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
 				"x":          mr.Pos.X,
 				"y":          mr.Pos.Y,
 				"z":          mr.Pos.Z,
+				"heading":    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
 				"stop":       mr.StopMove,
 				"ts":         m.Time.Unix(),
 			}
 			if u, v, ok := db.Project(uint32(res), mr.Pos.X, mr.Pos.Y); ok {
 				pos["u"], pos["v"] = u, v
 			}
+			srv.SetLastPosition(acc, pos) // 缓存供地图页加载即时回显
 			srv.Hub().Broadcast("position", acc, pos)
 			continue
 		}
