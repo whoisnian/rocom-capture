@@ -7,9 +7,10 @@
 ## 功能
 
 - **页面一 · 宠物列表**：种类/系别/昵称/等级/性格/特长/奖牌/声音/体重/身高/六维/捕捉时间等，支持多维筛选、排序、分页，实时更新。
-- **页面二 · 实时事件**：捕捉/孵蛋等宠物增减事件，支持按条件(种类/性格/奖牌/系别/异色)高亮提醒。
-- **页面三 · 宠物详情**：单只宠物完整信息，可一键保存为图片。
-- **页面四 · 调试**：实时展示所有游戏应用层消息(opcode)。
+- **页面二 · 捕获事件**：捕捉/孵蛋等宠物获得事件，支持按条件(种类/性格/奖牌/系别/异色)高亮提醒。
+- **页面三 · 实时地图**：登录账号自己在大地图上的实时位置与朝向，进入洞穴/家园楼层时叠加分层地图，支持缩放平移。
+- **页面四 · 宠物详情**：单只宠物完整信息，可一键保存为图片。
+- **页面五 · 调试**：实时展示所有游戏应用层消息(opcode)。
 
 ## 效果预览
 
@@ -107,6 +108,7 @@ Content/NewRoco/Modules/System/Common/CommonStatic/         # 搭档标记 + 杂
 Content/NewRoco/Modules/System/Common/Icon/Species/         # 系别(属性)图标
 Content/NewRoco/Modules/System/Common/Icon/XueMai/          # 血脉主图标
 Content/NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI/       # 六维属性图标
+Content/NewRoco/Modules/System/BigMap/Raw/Atlas/WorldMapNpc/ # 大地图 POI 图标(炼金釜/矿石/植物/眠枭等)
 ```
 
 **Save Texture**(大地图/分层切片 → `gen_bigmap.py`,实时地图页)
@@ -137,7 +139,7 @@ sudo ./rocom-capture -iface <网卡> -tls
 
 浏览器打开 `http://localhost:4939`。
 
-> **屏幕常亮 / HTTPS**:实时事件页有「屏幕常亮」开关(阻止手机熄屏,方便盯着高亮提醒),
+> **屏幕常亮 / HTTPS**:捕获事件页有「屏幕常亮」开关(阻止手机熄屏,方便盯着高亮提醒),
 > 但浏览器仅在 secure context(HTTPS 或 localhost)下提供该能力。手机经 `http://内网IP`
 > 访问时开关会禁用,需加 `-tls`:首次不存在证书时自动生成自签证书(`-cert`/`-key` 指定路径,
 > 默认 `rocom-cert.pem`/`rocom-key.pem`),SAN 覆盖 localhost 与本机所有 IP。手机打开

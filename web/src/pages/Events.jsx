@@ -199,7 +199,7 @@ export default function Events() {
       <section>
         <div className="toolbar list-toolbar event-head">
           <button className="btn filter-toggle" onClick={() => setCollapsed(false)}>规则{rules.length ? ` (${rules.length})` : ''}</button>
-          <strong className="event-title">实时事件</strong>
+          <strong className="event-title">捕获事件</strong>
           <span className="muted">共 {total} 只</span>
           <div className="spacer" />
           {/* 三个操作统一为单图标,含义见各自 title */}

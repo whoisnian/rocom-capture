@@ -115,11 +115,11 @@
 
 ## 7. 前端(`web/`，React + Vite)
 
-- 路由(HashRouter)：`/pets` 列表、`/pets/:gid` 详情、`/events` 事件、`/debug` 调试。
+- 路由(HashRouter)：`/pets` 列表、`/pets/:gid` 详情、`/events` 捕获事件、`/map` 实时地图、`/debug` 调试。
 - **账号切换**:顶栏下拉(`/api/accounts` 填充),`AccountContext` 下发当前账号;切换时经
   `<main key={account}>` 轻量重挂各页(不整页 reload),`api.js` 各请求自动带 `?account=`,
   各页对 SSE 按 `msg.account` 过滤(调试页不过滤)。
-- 实时：`EventSource('/api/stream')` 订阅，列表防抖刷新、事件流追加、调试流追加。
+- 实时：`EventSource('/api/stream')` 订阅，列表防抖刷新、事件流追加、调试流追加、地图位置(`position`)更新。
 - 响应式：桌面表格 / 移动卡片，桌面顶栏 / 移动底部 tab(CSS media query)。
 - 详情页用 `html-to-image` 导出 PNG。
 - 构建输出到 `internal/server/web/`，由 Go `embed`。
