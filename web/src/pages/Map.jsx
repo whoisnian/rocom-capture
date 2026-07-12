@@ -16,6 +16,7 @@ const ZOOM_MAX = 10
 const ZOOM_DEFAULTS = { 10003: 5, 10018: 5, 30001: 2, 30002: 3 }
 const ZOOM_FALLBACK = 5
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+// 默认缩放按场景(底图)决定;洞穴层只是叠加在底图上,进层不改缩放(与外层保持一致)。
 const defaultZoom = (p) => ZOOM_DEFAULTS[p && p.sceneResId] || ZOOM_FALLBACK
 
 // 实时地图页:地图软件式交互——方向箭头指示朝向、可缩放平移、默认放大跟随玩家。
@@ -25,8 +26,9 @@ export default function MapPage() {
   const account = useContext(AccountContext)
   const [pos, setPos] = useState(null)
   const [imgError, setImgError] = useState(false)
-  const sceneRef = useRef(null) // 当前底图名(换图重试)
-  const resRef = useRef(null)   // 当前 scene_res(换场景重置默认缩放)
+  const [layerError, setLayerError] = useState(false)
+  const sceneRef = useRef(null) // 当前底图名(换底图=换场景/等级才重置缩放/跟随)
+  const layerRef = useRef(null) // 当前叠加层图名(换层仅重试层图,不动缩放)
 
   // 视口尺寸(用于把归一化坐标换算成像素;地图边长 = min(w,h)*zoom)。
   const vpRef = useRef(null)
@@ -41,16 +43,18 @@ export default function MapPage() {
 
   const applyPos = useCallback((p) => {
     setPos(p)
-    // 底图文件名变化即重试(换场景,或家园换房屋等级 <res>_<lv> 变了)。
+    // 底图变化(换场景、家园换等级)才重置缩放/跟随并重试底图;同底图内移动不打断手动缩放/平移。
     if (p.img !== sceneRef.current) {
       sceneRef.current = p.img
       setImgError(false)
-    }
-    // 换场景:按该场景大小重置默认缩放并回到跟随(大世界/家园小图各自默认)。
-    if (p.sceneResId !== resRef.current) {
-      resRef.current = p.sceneResId
       setZoom(defaultZoom(p))
       setFollow(true)
+    }
+    // 叠加层变化(进/出/换洞穴层)只重试层图,不动缩放/跟随——与外层保持一致。
+    const li = p.layer ? p.layer.img : ''
+    if (li !== layerRef.current) {
+      layerRef.current = li
+      setLayerError(false)
     }
     if (p.u != null && st.current.follow) setFocus({ u: p.u, v: p.v })
   }, [])
@@ -58,8 +62,8 @@ export default function MapPage() {
   useEffect(() => {
     let alive = true
     sceneRef.current = null
-    resRef.current = null
-    setPos(null); setImgError(false); setFollow(true); setZoom(ZOOM_FALLBACK)
+    layerRef.current = null
+    setPos(null); setImgError(false); setLayerError(false); setFollow(true); setZoom(ZOOM_FALLBACK)
     getPosition().then((p) => { if (alive && p) applyPos(p) }).catch(() => {})
     return () => { alive = false }
   }, [account, applyPos])
@@ -173,9 +177,17 @@ export default function MapPage() {
           onPointerDown={onPointerDown} onPointerMove={onPointerMove}
           onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}
         >
-          <div className="map-world" style={{ left: mapLeft, top: mapTop, width: mapPx, height: mapPx }}>
+          <div className="map-world" style={{ width: mapPx, height: mapPx, transform: `translate3d(${mapLeft}px, ${mapTop}px, 0)` }}>
             <img className="map-base" src={`/img/bigmap/${pos.img}.webp`} alt={pos.sceneName}
               draggable={false} onError={() => setImgError(true)} />
+            {pos.layer && !layerError && (
+              <img className="map-layer" src={`/img/bigmap/${pos.layer.img}.webp`} alt="" draggable={false}
+                onError={() => setLayerError(true)}
+                style={{
+                  left: pos.layer.u0 * mapPx, top: pos.layer.v0 * mapPx,
+                  width: (pos.layer.u1 - pos.layer.u0) * mapPx, height: (pos.layer.v1 - pos.layer.v0) * mapPx,
+                }} />
+            )}
           </div>
           <div className="map-arrow" style={{ left: arrowX, top: arrowY, transform: `translate(-50%,-50%) rotate(${arrowRot}deg)` }}>
             <svg viewBox="0 0 24 24" width="30" height="30">

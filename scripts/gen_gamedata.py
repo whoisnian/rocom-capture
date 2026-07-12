@@ -326,11 +326,59 @@ for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
 # 独立切片(LayerMap 单张图),投影用该层自己的 camera_center + Ortho_width(而非底图的
 # map_center/side_length)——因为层图是局部放大视图。同一坐标系(scene_res_id),坐标不变,只换图。
 #
-# 选层机制(见 docs/data.md 3.2):客户端按位置对 AREA_CONF 多边形做点在区域内判定
-# (GetPointAreaId)→ area_func → 层。协议侧 ZoneSceneClientCaveStateReq(0x1838,c2s)下发
-# cave_name(如 "Cave_A2_02_01"),它是层 map_resource 去掉 "_CaveTunnel..." 后缀的前缀
-# (实测:"Cave_A2_02_01" 对应 信仰者村落一层/二层),可作粗粒度定位(定洞穴组,楼层仍需多边形)。
+# 选层机制(见 docs/data.md 3.2):游戏按玩家位置对该层的 AREA_CONF 多边形做点在区域内判定
+# (客户端 GetLayerIdByPos)→ 层。这是唯一完整机制:传送/移动进入、开阔洞穴区(月兔暗港)、
+# 楼层区分(一层/二层多边形不同)都据此。故本索引给每层带上其区域多边形 `poly`(世界 x,y)。
+# 层 area_func_id → AREA_FUNC_CONF.area_id → AREA_CONF.pos 顶点。
 # 只收录有 map_resource(即有切片图)的层;地表条目(无图,用底图)跳过。
+#
+# AREA_CONF(8.4MB,未 vendored)只在 NRC_AREA_DIR(默认 Downloads)存在时读取提取多边形;
+# 不存在时保留上一版 names.json 已烘焙的 poly(故常规无需 Downloads 即可重跑;更新地图时才需)。
+AREA_DIR = os.environ.get("NRC_AREA_DIR", os.path.expanduser("~/Downloads/NRC/Content/ScriptC/Data/Bin"))
+
+
+def _area_rows(t):
+    return decode_bin.decode_file(
+        os.path.join(AREA_DIR, "BinDataCompressed", t + ".bytes"),
+        schema_path=os.path.join(AREA_DIR, "BinConf", t + ".non"),
+    )["RocoDataRows"]
+
+
+# 层 id -> {poly: [[[x,y],...],...], res: 区域所属 scene_res_id}。多边形取自 AREA_CONF(世界坐标);
+# res 从区域行的 scene_res_id 取(用于填补 LAYERED 表 scene_res_id 为空的家园层=30001)。
+def _extract_layer_polys():
+    if not os.path.exists(os.path.join(AREA_DIR, "BinDataCompressed", "AREA_CONF.bytes")):
+        # 保留旧 names.json 的 poly/res(无 AREA_CONF 时不丢)。
+        old = os.path.join(OUT, "names.json")
+        if os.path.exists(old):
+            with open(old, encoding="utf-8") as f:
+                prev = json.load(f).get("layers", {})
+            return {k: {"poly": v["poly"], "res": v.get("res", 0)} for k, v in prev.items() if v.get("poly")}
+        return {}
+    af = {str(int(r["id"])): r for r in _area_rows("AREA_FUNC_CONF").values()}
+    ac = {str(int(r["id"])): r for r in _area_rows("AREA_CONF").values()}
+    out = {}
+    for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
+        afid = v.get("area_func_id")
+        fr = af.get(str(int(afid))) if afid else None
+        if not fr:
+            continue
+        polys, area_res = [], 0
+        for aid in fr.get("area_id", []):
+            arow = ac.get(str(int(aid)))
+            if not arow:
+                continue
+            verts = [[p["position_xyz"][0], p["position_xyz"][1]]
+                     for p in (arow.get("pos") or []) if p.get("position_xyz")]
+            if len(verts) >= 3:  # 只取多边形(顶点≥3),忽略单点触发区
+                polys.append(verts)
+                area_res = area_res or int(arow.get("scene_res_id") or 0)
+        if polys:
+            out[str(int(v["id"]))] = {"poly": polys, "res": area_res}
+    return out
+
+
+layer_polys = _extract_layer_polys()
 layers = {}
 for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
     img = v.get("map_resource")
@@ -338,18 +386,19 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
     if not (img and cc and ow):
         continue
     ow = int(ow)
-    # cave_name 前缀:洞穴层 map_resource 形如 "Cave_A2_02_01_CaveTunnel_...",取 "_CaveTunnel" 前一段
-    # 即协议 cave_name;下水管道口/家园层无此结构,cave 前缀留空(其进层检测机制不同,待验证)。
-    cave = img.split("_CaveTunnel")[0] if "_CaveTunnel" in img else ""
-    layers[str(int(v["id"]))] = {
+    lid = str(int(v["id"]))
+    lp = layer_polys.get(lid, {})
+    # 所属 scene_res:优先 LAYERED 表,缺失(家园层)时用区域多边形的 scene_res_id(=30001)。
+    lres = int(v.get("scene_res_id") or 0) or lp.get("res", 0)
+    layers[lid] = {
         "n": v.get("display_name", ""),
         "grp": v.get("map_layer_group"),     # 同组共享地表底图;组内 sort=1 地表、2+ 楼层
-        "res": int(v.get("scene_res_id") or 0),  # 所属 scene_res(家园层为 0)
+        "res": lres,
         "img": img,                          # 层切片 webp 文件名(保持原名,见 gen_bigmap.py)
-        "cave": cave,                        # 协议 cave_name 前缀(空=非洞穴层,暂不支持按 cave_name 定位)
         "ox": cc[0] - ow // 2,               # 层投影:同底图公式,参数换成 camera_center/Ortho_width
         "oy": cc[1] - ow // 2,
         "side": ow,
+        "poly": lp.get("poly", []),          # 区域多边形(世界 x,y),空则该层无法按位置定位
     }
 
 data = {

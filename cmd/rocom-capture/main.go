@@ -220,6 +220,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			if res == 0 { // 未知 res(中途开抓/无缓存):用移动包的 scene_cfg_id 兜底默认 res
 				res = db.DefaultSceneRes(mr.SceneCfgID)
 			}
+			// 地表底图始终作背景;玩家点用底图投影。坐标系统一为底图。
 			pos := map[string]any{
 				"account":    acc,
 				"sceneResId": res,
@@ -235,6 +236,22 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			}
 			if u, v, ok := db.Project(uint32(res), mr.Pos.X, mr.Pos.Y); ok {
 				pos["u"], pos["v"] = u, v
+			}
+			// 分层地图:玩家位置落在某层区域多边形内(LayerAt,复刻客户端 GetLayerIdByPos),
+			// 就把该层切片图叠加到地表底图上对应位置。层世界范围投影为底图归一化矩形(u0,v0)-(u1,v1),
+			// 前端据此定位切片图(透明处透出底图);玩家点仍用底图投影,自然落在矩形内。
+			// 传送/移动进入、开阔洞穴区、楼层区分皆据此(见 docs/data.md 3.2)。
+			if l, ok := db.LayerAt(res, mr.Pos.X, mr.Pos.Y); ok {
+				if mi, ok := db.MapInfo(uint32(res)); ok && mi.Side > 0 {
+					pos["sceneName"] = l.Name
+					pos["layer"] = map[string]any{
+						"img": "layer/" + l.Img,
+						"u0":  float64(l.OX-mi.OX) / float64(mi.Side),
+						"v0":  float64(l.OY-mi.OY) / float64(mi.Side),
+						"u1":  float64(l.OX+l.Side-mi.OX) / float64(mi.Side),
+						"v1":  float64(l.OY+l.Side-mi.OY) / float64(mi.Side),
+					}
+				}
 			}
 			srv.SetLastPosition(acc, pos) // 缓存供地图页加载即时回显
 			srv.Hub().Broadcast("position", acc, pos)

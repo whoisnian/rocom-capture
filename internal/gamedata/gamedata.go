@@ -121,20 +121,23 @@ type MapInfo struct {
 	Rooms int    `json:"rooms"` // >0 表示按房屋等级分层(家园室内 30001,底图 30001_<lv>)
 }
 
-// LayerInfo 是一个分层地图(洞穴/地下层)的切片图与投影(见 docs/data.md 3.2)。
-// 与所属场景同坐标系,进入该层时地图改用此层切片图 + 此投影(camera_center/Ortho_width)。
+// LayerInfo 是一个分层地图(洞穴/地下层)的切片图、投影与区域多边形(见 docs/data.md 3.2)。
+// 与所属场景同坐标系,进入该层(玩家位置落在其多边形内)时把切片叠加到底图对应位置。
 // 切片 webp 路径为 bigmap/layer/<Img>.webp。
 type LayerInfo struct {
-	ID    uint32 // 层 id(LAYERED_WORLD_MAP_CONF.id)
-	Name  string // 层名(信仰者村落一层…)
-	Group int32  // 层组;同组共享地表底图,组内多个楼层
-	Res   int32  // 所属 scene_res_cfg_id(家园层为 0)
-	Img   string // 切片图文件名(bigmap/layer/<Img>.webp)
-	Cave  string // 协议 cave_name 前缀(空=非洞穴层,不支持按 cave_name 定位)
-	OX    int32  // 层投影左上角世界坐标 X(= camera_center.x - Ortho_width/2)
-	OY    int32  // 层投影左上角世界坐标 Y
-	Side  int32  // 层投影世界边长(= Ortho_width);u=(x-ox)/side, v=(y-oy)/side
+	ID    uint32    // 层 id(LAYERED_WORLD_MAP_CONF.id)
+	Name  string    // 层名(信仰者村落一层…)
+	Group int32     // 层组;同组共享地表底图,组内多个楼层
+	Res   int32     // 所属 scene_res_cfg_id(家园层为 0)
+	Img   string    // 切片图文件名(bigmap/layer/<Img>.webp)
+	OX    int32     // 层投影左上角世界坐标 X(= camera_center.x - Ortho_width/2)
+	OY    int32     // 层投影左上角世界坐标 Y
+	Side  int32     // 层投影世界边长(= Ortho_width);切片在底图上的矩形据此算
+	Polys [][]xyInt // 区域多边形(世界 x,y);玩家点在任一多边形内即在该层
 }
+
+// xyInt 是一个多边形顶点(世界坐标 x,y)。
+type xyInt struct{ X, Y int32 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
 type NatureEffect struct {
@@ -186,14 +189,14 @@ func Load() (*DB, error) {
 			Rooms int    `json:"rooms"`
 		} `json:"maps"`
 		Layers map[string]struct {
-			N    string `json:"n"`
-			Grp  int32  `json:"grp"`
-			Res  int32  `json:"res"`
-			Img  string `json:"img"`
-			Cave string `json:"cave"`
-			OX   int32  `json:"ox"`
-			OY   int32  `json:"oy"`
-			Side int32  `json:"side"`
+			N    string       `json:"n"`
+			Grp  int32        `json:"grp"`
+			Res  int32        `json:"res"`
+			Img  string       `json:"img"`
+			OX   int32        `json:"ox"`
+			OY   int32        `json:"oy"`
+			Side int32        `json:"side"`
+			Poly [][][2]int32 `json:"poly"`
 		} `json:"layers"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
@@ -250,8 +253,16 @@ func Load() (*DB, error) {
 		if err != nil {
 			continue
 		}
+		polys := make([][]xyInt, 0, len(v.Poly))
+		for _, poly := range v.Poly {
+			pts := make([]xyInt, len(poly))
+			for i, p := range poly {
+				pts[i] = xyInt{X: p[0], Y: p[1]}
+			}
+			polys = append(polys, pts)
+		}
 		layers = append(layers, LayerInfo{ID: uint32(id), Name: v.N, Group: v.Grp, Res: v.Res,
-			Img: v.Img, Cave: v.Cave, OX: v.OX, OY: v.OY, Side: v.Side})
+			Img: v.Img, OX: v.OX, OY: v.OY, Side: v.Side, Polys: polys})
 	}
 	sort.Slice(layers, func(i, j int) bool { return layers[i].ID < layers[j].ID })
 	return &DB{
@@ -442,26 +453,38 @@ func (db *DB) Project(resID uint32, x, y int32) (u, v float64, ok bool) {
 	return float64(x-m.OX) / float64(m.Side), float64(y-m.OY) / float64(m.Side), true
 }
 
-// LayersByCave 返回 cave_name(ZoneSceneClientCaveStateReq 下发)对应的候选分层。cave_name 是层
-// map_resource 的前缀(如 "Cave_A2_02_01" 命中信仰者村落一层/二层),故一个 cave_name 可能返回同组
-// 多个楼层——精确楼层需再对位置做区域判定(见 docs/data.md 3.2,尚未实现)。空/无匹配返回 nil。
-func (db *DB) LayersByCave(caveName string) []LayerInfo {
-	if caveName == "" {
-		return nil
-	}
-	var out []LayerInfo
+// LayerAt 返回玩家位置(世界 x,y)所在的分层地图:遍历该场景(res)的层,点落在其任一区域
+// 多边形内即命中(复刻客户端 GetLayerIdByPos 的位置判定,传送/移动进入、楼层区分皆据此)。
+// 未在任何层返回 ok=false(显示地表底图)。同一位置罕见落在多层时取第一个匹配。
+func (db *DB) LayerAt(res, x, y int32) (LayerInfo, bool) {
 	for _, l := range db.layers {
-		if l.Cave == caveName {
-			out = append(out, l)
+		if l.Res != res {
+			continue
+		}
+		for _, poly := range l.Polys {
+			if pointInPoly(x, y, poly) {
+				return l, true
+			}
 		}
 	}
-	return out
+	return LayerInfo{}, false
 }
 
-// ProjectLayer 把世界坐标投影为某分层切片图的归一化坐标 u,v∈[0,1](公式同底图,参数用层的
-// camera_center/Ortho_width)。切片图路径为 bigmap/layer/<LayerInfo.Img>.webp。
-func (l LayerInfo) ProjectLayer(x, y int32) (u, v float64) {
-	return float64(x-l.OX) / float64(l.Side), float64(y-l.OY) / float64(l.Side)
+// pointInPoly 判断点 (x,y) 是否在多边形内(射线法,世界坐标整数)。
+func pointInPoly(x, y int32, poly []xyInt) bool {
+	inside := false
+	n := len(poly)
+	for i, j := 0, n-1; i < n; j, i = i, i+1 {
+		xi, yi, xj, yj := poly[i].X, poly[i].Y, poly[j].X, poly[j].Y
+		// 用 int64 叉积避免除法与溢出:边跨过水平射线 y,且交点在点右侧则翻转。
+		if (yi > y) != (yj > y) {
+			// x < xi + (xj-xi)*(y-yi)/(yj-yi)
+			if int64(x-xi)*int64(yj-yi) < int64(xj-xi)*int64(y-yi) == (yj > yi) {
+				inside = !inside
+			}
+		}
+	}
+	return inside
 }
 
 func key(id uint32) string { return strconv.FormatUint(uint64(id), 10) }
