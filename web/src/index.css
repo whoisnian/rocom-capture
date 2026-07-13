@@ -507,8 +507,8 @@ img.evo-avatar { object-fit: cover; }
 .map-base { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
 /* 洞穴/地下层切片:叠加在底图上对应地理位置(透明处透出底图)。 */
 .map-layer { position: absolute; user-select: none; -webkit-user-drag: none; pointer-events: none; }
-/* 方向箭头:恒定屏幕尺寸,随朝向旋转,不随地图缩放。 */
-.map-arrow { position: absolute; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+/* 方向箭头:恒定屏幕尺寸,随朝向旋转,不随地图缩放。位置同样只用 transform(逐帧写入,见 Map.jsx)。 */
+.map-arrow { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .map-arrow svg { display: block; }
 /* 缩放/回中控件 */
 .map-ctrl { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }

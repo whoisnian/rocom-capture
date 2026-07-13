@@ -120,6 +120,134 @@ type petSweep struct {
 	proc     time.Duration   // 累计实际解析+入库(+末页对账)耗时,排除等待客户端下一页的空档,用于暴露处理瓶颈
 }
 
+// layerDebounce 是分层地图切换的去抖时长。区域触发体之间有接缝,玩家在洞内正常走动会短暂「擦出」
+// 所有区域(实测空窗 0/0/94ms),贴着楼梯口走也会短暂擦进上层(实测 107ms);若照单全收,叠加图就会
+// 一闪一闪,看着像层图与底图不同步。而真正的进出层空窗是秒级的(实测 3.8/5.1/15.7s),两者差一个
+// 数量级,故只采纳「稳定超过本时长」的变化。代价是进出洞的切换晚 0.3s 可见,无关痛痒。
+const layerDebounce = 300 * time.Millisecond
+
+// layerState 是某连接的分层地图去抖状态:cur 为正在显示的层,pend 为待确认的新值。
+type layerState struct {
+	cur, pend     gamedata.LayerInfo
+	curOK, pendOK bool
+	since         time.Time // pend 首次出现的时刻
+	// fresh:换场景/传送后到**首个移动包**之间的「落地窗口」。此间的区域事件是落地时的权威状态,
+	// 不可能是走动擦出接缝的噪声,故直接采纳、不等去抖——否则传送进洞后若站着不动,进入事件会一直
+	// 卡在去抖里(没有下一个移动包来推进它),洞穴层图迟迟不出现。
+	fresh bool
+}
+
+// settle 收一个「按区域算出的层」,返回去抖后应显示的层。
+func (ls *layerState) settle(l gamedata.LayerInfo, ok bool, now time.Time) (gamedata.LayerInfo, bool) {
+	same := func(a gamedata.LayerInfo, aok bool, b gamedata.LayerInfo, bok bool) bool {
+		return aok == bok && (!aok || a.ID == b.ID)
+	}
+	switch {
+	case ls.fresh: // 落地窗口内(换场景后、玩家尚未移动):直接采纳,不等去抖
+		ls.cur, ls.curOK = l, ok
+		ls.pend, ls.pendOK, ls.since = l, ok, time.Time{}
+	case same(l, ok, ls.cur, ls.curOK): // 与在显示的一致:清掉待定
+		ls.pend, ls.pendOK, ls.since = l, ok, time.Time{}
+	case !same(l, ok, ls.pend, ls.pendOK) || ls.since.IsZero(): // 新的候选:开始计时
+		ls.pend, ls.pendOK, ls.since = l, ok, now
+	case now.Sub(ls.since) >= layerDebounce: // 候选稳定够久:采纳
+		ls.cur, ls.curOK = l, ok
+		ls.since = time.Time{}
+	}
+	return ls.cur, ls.curOK
+}
+
+// buildPos 组装一条位置推送(不含分层)。移动包与**传送落点**共用:传送时用一个只带 Pos/Yaw/StopMove
+// 的合成 MoveReq(无速度、无轨迹),这样传送一下发就能把地图切到目的地,不必干等第一个移动包。
+func buildPos(db *gamedata.DB, acc string, res, room int32, mr scene.MoveReq, t time.Time) map[string]any {
+	// 地表底图始终作背景;玩家点用底图投影。坐标系统一为底图。
+	pos := map[string]any{
+		"account":    acc,
+		"sceneResId": res,
+		"sceneCfgId": mr.SceneCfgID,
+		"sceneName":  sceneDisplayName(db, res, mr.SceneCfgID),
+		"img":        db.MapImage(uint32(res), room), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
+		"x":          mr.Pos.X,
+		"y":          mr.Pos.Y,
+		"z":          mr.Pos.Z,
+		"heading":    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
+		"stop":       mr.StopMove,
+		"ts":         t.Unix(),
+		"tsMs":       t.UnixMilli(), // 前端判断缓存位置是否过期(过期则不外推)
+	}
+	u, v, ok := db.Project(uint32(res), mr.Pos.X, mr.Pos.Y)
+	if !ok {
+		return pos // 该场景无底图:只回坐标
+	}
+	pos["u"], pos["v"] = u, v
+	mi, ok := db.MapInfo(uint32(res))
+	if !ok || mi.Side == 0 {
+		return pos
+	}
+	// 速度向量(UE 厘米/秒)按同一投影(纯缩放:u=(x-ox)/side)换算为「归一化底图坐标/秒」,
+	// 供前端在两包之间逐帧外推(航位推算),即客户端给其他玩家做平滑的同一套办法。
+	// 实测(pcap 回放)上一包 pos+speed*Δt 预测下一包 pos:中位误差 3cm、直线段 3s 也仅几米。
+	if !mr.StopMove {
+		pos["vu"] = float64(mr.Speed.X) / float64(mi.Side)
+		pos["vv"] = float64(mr.Speed.Y) / float64(mi.Side)
+	}
+	// 客户端沉默一段(直线巡航/推住摇杆盘旋时退化成 2.5-3s 心跳)后补报的真实轨迹:
+	// 那几秒里它没报过位置,前端只能外推;等这段轨迹到了就沿它把箭头滑回真实路线上(转弯尤其明显)。
+	// 持续操作时上报本就 0.1s 一包(轨迹点为空/极短),不必也不能回放——那会让 0.45s 的滑行跨过好几个
+	// 新包,箭头反而落后。故以轨迹跨度为准。
+	if mr.SegSpan() >= minSegSpan {
+		path := make([]map[string]any, 0, len(mr.Segs)+1)
+		for _, sg := range mr.Segs {
+			if su, sv, ok := db.Project(uint32(res), sg.Pos.X, sg.Pos.Y); ok {
+				path = append(path, map[string]any{"u": su, "v": sv})
+			}
+		}
+		// 末段采样略早于包时刻(实测差 0.2–0.6 个采样步长),to_pos 才是最新位置:补作轨迹终点,
+		// 前端滑完轨迹正好落在上报位置,与其后的外推无缝衔接。
+		if len(path) > 0 {
+			if last := path[len(path)-1]; last["u"] != u || last["v"] != v {
+				path = append(path, map[string]any{"u": u, "v": v})
+			}
+		}
+		if len(path) >= 2 {
+			pos["path"] = path
+		}
+	}
+	return pos
+}
+
+// layerPayload 把某分层地图投影成底图上的归一化矩形(u0,v0)-(u1,v1),前端据此定位切片图
+// (透明处透出底图);玩家点仍用底图投影,自然落在矩形内。该场景无底图时返回 nil。
+func layerPayload(db *gamedata.DB, res int32, l gamedata.LayerInfo) map[string]any {
+	mi, ok := db.MapInfo(uint32(res))
+	if !ok || mi.Side == 0 {
+		return nil
+	}
+	return map[string]any{
+		"img": "layer/" + l.Img,
+		"u0":  float64(l.OX-mi.OX) / float64(mi.Side),
+		"v0":  float64(l.OY-mi.OY) / float64(mi.Side),
+		"u1":  float64(l.OX+l.Side-mi.OX) / float64(mi.Side),
+		"v1":  float64(l.OY+l.Side-mi.OY) / float64(mi.Side),
+	}
+}
+
+// activeFuncs 把「func → area 集合」压成 func 集合(玩家当前所在的 area_func_id),供选层。
+func activeFuncs(funcs map[uint32]map[uint32]bool) map[uint32]bool {
+	out := make(map[uint32]bool, len(funcs))
+	for fn, set := range funcs {
+		if len(set) > 0 {
+			out[fn] = true
+		}
+	}
+	return out
+}
+
+// minSegSpan 是「值得回放的真实轨迹」的最短跨度(秒)。移动包按操作事件上报:持续改方向/变速时
+// 约 0.1s 一包(轨迹点为空或只有一两个,回放毫无意义且会拖慢箭头);推住摇杆盘旋或直线巡航时输入
+// 不变,退化成 2.5-3s 一次心跳,那几秒实际走的路(含大转弯)只在 move_seg_list 里。取 0.6s 为界。
+const minSegSpan = 0.6
+
 // consume 消费解密后的消息流：更新宠物库、产生事件、广播实时消息。
 func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.Server) {
 	// add_time 早于此刻的宠物视为初始仓库快照，不产生“获得”事件；
@@ -140,21 +268,105 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	sweeps := map[string]*petSweep{}
 
 	// 实时地图(仅自己):按连接维护当前 scene_res_cfg_id(s2c 进入/传送更新),
-	// c2s 移动包结合当前场景投影成地图坐标推给前端。移动包高频(~100-200ms/次,客户端
-	// Roco.Move.ReqInterval),故按账号节流,stop_move(停下)必推。
+	// c2s 移动包结合当前场景投影成地图坐标推给前端(逐包推送,不节流,峰值约 8 条/秒)。
 	// 从库预热:进入/传送通知只在切场景时下发,游戏中途不重发,故须像会话密钥一样从缓存恢复,
 	// 否则重启后虽能解密移动包,却因不知当前 res 而无法定位底图(移动包只带 scene_cfg_id)。
 	sceneByConn := map[string]int32{} // connID -> 当前 scene_res_cfg_id
 	roomByConn := map[string]int32{}  // connID -> 家园房屋等级(家园室内选分层底图,非家园为 0)
+	// areasByConn: connID -> area_func_id -> 该 func 下已进入的 area_id 集合。由服务器的区域进/出
+	// 事件维护(见 scene.ParseAreaActs),是「玩家当前在洞穴/几楼」的权威依据。一个 func 可含多个
+	// area(如信仰者村落一层同时进入 541030265/541030499),故按 func 存 area 集合:离开其中一个
+	// 仍在该层,集合空了才算离开。同样只在跨越触发体时下发,故与场景 res 一样落盘供重启恢复。
+	areasByConn := map[string]map[uint32]map[uint32]bool{}
+	layerByConn := map[string]*layerState{} // connID -> 分层地图去抖状态(见 layerDebounce)
 	if saved, err := st.LoadSessionScenes(); err == nil {
 		for id, s := range saved {
 			sceneByConn[id] = s.Res
 			roomByConn[id] = s.Room
+			for fn, ids := range s.Areas {
+				set := map[uint32]bool{}
+				for _, a := range ids {
+					set[a] = true
+				}
+				if len(set) > 0 {
+					if areasByConn[id] == nil {
+						areasByConn[id] = map[uint32]map[uint32]bool{}
+					}
+					areasByConn[id][fn] = set
+				}
+			}
 		}
 	}
-	lastPosSent := map[string]time.Time{} // 账号 -> 上次位置推送时刻(节流)
-	const posThrottle = 150 * time.Millisecond
-
+	// saveAreas 把某连接的区域集合落盘(map[func][]area 形式)。
+	saveAreas := func(conn string) {
+		out := map[uint32][]uint32{}
+		for fn, set := range areasByConn[conn] {
+			for a := range set {
+				out[fn] = append(out[fn], a)
+			}
+		}
+		st.SaveSessionAreas(conn, out)
+	}
+	// resetAreas 清空某连接的区域与去抖状态(换场景/传送时)。
+	resetAreas := func(conn string) {
+		delete(areasByConn, conn)
+		delete(layerByConn, conn)
+		saveAreas(conn)
+	}
+	// layerOf 按当前区域集合定层(经去抖)。fromMove=true 表示由移动包触发:玩家开始动了,
+	// 落地窗口就此关闭,其后的层变化一律走去抖(滤掉走动擦出/擦进触发体接缝的抖动)。
+	layerOf := func(conn string, res int32, t time.Time, fromMove bool) (gamedata.LayerInfo, bool) {
+		ls := layerByConn[conn]
+		if ls == nil {
+			ls = &layerState{fresh: true} // 换场景/传送后的落地窗口(见 layerState.fresh)
+			layerByConn[conn] = ls
+		}
+		raw, rawOK := db.LayerIn(res, activeFuncs(areasByConn[conn]))
+		l, ok := ls.settle(raw, rawOK, t)
+		if fromMove {
+			ls.fresh = false
+		}
+		return l, ok
+	}
+	// lastPos 为各账号最近推送的位置载荷(供 layerOnly 更新时合并回缓存)。
+	lastPos := map[string]map[string]any{}
+	// settleLayer 在区域事件后重新定层;层变了就推一条只更新分层的消息(不动位置锚点)。
+	settleLayer := func(conn, acc string, t time.Time) {
+		res := sceneByConn[conn]
+		if res == 0 {
+			return
+		}
+		ls := layerByConn[conn]
+		var prev gamedata.LayerInfo
+		var prevOK bool
+		if ls != nil {
+			prev, prevOK = ls.cur, ls.curOK
+		}
+		l, ok := layerOf(conn, res, t, false)
+		if ok == prevOK && (!ok || l.ID == prev.ID) {
+			return // 层没变
+		}
+		upd := map[string]any{
+			"account":   acc,
+			"layerOnly": true, // 前端只叠加/撤下切片图,不动位置锚点
+			"ts":        t.Unix(),
+			"tsMs":      t.UnixMilli(), // 仅供观测(调试页/回放核对);前端合并时不取
+		}
+		if ok {
+			upd["layer"], upd["sceneName"] = layerPayload(db, res, l), l.Name
+		} else {
+			cfg := int32(0)
+			if p := lastPos[acc]; p != nil {
+				cfg, _ = p["sceneCfgId"].(int32)
+			}
+			upd["layer"], upd["sceneName"] = nil, sceneDisplayName(db, res, cfg)
+		}
+		if p := lastPos[acc]; p != nil { // 同步进缓存,页面加载(GET /api/position)也能带上分层
+			p["layer"], p["sceneName"] = upd["layer"], upd["sceneName"]
+			srv.SetLastPosition(acc, p)
+		}
+		srv.Hub().Broadcast("position", acc, upd)
+	}
 	for m := range eng.Out {
 		// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面 resolve acc 之前)。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp {
@@ -192,67 +404,93 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		}
 		sc := st.For(acc)
 
-		// 实时地图(仅自己):s2c 进入/传送更新当前场景 res;c2s 移动包按当前场景投影后推送。
+		// 去抖中的层变化需要「过一会儿再看一眼」才能采纳,而玩家可能站着不动、迟迟没有下一个移动包。
+		// 故借该连接的任意一条消息(心跳等,实测约 1.6s 一条)把去抖推进到底。
+		if ls := layerByConn[m.Session]; ls != nil && !ls.since.IsZero() {
+			settleLayer(m.Session, acc, m.Time)
+		}
+
+		// 实时地图(仅自己):s2c 进入/传送更新当前场景 res 与落点、区域进出更新所在层;c2s 移动包投影后推送。
 		switch {
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpEnterSceneRsp:
 			if _, res, room, ok := scene.ParseEnterScene(m.AppBody); ok {
 				sceneByConn[m.Session], roomByConn[m.Session] = res, room
 				st.SaveSessionScene(m.Session, res, room) // 落盘供重启恢复
+				// 换场景/传送后旧区域一律作废:服务器不为它们补发离开事件,只在落地后重发进入事件
+				// (客户端同样在传送时清空区域,见 AreaAndZoneModule:OnTeleportClearAreaInfo)。
+				resetAreas(m.Session)
 			}
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpTeleportNotify:
-			if _, res, room, ok := scene.ParseTeleport(m.AppBody); ok {
-				sceneByConn[m.Session], roomByConn[m.Session] = res, room
-				st.SaveSessionScene(m.Session, res, room)
+			tp, ok := scene.ParseTeleport(m.AppBody)
+			if !ok {
+				continue
 			}
+			sceneByConn[m.Session], roomByConn[m.Session] = tp.ResID, tp.Room
+			st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
+			resetAreas(m.Session)
+			// 传送落点(to_pt)此刻已知,而客户端要过几秒(加载)才落地并开始发移动包:立刻按落点推一条
+			// 位置,否则地图会停在原地干等,玩家落地后不动更是一直不更新(分层也跟着不出现)。
+			// 落点是静止的一点:无速度、无轨迹;分层留待落地后的区域进入事件补上(见下)。
+			pos := buildPos(db, acc, tp.ResID, tp.Room, scene.MoveReq{
+				Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
+			}, m.Time)
+			lastPos[acc] = pos
+			srv.SetLastPosition(acc, pos)
+			srv.Hub().Broadcast("position", acc, pos)
+			continue
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
+			// 区域进/出:玩家真正踩进/离开区域触发体(3D 体积)时服务器才下发,是选层的权威依据。
+			acts := scene.ParseAreaActs(m.AppBody)
+			if len(acts) == 0 {
+				continue
+			}
+			for _, a := range acts {
+				funcs := areasByConn[m.Session]
+				if a.Enter {
+					if funcs == nil {
+						funcs = map[uint32]map[uint32]bool{}
+						areasByConn[m.Session] = funcs
+					}
+					if funcs[a.FuncID] == nil {
+						funcs[a.FuncID] = map[uint32]bool{}
+					}
+					funcs[a.FuncID][a.AreaID] = true
+					continue
+				}
+				if funcs[a.FuncID] != nil {
+					delete(funcs[a.FuncID], a.AreaID)
+					if len(funcs[a.FuncID]) == 0 { // 该 func 下的区域都离开了,才算离开这一层
+						delete(funcs, a.FuncID)
+					}
+				}
+			}
+			saveAreas(m.Session)
+			// 层可能就此变了(尤其传送落地时的进入事件):此刻玩家可能站着不动、下一个移动包遥遥无期,
+			// 故当场推一条**只更新分层**的消息(layerOnly),前端据此叠上/撤下切片图而不动位置锚点。
+			settleLayer(m.Session, acc, m.Time)
 			continue
 		case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
 			mr, ok := scene.ParseMoveReq(m.AppBody)
 			if !ok {
 				continue
 			}
-			// 节流:非停止包且距上次推送不足阈值则跳过(移动包高频)。
-			if !mr.StopMove && m.Time.Sub(lastPosSent[acc]) < posThrottle {
-				continue
-			}
-			lastPosSent[acc] = m.Time
+			// 逐包推送,不节流:客户端本就只在操作变化时上报(约 0.1s 一包,输入不变时退化成 2.5-3s
+			// 心跳),峰值仅约 8 条/秒。丢包会丢掉转向事件,前端外推便会偏出去(见 buildPos 的 vu/vv)。
 			res := sceneByConn[m.Session]
 			if res == 0 { // 未知 res(中途开抓/无缓存):用移动包的 scene_cfg_id 兜底默认 res
 				res = db.DefaultSceneRes(mr.SceneCfgID)
 			}
-			// 地表底图始终作背景;玩家点用底图投影。坐标系统一为底图。
-			pos := map[string]any{
-				"account":    acc,
-				"sceneResId": res,
-				"sceneCfgId": mr.SceneCfgID,
-				"sceneName":  sceneDisplayName(db, res, mr.SceneCfgID),
-				"img":        db.MapImage(uint32(res), roomByConn[m.Session]), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
-				"x":          mr.Pos.X,
-				"y":          mr.Pos.Y,
-				"z":          mr.Pos.Z,
-				"heading":    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
-				"stop":       mr.StopMove,
-				"ts":         m.Time.Unix(),
-			}
-			if u, v, ok := db.Project(uint32(res), mr.Pos.X, mr.Pos.Y); ok {
-				pos["u"], pos["v"] = u, v
-			}
-			// 分层地图:玩家位置落在某层区域多边形内(LayerAt,复刻客户端 GetLayerIdByPos),
-			// 就把该层切片图叠加到地表底图上对应位置。层世界范围投影为底图归一化矩形(u0,v0)-(u1,v1),
-			// 前端据此定位切片图(透明处透出底图);玩家点仍用底图投影,自然落在矩形内。
-			// 传送/移动进入、开阔洞穴区、楼层区分皆据此(见 docs/data.md 3.2)。
-			if l, ok := db.LayerAt(res, mr.Pos.X, mr.Pos.Y); ok {
-				if mi, ok := db.MapInfo(uint32(res)); ok && mi.Side > 0 {
+			pos := buildPos(db, acc, res, roomByConn[m.Session], mr, m.Time)
+			// 分层地图:玩家当前所在区域(服务器区域进/出事件维护)命中某层的 area_func_id 即在该层,
+			// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
+			if l, ok := layerOf(m.Session, res, m.Time, true); ok {
+				if lp := layerPayload(db, res, l); lp != nil {
 					pos["sceneName"] = l.Name
-					pos["layer"] = map[string]any{
-						"img": "layer/" + l.Img,
-						"u0":  float64(l.OX-mi.OX) / float64(mi.Side),
-						"v0":  float64(l.OY-mi.OY) / float64(mi.Side),
-						"u1":  float64(l.OX+l.Side-mi.OX) / float64(mi.Side),
-						"v1":  float64(l.OY+l.Side-mi.OY) / float64(mi.Side),
-					}
+					pos["layer"] = lp
 				}
 			}
+			lastPos[acc] = pos
 			srv.SetLastPosition(acc, pos) // 缓存供地图页加载即时回显
 			srv.Hub().Broadcast("position", acc, pos)
 			continue

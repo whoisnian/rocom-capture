@@ -18,6 +18,7 @@ const (
 	OpSceneMoveReq   = 0x0133 // ZONE_SCENE_MOVE_REQ(307), c2s,自己移动(to_pos/speed/scene_cfg_id)
 	OpEnterSceneRsp  = 0x0152 // ZONE_ENTER_SCENE_RSP(338), s2c,进入场景(scene_cfg_id/scene_res_cfg_id)
 	OpTeleportNotify = 0x015c // ZONE_SCENE_TELEPORT_NOTIFY(348), s2c,传送(to_scene_cfg_id/to_scene_res_cfg_id)
+	OpPlayActsNotify = 0x0414 // ZONE_SCENE_PLAY_ACTS_NOTIFY(1044), s2c,区域进/出等动作(见 ParseAreaActs)
 )
 
 // Position 是场景世界坐标(UE 单位,1=1 厘米;玩家 z 为脚底高度,角色中心+85)。
@@ -25,13 +26,38 @@ type Position struct {
 	X, Y, Z int32
 }
 
+// Seg 是 move_seg_list(field 12,MoveSegmentInfo{pos,time_stamp})里的一个路径点:客户端把
+// **两次上报之间实际走过的轨迹**按约 0.3s 一个点补报上来,末点位置≈to_pos、时刻≈包时刻。
+//
+// 上报是按操作事件触发的:持续改方向/变速时约 0.1s 一包(Segs 基本为空),而推住摇杆不动、
+// 直线巡航或坐骑自行盘旋时输入不变,就退化成约 2.5-3s 一次心跳——**那几秒里实际走的路(哪怕是
+// 一个大转弯)只能靠 Segs 事后补报**。地面与飞行同理。前端据此把箭头沿真实曲线滑回正轨,
+// 而不是直线跳过去(见 docs/architecture.md 7)。
+type Seg struct {
+	Pos       Position
+	TimeStamp uint64 // 服务器时钟(毫秒)
+}
+
 // MoveReq 是一条自己移动上报(ZoneSceneMoveReq)里做地图定位所需的字段。
 type MoveReq struct {
 	Pos        Position // to_pos(field 2)
+	Speed      Position // speed(field 4),速度向量(UE 单位/秒);停下时为零。见 ParseMoveReq 说明
 	Yaw        int32    // to_rot.z(field 3 的 z),朝向角×10(0.1 度单位);朝向角(度)=Yaw/10
+	MoveMode   int32    // move_mode(field 6),SceneMoveType 枚举(1/2/3 地面,6-9 飞行…)
 	SceneCfgID int32    // scene_cfg_id(field 17);一个 cfg 可对应多个 res,故仅作校验,定位用当前 res
 	StopMove   bool     // stop_move(field 8),停下时上报
-	TimeStamp  uint64   // time_stamp(field 1),服务器时钟
+	TimeStamp  uint64   // time_stamp(field 1),服务器时钟(毫秒)
+	Segs       []Seg    // move_seg_list(field 12),本次上报覆盖时段内的真实轨迹点
+}
+
+// SegSpan 是本包携带的轨迹点覆盖的时长(秒),即「客户端上次上报到本次沉默了多久」。
+// 密集上报(持续操作,约 0.1s 一包)时为 0 或很短,此时轨迹点没有意义;沉默较久(直线巡航/
+// 推住摇杆盘旋的心跳,2.5-3s)时才是那段空窗里唯一的真实轨迹。调用方据此决定是否回放它。
+func (mr MoveReq) SegSpan() float64 {
+	if len(mr.Segs) < 2 {
+		return 0
+	}
+	return float64(mr.Segs[len(mr.Segs)-1].TimeStamp-mr.Segs[0].TimeStamp) / 1000
 }
 
 // ParseMoveReq 从 c2s 移动包的 AppBody 解析 MoveReq。
@@ -123,12 +149,37 @@ loop:
 				mr.Yaw = p.Z
 			}
 			next = next[m:]
+		case 4: // speed(速度向量,Position 形状);移动中非零,停下为零/缺省
+			sub, m := protowire.ConsumeBytes(next)
+			if m < 0 {
+				return mr, consumed, gotPos
+			}
+			if p, ok := parsePosition(sub); ok {
+				mr.Speed = p
+			}
+			next = next[m:]
+		case 6:
+			v, m := protowire.ConsumeVarint(next)
+			if m < 0 {
+				return mr, consumed, gotPos
+			}
+			mr.MoveMode = int32(v)
+			next = next[m:]
 		case 8:
 			v, m := protowire.ConsumeVarint(next)
 			if m < 0 {
 				return mr, consumed, gotPos
 			}
 			mr.StopMove = v != 0
+			next = next[m:]
+		case 12: // move_seg_list(repeated MoveSegmentInfo);解不动的点跳过,不影响其余字段
+			sub, m := protowire.ConsumeBytes(next)
+			if m < 0 {
+				return mr, consumed, gotPos
+			}
+			if s, ok := parseSeg(sub); ok {
+				mr.Segs = append(mr.Segs, s)
+			}
 			next = next[m:]
 		case 17:
 			v, m := protowire.ConsumeVarint(next)
@@ -148,6 +199,48 @@ loop:
 		rest = next
 	}
 	return mr, consumed, gotPos
+}
+
+// parseSeg 把 MoveSegmentInfo 子消息解为 Seg(pos=field 1 的 Position,time_stamp=field 2)。
+// 缺 pos 即判为不是路径点(起点错位时的误命中),返回 false。
+func parseSeg(b []byte) (Seg, bool) {
+	var s Seg
+	var got bool
+	rest := b
+	for len(rest) > 0 {
+		num, typ, n := protowire.ConsumeTag(rest)
+		if n < 0 {
+			return s, false
+		}
+		rest = rest[n:]
+		switch {
+		case num == 1 && typ == protowire.BytesType:
+			sub, m := protowire.ConsumeBytes(rest)
+			if m < 0 {
+				return s, false
+			}
+			p, ok := parsePosition(sub)
+			if !ok {
+				return s, false
+			}
+			s.Pos, got = p, true
+			rest = rest[m:]
+		case num == 2 && typ == protowire.VarintType:
+			v, m := protowire.ConsumeVarint(rest)
+			if m < 0 {
+				return s, false
+			}
+			s.TimeStamp = v
+			rest = rest[m:]
+		default:
+			m := protowire.ConsumeFieldValue(num, typ, rest)
+			if m < 0 {
+				return s, false
+			}
+			rest = rest[m:]
+		}
+	}
+	return s, got
 }
 
 // parsePosition 把子消息字节解为 Position。Position 仅含 x/y/z(field 1-3,int32/varint),
@@ -200,20 +293,101 @@ func ParseEnterScene(body []byte) (cfgID, resID, room int32, ok bool) {
 	return cfgID, resID, room, !fail && resID != 0
 }
 
-// ParseTeleport 从 s2c ZoneSceneTeleportNotify 的 protobuf body 取 to_scene_cfg_id(field 11)、
-// to_scene_res_cfg_id(field 12)与 home_room_level(field 31)。
-func ParseTeleport(body []byte) (cfgID, resID, room int32, ok bool) {
+// AreaAct 是一次区域进/出事件(玩家自己踩进/离开某个区域触发体)。
+type AreaAct struct {
+	AreaID uint32 // entered_area_id / left_area_id(AREA_CONF.id)
+	FuncID uint32 // area_func_conf_id(AREA_FUNC_CONF.id);分层地图据此选层
+	Enter  bool   // true=进入,false=离开
+}
+
+// ParseAreaActs 从 s2c ZoneScenePlayActsNotify(0x0414)取区域进/出事件:
+// acts(field 1,SpaceActionCollection)里的 enterted_catcher(61,注意游戏里就是这个拼写)与
+// left_catcher(62),各为 {actor_id(1), area_id(2), area_func_conf_id(3)}。
+//
+// **这是「玩家当前在哪一层」的权威依据**:服务器只在玩家真正进入区域触发体(3D 体积)时才下发,
+// 客户端也正是据此选层(AreaAndZoneModule 维护 zone 集合 → BigMapModuleData:GetCurMapLayerId
+// 取其中命中分层表的 area_func_id)。用位置点对区域多边形做 2D 判定则会在洞穴正上方的地表误命中
+// ——多边形只有 x/y,分不清人在洞里还是在洞顶。见 docs/data.md 3.2。
+func ParseAreaActs(body []byte) []AreaAct {
+	var acts []AreaAct
+	scanFields(body, func(num protowire.Number, typ protowire.Type, val []byte, _ uint64) {
+		if num != 1 || typ != protowire.BytesType { // acts
+			return
+		}
+		scanFields(val, func(n2 protowire.Number, t2 protowire.Type, sub []byte, _ uint64) {
+			if t2 != protowire.BytesType || (n2 != 61 && n2 != 62) {
+				return
+			}
+			if a, ok := parseCatcher(sub); ok {
+				a.Enter = n2 == 61
+				acts = append(acts, a)
+			}
+		})
+	})
+	return acts
+}
+
+// parseCatcher 解 SpaceAct_Entered/LeftCatcher{actor_id(1), area_id(2), area_func_conf_id(3), ...}。
+// 服务器只对玩家自己下发(客户端同样不校验 actor_id),故不按 actor 过滤。
+func parseCatcher(b []byte) (AreaAct, bool) {
+	var a AreaAct
+	scanFields(b, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+		if typ != protowire.VarintType {
+			return
+		}
+		switch num {
+		case 2:
+			a.AreaID = uint32(v)
+		case 3:
+			a.FuncID = uint32(v)
+		}
+	})
+	return a, a.AreaID != 0 && a.FuncID != 0
+}
+
+// Teleport 是一次传送通知(ZoneSceneTeleportNotify)里做地图定位所需的字段。
+type Teleport struct {
+	CfgID int32    // to_scene_cfg_id(field 11)
+	ResID int32    // to_scene_res_cfg_id(field 12)
+	Room  int32    // home_room_level(field 31),家园室内选分层底图
+	Pos   Position // to_pt.pos(field 14 的 Point.pos):**落点**世界坐标
+	Yaw   int32    // to_pt.dir.z:落点朝向角×10
+}
+
+// ParseTeleport 从 s2c ZoneSceneTeleportNotify 的 protobuf body 解析 Teleport。
+//
+// 落点(to_pt)在传送**刚下发时**就已知,而客户端要过几秒(加载)才落地并开始发移动包。据此可立刻把
+// 地图切到目的地,不必干等第一个移动包——否则传送后地图会停在原地好几秒,甚至玩家落地不动就一直不更新。
+// 实测(3 份 pcap)to_pt 与落地后首个移动包的坐标/朝向一致(误差几厘米)。
+func ParseTeleport(body []byte) (Teleport, bool) {
+	var t Teleport
 	scanFields(body, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
 		switch {
 		case num == 11 && typ == protowire.VarintType:
-			cfgID = int32(v)
+			t.CfgID = int32(v)
 		case num == 12 && typ == protowire.VarintType:
-			resID = int32(v)
+			t.ResID = int32(v)
 		case num == 31 && typ == protowire.VarintType:
-			room = int32(v)
+			t.Room = int32(v)
+		case num == 14 && typ == protowire.BytesType: // to_pt = Point{pos(1), dir(2)}
+			scanFields(val, func(n2 protowire.Number, t2 protowire.Type, sub []byte, _ uint64) {
+				if t2 != protowire.BytesType {
+					return
+				}
+				p, ok := parsePosition(sub)
+				if !ok {
+					return
+				}
+				switch n2 {
+				case 1:
+					t.Pos = p
+				case 2:
+					t.Yaw = p.Z // dir 是旋转(FRotator×10),只有 z=Yaw 有意义
+				}
+			})
 		}
 	})
-	return cfgID, resID, room, resID != 0
+	return t, t.ResID != 0
 }
 
 // retFailed 判断 RetInfo 子消息是否表示失败(field 1 = ret_code,非 0 即失败)。

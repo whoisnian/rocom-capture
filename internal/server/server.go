@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
@@ -145,14 +147,27 @@ func (s *Server) SetLastPosition(account string, pos map[string]any) {
 }
 
 // handlePosition 返回当前账号最近一次位置(实时地图页初始定位);无记录返回 null。
+// 缓存位置可能已是很久以前的(玩家早已停下/离线),前端据 vu/vv 外推会一路飘走,
+// 故过期(超过 posFresh)就抹掉速度:页面加载先静态回显,下一个移动包到达后自然接管。
 func (s *Server) handlePosition(w http.ResponseWriter, r *http.Request) {
 	acc := s.acct(r)
 	s.posMu.Lock()
 	pos := s.lastPos[acc]
 	s.posMu.Unlock()
+	if ts, ok := pos["tsMs"].(int64); ok && time.Since(time.UnixMilli(ts)) > posFresh {
+		stale := make(map[string]any, len(pos))
+		maps.Copy(stale, pos)
+		delete(stale, "vu")
+		delete(stale, "vv")
+		delete(stale, "path") // 陈旧轨迹不该再回放一遍
+		pos = stale
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(pos) // pos 为 nil 时输出 null
 }
+
+// posFresh 是缓存位置仍可用于外推的时限(客户端移动中最长 3s 一个心跳包,留些余量)。
+const posFresh = 4 * time.Second
 
 // handleAccounts 返回已知账号列表(account/name/petCount),供前端账号切换下拉。
 func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {

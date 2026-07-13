@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 	// 为早于该列的旧库补列(CREATE TABLE IF NOT EXISTS 不会新增列);已存在则忽略错误。
 	s.db.Exec(`ALTER TABLE sessions ADD COLUMN scene_res INTEGER`) // 实时地图:当前场景 res,供重启恢复
 	s.db.Exec(`ALTER TABLE sessions ADD COLUMN home_room INTEGER`) // 家园室内房屋等级(选分层底图)
+	s.db.Exec(`ALTER TABLE sessions ADD COLUMN areas TEXT`)        // 当前所在区域(area_func→area_id,选洞穴/楼层)
 	s.db.Exec(`ALTER TABLE pets ADD COLUMN egg_groups TEXT`)
 	// 身高/体重在当前形态取值范围内的百分位(0-100),写入时按 gamedata 计算并落列,
 	// 供跨种族按「相对自身范围偏大/偏小」排序(见 buildOrder);范围缺失或旧库未回填时为
@@ -181,8 +182,9 @@ ON CONFLICT(conn_id) DO UPDATE SET account=excluded.account, updated_at=excluded
 
 // SessionScene 是一个连接缓存的场景态:当前 scene_res 与家园房屋等级(非家园为 0)。
 type SessionScene struct {
-	Res  int32
-	Room int32
+	Res   int32
+	Room  int32
+	Areas map[uint32][]uint32 // 当前所在区域:area_func_id → 该 func 下已进入的 area_id(选分层地图)
 }
 
 // SaveSessionScene 持久化某连接当前所在的 scene_res_cfg_id 与家园房屋等级(实时地图页用)。
@@ -196,9 +198,24 @@ ON CONFLICT(conn_id) DO UPDATE SET scene_res=excluded.scene_res, home_room=exclu
 	return err
 }
 
+// SaveSessionAreas 持久化某连接当前所在的区域集合(area_func_id → 已进入的 area_id)。
+// 区域进/出只在跨越触发体时下发(ZONE_SCENE_PLAY_ACTS_NOTIFY),游戏中途不重发,故与场景 res
+// 一样须落盘:否则抓包服务重启后不知玩家还在洞里,地图会退回地表底图。
+func (s *Store) SaveSessionAreas(connID string, areas map[uint32][]uint32) error {
+	blob, err := json.Marshal(areas)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`
+INSERT INTO sessions(conn_id,areas,updated_at) VALUES(?,?,?)
+ON CONFLICT(conn_id) DO UPDATE SET areas=excluded.areas, updated_at=excluded.updated_at`,
+		connID, string(blob), time.Now().Unix())
+	return err
+}
+
 // LoadSessionScenes 读取近 SessionTTL 内的 conn_id→场景态映射(重启预热用)。
 func (s *Store) LoadSessionScenes() (map[string]SessionScene, error) {
-	rows, err := s.db.Query(`SELECT conn_id,scene_res,COALESCE(home_room,0) FROM sessions WHERE scene_res IS NOT NULL AND scene_res<>0 AND updated_at>=?`,
+	rows, err := s.db.Query(`SELECT conn_id,scene_res,COALESCE(home_room,0),COALESCE(areas,'') FROM sessions WHERE scene_res IS NOT NULL AND scene_res<>0 AND updated_at>=?`,
 		time.Now().Add(-SessionTTL).Unix())
 	if err != nil {
 		return nil, err
@@ -206,11 +223,15 @@ func (s *Store) LoadSessionScenes() (map[string]SessionScene, error) {
 	defer rows.Close()
 	out := map[string]SessionScene{}
 	for rows.Next() {
-		var connID string
+		var connID, areas string
 		var sc SessionScene
-		if rows.Scan(&connID, &sc.Res, &sc.Room) == nil {
-			out[connID] = sc
+		if rows.Scan(&connID, &sc.Res, &sc.Room, &areas) != nil {
+			continue
 		}
+		if areas != "" {
+			json.Unmarshal([]byte(areas), &sc.Areas) // 解不动就当没有(退回地表底图)
+		}
+		out[connID] = sc
 	}
 	return out, rows.Err()
 }

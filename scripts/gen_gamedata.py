@@ -322,18 +322,20 @@ for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
         **({"rooms": HOME_ROOM_LEVELS} if int(res) == HOME_INDOOR_RES else {}),
     }
 
-# 分层地图(洞穴/室内层):LAYERED_WORLD_MAP_CONF。玩家进入洞穴/地下层时,地图显示切换为该层的
-# 独立切片(LayerMap 单张图),投影用该层自己的 camera_center + Ortho_width(而非底图的
-# map_center/side_length)——因为层图是局部放大视图。同一坐标系(scene_res_id),坐标不变,只换图。
+# 分层地图(洞穴/室内层):LAYERED_WORLD_MAP_CONF。玩家进入洞穴/地下层时,地图把该层的独立切片
+# (LayerMap 单张图)叠加到地表底图上,投影用该层自己的 camera_center + Ortho_width(而非底图的
+# map_center/side_length)——因为层图是局部放大视图。同一坐标系(scene_res_id),坐标不变。
 #
-# 选层机制(见 docs/data.md 3.2):游戏按玩家位置对该层的 AREA_CONF 多边形做点在区域内判定
-# (客户端 GetLayerIdByPos)→ 层。这是唯一完整机制:传送/移动进入、开阔洞穴区(月兔暗港)、
-# 楼层区分(一层/二层多边形不同)都据此。故本索引给每层带上其区域多边形 `poly`(世界 x,y)。
-# 层 area_func_id → AREA_FUNC_CONF.area_id → AREA_CONF.pos 顶点。
+# 选层机制(见 docs/data.md 3.2):**服务器的区域进/出事件**(ZONE_SCENE_PLAY_ACTS_NOTIFY 里的
+# enterted_catcher/left_catcher)给出玩家当前所在区域的 area_func_id,命中本表 area_func_id 即在该层
+# (客户端 BigMapModuleData:GetCurMapLayerId 同此)。故本索引给每层带上 `afid`。
+# 早前改用「位置点在 AREA_CONF 多边形内」近似,会在洞穴正上方的地表误命中(多边形只有 x/y,
+# 而区域触发体是 3D 的),已废弃,多边形不再入库。
 # 只收录有 map_resource(即有切片图)的层;地表条目(无图,用底图)跳过。
 #
-# AREA_CONF(8.4MB,未 vendored)只在 NRC_AREA_DIR(默认 Downloads)存在时读取提取多边形;
-# 不存在时保留上一版 names.json 已烘焙的 poly(故常规无需 Downloads 即可重跑;更新地图时才需)。
+# 层的 scene_res:LAYERED 表有就用(洞穴层=10003);家园层该列为空,只能从其区域行补(=30001)。
+# AREA_CONF(8.4MB,未 vendored)只在 NRC_AREA_DIR(默认 Downloads)存在时读;不存在时保留上一版
+# names.json 已烘焙的 res(故常规无需 Downloads 即可重跑;更新地图时才需)。
 AREA_DIR = os.environ.get("NRC_AREA_DIR", os.path.expanduser("~/Downloads/NRC/Content/ScriptC/Data/Bin"))
 
 
@@ -344,16 +346,14 @@ def _area_rows(t):
     )["RocoDataRows"]
 
 
-# 层 id -> {poly: [[[x,y],...],...], res: 区域所属 scene_res_id}。多边形取自 AREA_CONF(世界坐标);
-# res 从区域行的 scene_res_id 取(用于填补 LAYERED 表 scene_res_id 为空的家园层=30001)。
-def _extract_layer_polys():
+# 层 id -> 该层区域所属 scene_res_id(用于填补 LAYERED 表 scene_res_id 为空的家园层=30001)。
+def _extract_layer_res():
     if not os.path.exists(os.path.join(AREA_DIR, "BinDataCompressed", "AREA_CONF.bytes")):
-        # 保留旧 names.json 的 poly/res(无 AREA_CONF 时不丢)。
-        old = os.path.join(OUT, "names.json")
+        old = os.path.join(OUT, "names.json")  # 保留旧 names.json 的 res(无 AREA_CONF 时不丢)
         if os.path.exists(old):
             with open(old, encoding="utf-8") as f:
                 prev = json.load(f).get("layers", {})
-            return {k: {"poly": v["poly"], "res": v.get("res", 0)} for k, v in prev.items() if v.get("poly")}
+            return {k: v["res"] for k, v in prev.items() if v.get("res")}
         return {}
     af = {str(int(r["id"])): r for r in _area_rows("AREA_FUNC_CONF").values()}
     ac = {str(int(r["id"])): r for r in _area_rows("AREA_CONF").values()}
@@ -363,22 +363,16 @@ def _extract_layer_polys():
         fr = af.get(str(int(afid))) if afid else None
         if not fr:
             continue
-        polys, area_res = [], 0
         for aid in fr.get("area_id", []):
             arow = ac.get(str(int(aid)))
-            if not arow:
-                continue
-            verts = [[p["position_xyz"][0], p["position_xyz"][1]]
-                     for p in (arow.get("pos") or []) if p.get("position_xyz")]
-            if len(verts) >= 3:  # 只取多边形(顶点≥3),忽略单点触发区
-                polys.append(verts)
-                area_res = area_res or int(arow.get("scene_res_id") or 0)
-        if polys:
-            out[str(int(v["id"]))] = {"poly": polys, "res": area_res}
+            res = int(arow.get("scene_res_id") or 0) if arow else 0
+            if res:
+                out[str(int(v["id"]))] = res
+                break
     return out
 
 
-layer_polys = _extract_layer_polys()
+layer_res = _extract_layer_res()
 layers = {}
 for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
     img = v.get("map_resource")
@@ -387,9 +381,8 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
         continue
     ow = int(ow)
     lid = str(int(v["id"]))
-    lp = layer_polys.get(lid, {})
-    # 所属 scene_res:优先 LAYERED 表,缺失(家园层)时用区域多边形的 scene_res_id(=30001)。
-    lres = int(v.get("scene_res_id") or 0) or lp.get("res", 0)
+    # 所属 scene_res:优先 LAYERED 表,缺失(家园层)时从其区域行补(=30001)。
+    lres = int(v.get("scene_res_id") or 0) or layer_res.get(lid, 0)
     layers[lid] = {
         "n": v.get("display_name", ""),
         "grp": v.get("map_layer_group"),     # 同组共享地表底图;组内 sort=1 地表、2+ 楼层
@@ -398,7 +391,7 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
         "ox": cc[0] - ow // 2,               # 层投影:同底图公式,参数换成 camera_center/Ortho_width
         "oy": cc[1] - ow // 2,
         "side": ow,
-        "poly": lp.get("poly", []),          # 区域多边形(世界 x,y),空则该层无法按位置定位
+        "afid": int(v.get("area_func_id") or 0),  # 服务器区域进/出事件的 area_func_id,据此选层
     }
 
 data = {
