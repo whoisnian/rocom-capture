@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -157,6 +158,56 @@ func (ls *layerState) settle(l gamedata.LayerInfo, ok bool, now time.Time) (game
 	return ls.cur, ls.curOK
 }
 
+// ---- 眠枭之星收集判定(见 docs/data.md 3.4)----
+//
+// 已收集的星星服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
+//
+//	收到某点的实体          ⇒ 未收集
+//	走到某点附近却没有实体  ⇒ 已收集
+//
+// AOI 是**按格子**下发的(配置里有「跨aoi拆分」的区域),不是圆形半径:实测多次出现「更远的实体
+// 下发了、更近的没下发」。故不能拿单一半径当 AOI 边界,只能取一个**保守判定半径**——4 份 pcap 里
+// 凡距玩家轨迹 ≤100m 的固定 POI(必定存在那些)全部下发,无一例外,故 80m 留足余量。
+const (
+	starSweepRadius   = 8000  // 判定半径(厘米):玩家进到此距离内仍无实体 ⇒ 该点已收集
+	starCollectRadius = 3000  // 实体离开 AOI 时,玩家在此距离内 ⇒ 是被收走了(而非走远出 AOI)
+	starSettle        = 1500 * time.Millisecond // 进场景后等快照到齐再判定,免得把还没下发的当成已收集
+)
+
+// starTracker 是一个连接在**当前场景会话**内的星星观测态(换场景/传送即重置)。
+type starTracker struct {
+	seen   map[int32]bool   // 本场景收到过实体的刷新点 id ⇒ 未收集
+	actor  map[uint64]int32 // 实体 actor_id -> 刷新点 id(实体离开时只给 actor_id)
+	snapAt time.Time        // 周边实体快照(0x014a)到达时刻;零值 = 还没到,不做已收集判定
+	res    int32            // 当前场景 res(星点按场景取)
+}
+
+// posXY 从位置推送里取玩家世界坐标。
+func posXY(pos map[string]any) (int32, int32, bool) {
+	x, ok1 := pos["x"].(int32)
+	y, ok2 := pos["y"].(int32)
+	return x, y, ok1 && ok2
+}
+
+// starPos 查某刷新点的世界坐标(星点来自 gamedata 的 POI 表)。
+func starPos(db *gamedata.DB, res int32, refreshID int32) [2]int32 {
+	for _, p := range db.POIs(uint32(res)) {
+		if p.R == refreshID {
+			return [2]int32{p.X, p.Y}
+		}
+	}
+	return [2]int32{}
+}
+
+// near 报告 (x,y) 是否在点 p 的 r 厘米内(平面距离;星星有同 xy 叠放的,z 不参与)。
+func near(x, y int32, p [2]int32, r int32) bool {
+	if p == ([2]int32{}) {
+		return false
+	}
+	dx, dy := float64(x-p[0]), float64(y-p[1])
+	return math.Hypot(dx, dy) <= float64(r)
+}
+
 // buildPos 组装一条位置推送(不含分层)。移动包与**传送落点**共用:传送时用一个只带 Pos/Yaw/StopMove
 // 的合成 MoveReq(无速度、无轨迹),这样传送一下发就能把地图切到目的地,不必干等第一个移动包。
 func buildPos(db *gamedata.DB, acc string, res, room int32, mr scene.MoveReq, t time.Time) map[string]any {
@@ -279,6 +330,8 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	// 仍在该层,集合空了才算离开。同样只在跨越触发体时下发,故与场景 res 一样落盘供重启恢复。
 	areasByConn := map[string]map[uint32]map[uint32]bool{}
 	layerByConn := map[string]*layerState{} // connID -> 分层地图去抖状态(见 layerDebounce)
+	starByConn := map[string]*starTracker{} // connID -> 眠枭之星收集判定(见 starTracker)
+	starKnown := map[string]map[int32]int{} // account -> 已确认的星星状态(库内快照,只写增量)
 	if saved, err := st.LoadSessionScenes(); err == nil {
 		for id, s := range saved {
 			sceneByConn[id] = s.Res
@@ -312,6 +365,77 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		delete(areasByConn, conn)
 		delete(layerByConn, conn)
 		saveAreas(conn)
+	}
+	// starSave 落盘并广播星星状态增量(只写与库内快照不同的)。
+	starSave := func(acc string, states map[int32]int) {
+		known := starKnown[acc]
+		if known == nil {
+			known = st.StarStates(acc)
+			starKnown[acc] = known
+		}
+		diff := map[int32]int{}
+		for rid, s := range states {
+			if known[rid] != s {
+				known[rid], diff[rid] = s, s
+			}
+		}
+		if len(diff) == 0 {
+			return
+		}
+		st.SetStarStates(acc, diff)
+		srv.Hub().Broadcast("stars", acc, diff)
+	}
+	// starObserve 收下一个 AOI 通知里的星星实体进/离(0x0413/0x0414)。
+	// 实体进入 ⇒ 该点未收集;实体离开且玩家就在旁边 ⇒ 刚被收走(走远出 AOI 的离开不算,故看距离)。
+	starObserve := func(conn, acc string, body []byte, pos map[string]any) {
+		ts := starByConn[conn]
+		if ts == nil {
+			return
+		}
+		states := map[int32]int{}
+		for _, a := range scene.ParseActorEnter(body) {
+			if a.IsStar() && a.RefreshID != 0 {
+				ts.seen[a.RefreshID] = true
+				ts.actor[a.ActorID] = a.RefreshID
+				states[a.RefreshID] = store.StarUncollected
+			}
+		}
+		for _, id := range scene.ParseActorLeave(body) {
+			rid, ok := ts.actor[id]
+			if !ok {
+				continue
+			}
+			delete(ts.actor, id)
+			// 玩家不可能隔着几十米收集:只有他就在旁边时,实体消失才是「被收走」。
+			if px, py, ok := posXY(pos); ok && near(px, py, starPos(db, ts.res, rid), starCollectRadius) {
+				delete(ts.seen, rid)
+				states[rid] = store.StarCollected
+			}
+		}
+		starSave(acc, states)
+	}
+	// starSweep 按玩家当前位置判定周围的星星:走到判定半径内却没收到实体 ⇒ 已收集。
+	starSweep := func(conn, acc string, res int32, x, y int32, now time.Time) {
+		ts := starByConn[conn]
+		// 快照没到齐就判,会把「还没下发」当成「已收集」。
+		if ts == nil || ts.res != res || ts.snapAt.IsZero() || now.Sub(ts.snapAt) < starSettle {
+			return
+		}
+		states := map[int32]int{}
+		for _, p := range db.POIs(uint32(res)) {
+			if !strings.HasPrefix(p.K, "star") {
+				continue
+			}
+			if !near(x, y, [2]int32{p.X, p.Y}, starSweepRadius) {
+				continue
+			}
+			if ts.seen[p.R] {
+				states[p.R] = store.StarUncollected
+			} else {
+				states[p.R] = store.StarCollected
+			}
+		}
+		starSave(acc, states)
 	}
 	// layerOf 按当前区域集合定层(经去抖)。fromMove=true 表示由移动包触发:玩家开始动了,
 	// 落地窗口就此关闭,其后的层变化一律走去抖(滤掉走动擦出/擦进触发体接缝的抖动)。
@@ -419,7 +543,34 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				// 换场景/传送后旧区域一律作废:服务器不为它们补发离开事件,只在落地后重发进入事件
 				// (客户端同样在传送时清空区域,见 AreaAndZoneModule:OnTeleportClearAreaInfo)。
 				resetAreas(m.Session)
+				// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
+				starByConn[m.Session] = &starTracker{
+					seen: map[int32]bool{}, actor: map[uint64]int32{}, res: res,
+				}
 			}
+			// 按区域的收集进度(服务器口径):区域收满 ⇒ 该区域的星星整片可隐藏,无需逐点走到。
+			if zp := scene.ParseZoneProgress(m.AppBody); len(zp) > 0 {
+				rows := make([]store.ZoneProgressRow, 0, len(zp))
+				for _, p := range zp {
+					rows = append(rows, store.ZoneProgressRow{Camp: p.Camp, NpcID: p.NpcID, Got: p.Got, Total: p.Total})
+				}
+				st.SetStarZones(acc, rows)
+				srv.Hub().Broadcast("starzones", acc, rows)
+			}
+			continue
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpEnterSceneFinishAck:
+			// 周边实体快照:进场景/传送后一次性给出 AOI 内的实体。星星实体 ⇒ 那些点未收集。
+			ts := starByConn[m.Session]
+			if ts == nil {
+				continue
+			}
+			for _, a := range scene.ParseSceneActors(m.AppBody) {
+				if a.IsStar() && a.RefreshID != 0 {
+					ts.seen[a.RefreshID] = true
+					ts.actor[a.ActorID] = a.RefreshID
+				}
+			}
+			ts.snapAt = m.Time
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpTeleportNotify:
 			tp, ok := scene.ParseTeleport(m.AppBody)
@@ -439,7 +590,12 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			srv.SetLastPosition(acc, pos)
 			srv.Hub().Broadcast("position", acc, pos)
 			continue
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsBatchNotify:
+			starObserve(m.Session, acc, m.AppBody, lastPos[acc])
+			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
+			// 同一个通知里既有区域进/出(选层),也有 AOI 实体进/离(星星收集判定)。
+			starObserve(m.Session, acc, m.AppBody, lastPos[acc])
 			// 区域进/出:玩家真正踩进/离开区域触发体(3D 体积)时服务器才下发,是选层的权威依据。
 			acts := scene.ParseAreaActs(m.AppBody)
 			if len(acts) == 0 {
@@ -493,6 +649,8 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			lastPos[acc] = pos
 			srv.SetLastPosition(acc, pos) // 缓存供地图页加载即时回显
 			srv.Hub().Broadcast("position", acc, pos)
+			// 玩家走到哪,就把周围的星星判一遍(走近了却没实体 ⇒ 已收集)。
+			starSweep(m.Session, acc, res, mr.Pos.X, mr.Pos.Y, m.Time)
 			continue
 		}
 

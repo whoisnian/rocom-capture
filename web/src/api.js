@@ -99,6 +99,14 @@ export async function getPosition() {
   return r.ok ? r.json() : null
 }
 
+// getPois 返回某场景(scene_res_cfg_id)的大地图 POI 图层:
+//   {kinds:[{k,n,icon,on,num}], pois:[{k,u,v,n}]}——u,v 是底图归一化坐标(后端已投影,同玩家位置)。
+// 场景无底图时两者皆空。
+export async function getPois(res) {
+  const r = await fetch('/api/pois?res=' + res)
+  return r.ok ? r.json() : { kinds: [], pois: [] }
+}
+
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export async function getEvolution(base) {
   const r = await fetch('/api/evolution?base=' + base)

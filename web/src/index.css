@@ -479,13 +479,18 @@ img.evo-avatar { object-fit: cover; }
   .filter-toggle { display: inline-flex; }
 }
 
-/* ── 实时地图页 ── */
-.map-loc { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+/* ── 实时地图页(无工具栏:地图占满整页) ── */
 /* 地图页占满 .content 剩余高度:纯 flex 逐层撑满(不用百分比高度,避免 flex 项高度对百分比
    子元素不算「确定高度」导致塌陷)。仅地图页把 .content 变 flex 列(:has 作用域,不影响他页)。 */
 .content:has(.map-page) { display: flex; flex-direction: column; }
 .map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.map-page .toolbar { flex: none; }
+/* 左侧图层栏 + 地图(栏宽同宠物列表的筛选栏);两列一起撑满 .map-page 的剩余高度。 */
+.map-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 312px 1fr; gap: 16px; }
+@media (min-width: 761px) {
+  /* 桌面:图层栏随地图一起撑满高度,不用 .filters 那套 sticky + 视口高度(地图页本就不滚动)。
+     必须限定在桌面断点内:否则(同为单类选择器、且写在后面)会盖掉移动端把 .filters 变抽屉的规则。 */
+  .map-filters { position: static; max-height: none; height: 100%; }
+}
 /* 视口:地图软件式窗口,内部地图层可平移缩放;flex:1 填满剩余高度。 */
 .map-vp {
   position: relative;
@@ -520,6 +525,41 @@ img.evo-avatar { object-fit: cover; }
 }
 .map-btn:hover { border-color: var(--accent); }
 .map-btn.on { color: var(--accent); border-color: var(--accent); }
+/* 图层抽屉入口:桌面隐藏(侧栏常驻),窄屏浮在地图左下角。必须写在 .map-btn 之后,否则被其
+   display:flex 盖掉。 */
+.map-layers-btn { display: none; left: 10px; bottom: 10px; right: auto; }
+
+/* POI 标记(炼金釜/魔力之源/…):在 .map-world 内按底图归一化坐标定位,尺寸恒定不随缩放变大,
+   故用 translate(-50%,-50%) 把图标中心对准锚点。
+   解包图标**不是方的**(魔力之源 54×66、庇护所 62×58…),故只定高、宽度按原始比例自适应
+   (width:auto + height 固定);写死等宽高会把竖长的图标横向拉伸。 */
+.map-poi {
+  position: absolute; width: auto; height: 26px;
+  transform: translate(-50%, -50%);
+  user-select: none; -webkit-user-drag: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
+}
+/* 收集模式下「已确认还在」的眠枭之星:描一圈金色,与尚未走到过的候选点区分开。 */
+.map-poi.sure { filter: drop-shadow(0 0 3px #ffd54a) drop-shadow(0 0 6px #ffd54a); }
+/* 收集模式的说明文字 */
+.map-star-stat { font-size: 12px; line-height: 1.5; }
+/* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数。图标同样只定高不定宽(见上)。 */
+.map-layer-btn {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line);
+  color: var(--fg-dim); font-size: 13px; line-height: 1; cursor: pointer; text-align: left;
+}
+.map-layer-btn img { width: auto; height: 22px; display: block; flex: none; }
+.map-layer-name { flex: 1; }
+.map-layer-btn:hover { border-color: var(--accent); }
+.map-layer-btn.on { color: var(--fg); border-color: var(--accent); }
+.map-layer-btn:not(.on) img { filter: grayscale(1); opacity: .45; } /* 关闭态:图标灰掉 */
+
+/* 窄屏:图层栏收进侧滑抽屉(同宠物列表的筛选),地图占满整宽,左下角浮出图层入口。 */
+@media (max-width: 760px) {
+  .map-layout { grid-template-columns: 1fr; }
+  .map-layers-btn { display: flex; }
+}
 
 .map-nomap {
   max-width: 760px; margin: 0 auto; padding: 40px 20px; text-align: center;

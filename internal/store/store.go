@@ -124,6 +124,19 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE TABLE IF NOT EXISTS sessions (
   conn_id TEXT PRIMARY KEY, key BLOB, account TEXT, updated_at INTEGER
 );
+-- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
+-- 没有实体——已收集的星星服务器不刷,见 docs/data.md 3.4)。没有行 = 尚未确认(前端照常显示)。
+CREATE TABLE IF NOT EXISTS star_state (
+  account TEXT NOT NULL, refresh_id INTEGER,
+  state INTEGER, updated_at INTEGER,
+  PRIMARY KEY(account, refresh_id)
+);
+-- 服务器口径的按区域收集进度(进场景包下发);区域收满即可整片隐藏,无需逐点走到。
+CREATE TABLE IF NOT EXISTS star_zone (
+  account TEXT NOT NULL, camp INTEGER, npc_id INTEGER,
+  got INTEGER, total INTEGER, updated_at INTEGER,
+  PRIMARY KEY(account, camp, npc_id)
+);
 `)
 	if err != nil {
 		return err
@@ -823,4 +836,105 @@ func nzb(p *pet.Pet) int {
 		return 0
 	}
 	return b2i(p.Shiny)
+}
+
+// ---- 眠枭之星收集状态(见 docs/data.md 3.4)----
+
+// 星星收集状态:未确认(无行)/未收集/已收集。
+const (
+	StarUncollected = 1 // 收到过该刷新点的 NPC 实体 ⇒ 还在原地,未收集
+	StarCollected   = 2 // 玩家走近了却没有该实体 ⇒ 已收集(已收集的星星服务器不刷)
+)
+
+// SetStarStates 批量记录星星刷新点的收集状态(按账号 upsert)。
+func (s *Store) SetStarStates(account string, states map[int32]int) error {
+	if len(states) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO star_state(account, refresh_id, state, updated_at) VALUES(?,?,?,?)
+		ON CONFLICT(account, refresh_id) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	now := time.Now().Unix()
+	for rid, st := range states {
+		if _, err := stmt.Exec(account, rid, st, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// StarStates 返回某账号已确认的星星状态(刷新点 id -> 状态)。
+func (s *Store) StarStates(account string) map[int32]int {
+	out := map[int32]int{}
+	rows, err := s.db.Query(`SELECT refresh_id, state FROM star_state WHERE account=?`, account)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rid int32
+		var st int
+		if rows.Scan(&rid, &st) == nil {
+			out[rid] = st
+		}
+	}
+	return out
+}
+
+// ZoneProgressRow 是某账号某区域某类星星的收集进度(服务器口径)。
+type ZoneProgressRow struct {
+	Camp  int32 `json:"camp"`
+	NpcID int32 `json:"npc"`
+	Got   int32 `json:"got"`
+	Total int32 `json:"tot"`
+}
+
+// SetStarZones 覆盖写入某账号的按区域收集进度(进场景包每次都给全量)。
+func (s *Store) SetStarZones(account string, rows []ZoneProgressRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO star_zone(account, camp, npc_id, got, total, updated_at) VALUES(?,?,?,?,?,?)
+		ON CONFLICT(account, camp, npc_id) DO UPDATE SET got=excluded.got, total=excluded.total, updated_at=excluded.updated_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	now := time.Now().Unix()
+	for _, r := range rows {
+		if _, err := stmt.Exec(account, r.Camp, r.NpcID, r.Got, r.Total, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// StarZones 返回某账号的按区域收集进度。
+func (s *Store) StarZones(account string) []ZoneProgressRow {
+	var out []ZoneProgressRow
+	rows, err := s.db.Query(`SELECT camp, npc_id, got, total FROM star_zone WHERE account=?`, account)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r ZoneProgressRow
+		if rows.Scan(&r.Camp, &r.NpcID, &r.Got, &r.Total) == nil {
+			out = append(out, r)
+		}
+	}
+	return out
 }

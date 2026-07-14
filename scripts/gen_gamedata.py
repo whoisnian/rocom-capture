@@ -334,29 +334,15 @@ for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
 # 只收录有 map_resource(即有切片图)的层;地表条目(无图,用底图)跳过。
 #
 # 层的 scene_res:LAYERED 表有就用(洞穴层=10003);家园层该列为空,只能从其区域行补(=30001)。
-# AREA_CONF(8.4MB,未 vendored)只在 NRC_AREA_DIR(默认 Downloads)存在时读;不存在时保留上一版
-# names.json 已烘焙的 res(故常规无需 Downloads 即可重跑;更新地图时才需)。
-AREA_DIR = os.environ.get("NRC_AREA_DIR", os.path.expanduser("~/Downloads/NRC/Content/ScriptC/Data/Bin"))
-
-
-def _area_rows(t):
-    return decode_bin.decode_file(
-        os.path.join(AREA_DIR, "BinDataCompressed", t + ".bytes"),
-        schema_path=os.path.join(AREA_DIR, "BinConf", t + ".non"),
-    )["RocoDataRows"]
+# AREA_CONF/AREA_FUNC_CONF 已随仓库 vendored(为 POI 坐标一并入库,见下方「大地图 POI」)。
+area_conf = rows("AREA_CONF.json")
+area_func = rows("AREA_FUNC_CONF.json")
 
 
 # 层 id -> 该层区域所属 scene_res_id(用于填补 LAYERED 表 scene_res_id 为空的家园层=30001)。
 def _extract_layer_res():
-    if not os.path.exists(os.path.join(AREA_DIR, "BinDataCompressed", "AREA_CONF.bytes")):
-        old = os.path.join(OUT, "names.json")  # 保留旧 names.json 的 res(无 AREA_CONF 时不丢)
-        if os.path.exists(old):
-            with open(old, encoding="utf-8") as f:
-                prev = json.load(f).get("layers", {})
-            return {k: v["res"] for k, v in prev.items() if v.get("res")}
-        return {}
-    af = {str(int(r["id"])): r for r in _area_rows("AREA_FUNC_CONF").values()}
-    ac = {str(int(r["id"])): r for r in _area_rows("AREA_CONF").values()}
+    af = {str(int(r["id"])): r for r in area_func.values()}
+    ac = {str(int(r["id"])): r for r in area_conf.values()}
     out = {}
     for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
         afid = v.get("area_func_id")
@@ -394,6 +380,141 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
         "afid": int(v.get("area_func_id") or 0),  # 服务器区域进/出事件的 area_func_id,据此选层
     }
 
+# ---- 大地图 POI(实时地图页的图标图层,见 docs/data.md 3.3)----
+# WORLD_MAP_CONF 是「地图元素」表:每行一个可在大地图/罗盘显示的元素,带图标(npcicon_* /
+# areaicon_* / npcicon_levelup)与文案(element_text_name),但**没有坐标**。坐标要再走两跳:
+#   WORLD_MAP_CONF.npc_refresh_ids → NPC_REFRESH_CONTENT_CONF.refresh_param
+#     refresh_type=1 → AREA_CONF[param].center_xyz          (炼金釜/魔力之源/守护地…)
+#     refresh_type=4 → SCENE_OBJECT_CONF[param].position_xyz(眠枭庇护所,actor 名 BP_NPCOwl_*)
+# 注意 SCENE_OBJECT_AWARD 与 SCENE_OBJECT_CONF **id 相同但含义不同**(前者是可采集物),别取错表。
+#
+# 眠枭之星是特例:它那 4 行(30000-30003)没有 npc_refresh_ids,绑定方向是反的——
+# NPC_CONF.min_map_disappear 存的是 WORLD_MAP_CONF.id(字段名像「小地图消失距离」,实为外键:
+# 全表仅 9 行有此列,值 100% 是合法的 WORLD_MAP_CONF.id,且全是眠枭之星系 NPC)。故从 NPC 反查
+# 其刷新行再取坐标。A1=蓝、A2=黄(与 gen_icons.py 的 owl_worldmap_fruit_A1=蓝色精灵果实一致)。
+#
+# 图层清单(k=键 / n=中文 / icon=图标原始文件名,须在 gen_icons.py 的 WORLDMAP 组里 / on=默认开启)。
+# icon 同时是**匹配依据**:该图标出现在 WORLD_MAP_CONF 行的任意图标字段即算属于本图层。
+POI_KINDS = [
+    {"k": "mana",        "n": "魔力之源",       "icon": "Interestplace_Campinglan_png",         "on": True},
+    {"k": "alchemy",     "n": "炼金釜",         "icon": "Alchemy_png",                          "on": True},
+    {"k": "guard",       "n": "守护地",         "icon": "Interestplace_Underground_Unlock_png"},
+    {"k": "owl_big",     "n": "大型眠枭庇护所", "icon": "img_gaojimianxiao_weifangman_png"},
+    {"k": "owl_small",   "n": "小型眠枭庇护所", "icon": "img_dijimianxiao_weifangman_png"},
+    {"k": "star_blue",   "n": "蓝色眠枭之星",   "icon": "img_miaoxianzhixing_lan_png"},
+    {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png"},
+]
+
+npc_refresh = rows("NPC_REFRESH_CONTENT_CONF.json")
+scene_object = rows("SCENE_OBJECT_CONF.json")
+npc_conf = rows("NPC_CONF.json")
+world_map = rows("WORLD_MAP_CONF.json")
+
+# 只收「游戏里确实会显示」的元素:WORLD_MAP_CONF 有 9 个显示开关(大地图/小地图/罗盘 × 未探索/
+# 已探索/未完成)。全空 = 纯触发体,游戏从不画它——如魔力之源的 5 行「空npc,用于分层地图切换」
+# (wmc 54001-54005,散落在真实魔力之源 65-260m 外,不加此过滤会在图上多出 5 个假图标)。
+# 不能只看大地图开关:眠枭之星按设计只上小地图/罗盘(大地图三个开关全空),那样会被全部误杀。
+SHOW_FLAGS = [f"{s}_in_{m}" for m in ("map", "minimap", "compass")
+              for s in ("unexplored", "explored", "unfinished")]
+world_map_all = world_map  # 区域行(1-35)没有显示标志,会被下面滤掉,故先留一份原表给 zones 用
+world_map = {k: w for k, w in world_map.items() if any(w.get(f) for f in SHOW_FLAGS)}
+
+
+# ---- 区域(zone)与眠枭之星的归属 ----
+# 眠枭之星在**游戏内按区域计数**(商店街周边/月牙湖岸/风眠圣所…),服务器在进场景包里下发
+# 「每区域已收集/总数」(见 docs/data.md 3.4)。它用的区域键是该区域营地(魔力之源)的刷新点 id:
+#   WORLD_MAP_CONF 的 1-35 号行 = 区域行(zone_name + camp_refresh_id)。
+# 区域的**地理范围**不在区域行里(其 name_area_id 只是大地图上的地名锚点,单顶点),而是
+# AREA_CONF 里一批以区域名命名的多边形(editor_name[0] == zone_name,34/35 个区域有,缺「圣羽祭台」)。
+# 星点落在哪个多边形内就属于哪个区域;落不进任何多边形的点 z=0(前端一律显示,不做区域隐藏)。
+#
+# 注意:配置里的候选星点(474)比服务器统计的总数(312)多——有些点位实际不刷。这不影响用途:
+# 区域未收满时全显示;收满时该区域的星星确实都已收集,连带隐藏多余候选点也无妨。
+zone_name = {}   # camp_refresh_id -> 区域名
+zone_polys = {}  # 区域名 -> [多边形(顶点 xy 列表)]
+for v in world_map_all.values():
+    if v.get("zone_name") and v.get("camp_refresh_id"):
+        zone_name[int(v["camp_refresh_id"])] = v["zone_name"]
+_name2camp = {n: c for c, n in zone_name.items()}
+for v in area_conf.values():
+    en = v.get("editor_name") or []
+    pts = [p["position_xyz"] for p in (v.get("pos") or []) if p.get("position_xyz")]
+    if len(pts) >= 3 and en and en[0] in _name2camp and v.get("scene_res_id") == 10003:
+        zone_polys.setdefault(en[0], []).append([(int(p[0]), int(p[1])) for p in pts])
+
+
+def _in_poly(x, y, poly):
+    """射线法:点在多边形内(只用 x/y,区域是平面划分)。"""
+    inside, n = False, len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            inside = not inside
+    return inside
+
+
+def zone_of(x, y):
+    """星点 → 所属区域的营地 id(即服务器进度里的区域键);不在任何区域内返回 0。"""
+    for name, polys in zone_polys.items():
+        if any(_in_poly(x, y, p) for p in polys):
+            return _name2camp[name]
+    return 0
+
+
+def _poi_pos(refresh_id):
+    """刷新行 → (scene_res_id, x, y);禁用行(disable)与解不出坐标的返回 None。"""
+    r = npc_refresh.get(str(int(refresh_id)))
+    if not r or r.get("disable"):  # 策划留的废弃/未启用点位
+        return None
+    p = r.get("refresh_param")
+    row = area_conf.get(str(int(p))) if p else None
+    if row and r.get("refresh_type") == 1:
+        xyz, res = row.get("center_xyz"), row.get("scene_res_id")
+    else:
+        row = scene_object.get(str(int(p))) if p else None
+        if not row:
+            return None
+        xyz, res = row.get("position_xyz"), row.get("scene_res_conf_id")
+    if not (xyz and res):
+        return None
+    return int(res), int(xyz[0]), int(xyz[1])
+
+
+# pois: scene_res_id -> [{k:图层键, x, y, n:名称}](世界坐标,厘米;Go 侧用 maps 的同一投影换算成
+# 底图归一化 uv,见 gamedata.Project——投影公式只此一处)。只收有底图的场景:其余(副本/独立洞穴
+# 场景)无从投影。洞穴/楼层的点仍属地表 res(如 10003),会照常落在底图上。
+pois = {}
+for kind in POI_KINDS:
+    icon, seen = kind["icon"], set()
+    wids = {k for k, w in world_map.items() if icon in json.dumps(w, ensure_ascii=False)}
+    # 正向:地图元素行自带刷新点
+    todo = [(w, r) for k, w in world_map.items() if k in wids for r in (w.get("npc_refresh_ids") or [])]
+    # 反向:NPC_CONF.min_map_disappear 指回地图元素行(眠枭之星)
+    npcs = {int(n["id"]) for n in npc_conf.values()
+            if n.get("min_map_disappear") and str(int(n["min_map_disappear"])) in wids}
+    if npcs:
+        todo += [(npc_conf[str(int(r["npc_id"]))], int(r["id"])) for r in npc_refresh.values()
+                 if r.get("npc_id") and int(r["npc_id"]) in npcs]
+    for owner, rid in todo:
+        if rid in seen:
+            continue
+        seen.add(rid)
+        got = _poi_pos(rid)
+        if not got:
+            continue
+        res, x, y = got
+        if str(res) not in maps:
+            continue
+        name = owner.get("element_text_name") or owner.get("name") or kind["n"]
+        # r=刷新点 id(NPC_REFRESH_CONTENT_CONF.id):服务器下发的 NPC 实体带同一个 id
+        #   (ActorInfo.npc.npc_base.npc_content_cfg_id),据此把实体对回这个点位。见 docs/data.md 3.4。
+        # z=所属区域的营地 id(仅眠枭之星需要;见下方 zones)。
+        e = {"k": kind["k"], "r": rid, "x": x, "y": y, "n": name}
+        if kind["k"].startswith("star"):
+            e["z"] = zone_of(x, y)
+        pois.setdefault(str(res), []).append(e)
+
 data = {
     "species": species,
     # 蛋组: id -> {name:社区流行名, desc:官方描述}。petbase[].eg 引用这些 id。
@@ -406,6 +527,13 @@ data = {
     "maps": maps,
     # 分层地图(洞穴/地下层):层id -> {名称,组,scene_res,层图,cave前缀,投影 ox/oy/side}。见上。
     "layers": layers,
+    # 大地图 POI(实时地图页可开关的图标图层):poi_kinds 是图层清单(有序,on=默认开启),
+    # pois 是 scene_res_id -> [{k:图层键, r:刷新点id, x, y, n:名称, z:所属区域(仅星星)}]。
+    # 见上与 docs/data.md 3.3/3.4。
+    "poi_kinds": POI_KINDS,
+    "pois": pois,
+    # 区域: 营地(魔力之源)刷新点 id -> 区域名。服务器的眠枭之星收集进度按此键下发(3.4)。
+    "zones": {str(k): v for k, v in zone_name.items()},
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
     "nature_effect": nature_effect,
     "skill_dam_type": enum_dim("SkillDamType"),

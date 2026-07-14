@@ -102,6 +102,28 @@ type DB struct {
 	sceneRes    map[string]sceneRes // scene_res_cfg_id -> {名称, 所属 scene_cfg_id}
 	maps        map[uint32]MapInfo  // 有大地图底图的 scene_res_cfg_id -> 投影参数
 	layers      []LayerInfo         // 分层地图(洞穴/地下层),按 cave_name 前缀/位置定位
+	poiKinds    []POIKind           // 大地图 POI 图层清单(有序,前端开关)
+	pois        map[uint32][]POI    // scene_res_cfg_id -> 该场景的 POI(世界坐标)
+	zones       map[string]string   // 区域(营地 id) -> 区域名;眠枭之星收集进度按此键统计
+}
+
+// POIKind 是一类大地图 POI(实时地图页的一个可开关图层),取自 names.json 的 poi_kinds。
+type POIKind struct {
+	K    string `json:"k"`    // 图层键(alchemy/mana/…),与 POI.K 对应
+	N    string `json:"n"`    // 中文名(炼金釜/魔力之源…)
+	Icon string `json:"icon"` // 图标原始文件名;Go 侧拼 worldmap/<原名>.webp
+	On   bool   `json:"on"`   // 默认开启(魔力之源、炼金釜)
+}
+
+// POI 是一个大地图标记点(世界坐标,厘米)。名称取自 WORLD_MAP_CONF.element_text_name
+// (如「月牙湖岸的魔力之源」),无名时退到图层名。坐标来源与提取见 docs/data.md 3.3。
+type POI struct {
+	K string `json:"k"` // 所属图层键
+	R int32  `json:"r"` // 刷新点 id(NPC_REFRESH_CONTENT_CONF.id);服务器下发的 NPC 实体带同一个 id
+	X int32  `json:"x"` // 世界坐标 X(厘米)
+	Y int32  `json:"y"` // 世界坐标 Y
+	N string `json:"n"` // 名称(悬停显示)
+	Z int32  `json:"z"` // 所属区域(营地 id;仅眠枭之星有,0=不属任何区域)
 }
 
 // sceneRes 是一个场景资源(scene_res_cfg_id)的名称与所属场景(scene_cfg_id)。
@@ -198,6 +220,9 @@ func Load() (*DB, error) {
 			Side int32  `json:"side"`
 			Afid uint32 `json:"afid"`
 		} `json:"layers"`
+		POIKinds []POIKind         `json:"poi_kinds"`
+		POIs     map[string][]POI  `json:"pois"`  // scene_res_id -> 该场景 POI(世界坐标)
+		Zones    map[string]string `json:"zones"` // 营地 id -> 区域名
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
 		return nil, err
@@ -257,12 +282,21 @@ func Load() (*DB, error) {
 			Img: v.Img, OX: v.OX, OY: v.OY, Side: v.Side, AreaFunc: v.Afid})
 	}
 	sort.Slice(layers, func(i, j int) bool { return layers[i].ID < layers[j].ID })
+	pois := make(map[uint32][]POI, len(raw.POIs))
+	for k, v := range raw.POIs {
+		if res, err := strconv.ParseUint(k, 10, 32); err == nil {
+			pois[uint32(res)] = v
+		}
+	}
 	return &DB{
 		scenes:       raw.Scenes,
 		sceneDefRes:  raw.SceneDefaultRes,
 		sceneRes:     raw.SceneRes,
 		maps:         maps,
 		layers:       layers,
+		poiKinds:     raw.POIKinds,
+		pois:         pois,
+		zones:        raw.Zones,
 		species:      raw.Species,
 		nature:       raw.Nature,
 		skillDamType: raw.SkillDamType,
@@ -531,6 +565,18 @@ func (db *DB) StaticIcon(sem string) string { return db.iconPath("static", db.st
 func (db *DB) MedalIcon(medalID uint32) string {
 	return db.iconPath("medal", db.medalIcons[key(medalID)])
 }
+
+// POIKinds 返回大地图 POI 图层清单(有序:魔力之源、炼金釜、守护地、庇护所、眠枭之星)。
+func (db *DB) POIKinds() []POIKind { return db.poiKinds }
+
+// POIIcon 返回 POI 图层的图标路径 worldmap/<原名>.webp;未 embed 时空串。
+func (db *DB) POIIcon(kind POIKind) string { return db.iconPath("worldmap", kind.Icon) }
+
+// POIs 返回某场景的全部 POI(世界坐标);无底图的场景不收录,返回 nil。
+func (db *DB) POIs(resID uint32) []POI { return db.pois[resID] }
+
+// ZoneName 返回区域名(键为该区域营地(魔力之源)的刷新点 id,即服务器收集进度里的区域键)。
+func (db *DB) ZoneName(camp int32) string { return db.zones[key(uint32(camp))] }
 
 // TalentRate 返回天分评价名(talent_rank)。
 func (db *DB) TalentRate(rank uint32) string { return db.talentRate[key(rank)] }

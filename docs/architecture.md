@@ -108,7 +108,8 @@
 | `GET /api/filter-options` | 各筛选维度的可选值(`?account=`) |
 | `GET /api/stats` | 统计(当前账号宠物总数,`?account=`) |
 | `GET /api/position` | 当前账号最近一次位置(地图页初始回显);超过 4s 未更新则抹掉速度(不给前端外推) |
-| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|debug\|position, account, data}` |
+| `GET /api/pois` | 某场景(`?res=<scene_res_cfg_id>`)的大地图 POI:图层清单 + 已投影为底图归一化 u/v 的标记点;眠枭之星另带收集状态与按区域进度(见 docs/data.md 3.3/3.4) |
+| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|debug\|position\|stars\|starzones, account, data}` |
 | `GET /*` | 前端 SPA(未匹配路径回退 index.html) |
 
 > 除 `/api/accounts` 与静态数据(`/api/medals`、`/api/evolution`)外,读接口均按 `?account=`
