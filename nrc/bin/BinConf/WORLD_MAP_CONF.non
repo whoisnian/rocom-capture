@@ -1,0 +1,515 @@
+{
+    "Name": "WORLD_MAP_CONF",
+    "Type": "EStruct",
+    "UniqueKey": "id",
+    "Properties": [
+        {
+            "Name": "id",
+            "Type": "EInt32",
+            "Offset": 0,
+            "Size": 4
+        },
+        {
+            "Name": "map_show_type",
+            "Type": "EInt32",
+            "Offset": 4,
+            "Size": 4
+        },
+        {
+            "Name": "area_func_ids",
+            "Type": "EInt32",
+            "Offset": 8,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "npc_refresh_ids",
+            "Type": "EInt32",
+            "Offset": 12,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "npc_conf_id",
+            "Type": "EInt32",
+            "Offset": 16,
+            "Size": 4
+        },
+        {
+            "Name": "auto_explored_area",
+            "Type": "EUint32",
+            "Offset": 20,
+            "Size": 4
+        },
+        {
+            "Name": "dungeon_id",
+            "Type": "EUint32",
+            "Offset": 24,
+            "Size": 4
+        },
+        {
+            "Name": "map_show_location",
+            "Type": "EInt32",
+            "Offset": 28,
+            "Size": 4
+        },
+        {
+            "Name": "area_func_id_inter",
+            "Type": "EInt32",
+            "Offset": 32,
+            "Size": 4
+        },
+        {
+            "Name": "storyflag_id",
+            "Type": "EInt32",
+            "Offset": 36,
+            "Size": 4
+        },
+        {
+            "Name": "icon_priority",
+            "Type": "EUint32",
+            "Offset": 40,
+            "Size": 4
+        },
+        {
+            "Name": "default_track",
+            "Type": "EBool",
+            "Offset": 44,
+            "Size": 1
+        },
+        {
+            "Name": "default_track_worldmap",
+            "Type": "EBool",
+            "Offset": 45,
+            "Size": 1
+        },
+        {
+            "Name": "default_track_loop",
+            "Type": "EBool",
+            "Offset": 46,
+            "Size": 1
+        },
+        {
+            "Name": "name_area_id",
+            "Type": "EInt32",
+            "Offset": 47,
+            "Size": 4
+        },
+        {
+            "Name": "zone_name",
+            "Type": "ELocalizedString",
+            "Offset": 51,
+            "Size": 4
+        },
+        {
+            "Name": "camp_refresh_id",
+            "Type": "EUint32",
+            "Offset": 55,
+            "Size": 4
+        },
+        {
+            "Name": "unexplored_in_compass",
+            "Type": "EUint32",
+            "Offset": 59,
+            "Size": 4
+        },
+        {
+            "Name": "explored_in_compass",
+            "Type": "EUint32",
+            "Offset": 63,
+            "Size": 4
+        },
+        {
+            "Name": "unfinished_in_compass",
+            "Type": "EUint32",
+            "Offset": 67,
+            "Size": 4
+        },
+        {
+            "Name": "unexplored_in_minimap",
+            "Type": "EUint32",
+            "Offset": 71,
+            "Size": 4
+        },
+        {
+            "Name": "explored_in_minimap",
+            "Type": "EUint32",
+            "Offset": 75,
+            "Size": 4
+        },
+        {
+            "Name": "unfinished_in_minimap",
+            "Type": "EUint32",
+            "Offset": 79,
+            "Size": 4
+        },
+        {
+            "Name": "h_detection_range",
+            "Type": "EString",
+            "Offset": 83,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "v_detection_range",
+            "Type": "EString",
+            "Offset": 87,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "unexplored_in_map",
+            "Type": "EUint32",
+            "Offset": 91,
+            "Size": 4
+        },
+        {
+            "Name": "explored_in_map",
+            "Type": "EUint32",
+            "Offset": 95,
+            "Size": 4
+        },
+        {
+            "Name": "unfinished_in_map",
+            "Type": "EUint32",
+            "Offset": 99,
+            "Size": 4
+        },
+        {
+            "Name": "areaicon_unexplore",
+            "Type": "EString",
+            "Offset": 103,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "areaicon_explore",
+            "Type": "EString",
+            "Offset": 107,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "areaicon_unfinished",
+            "Type": "EString",
+            "Offset": 111,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_lock",
+            "Type": "EString",
+            "Offset": 115,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_unlock",
+            "Type": "EString",
+            "Offset": 119,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_corner_unlock",
+            "Type": "EString",
+            "Offset": 123,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_color_unlock",
+            "Type": "EString",
+            "Offset": 127,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_unfinished",
+            "Type": "EString",
+            "Offset": 131,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "map_markicon",
+            "Type": "EString",
+            "Offset": 135,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "compass_markicon",
+            "Type": "EString",
+            "Offset": 139,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "npcicon_levelup",
+            "Type": "EStruct",
+            "Offset": 143,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 4,
+            "Struct": {
+                "Name": "WORLD_MAP_CONF.npcicon_levelup",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "level",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4
+                    },
+                    {
+                        "Name": "icon",
+                        "Type": "EString",
+                        "Offset": 4,
+                        "Size": 4,
+                        "CompressedSize": 4
+                    }
+                ]
+            }
+        },
+        {
+            "Name": "teleport_rule_id",
+            "Type": "EInt32",
+            "Offset": 147,
+            "Size": 4
+        },
+        {
+            "Name": "teleport_id",
+            "Type": "EInt32",
+            "Offset": 151,
+            "Size": 4
+        },
+        {
+            "Name": "teleport_text",
+            "Type": "EString",
+            "Offset": 155,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "teleport_flag",
+            "Type": "EInt32",
+            "Offset": 159,
+            "Size": 4
+        },
+        {
+            "Name": "special_teleport_rule_id",
+            "Type": "EInt32",
+            "Offset": 163,
+            "Size": 4
+        },
+        {
+            "Name": "special_teleport",
+            "Type": "EInt32",
+            "Offset": 167,
+            "Size": 4
+        },
+        {
+            "Name": "special_teleport_text",
+            "Type": "EString",
+            "Offset": 171,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "special_teleport_flag",
+            "Type": "EInt32",
+            "Offset": 175,
+            "Size": 4
+        },
+        {
+            "Name": "map_func_icon_group",
+            "Type": "EInt32",
+            "Offset": 179,
+            "Size": 4
+        },
+        {
+            "Name": "layered_id",
+            "Type": "EUint32",
+            "Offset": 183,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "unlock_zone",
+            "Type": "EUint32",
+            "Offset": 187,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "element_show_scale",
+            "Type": "EInt32",
+            "Offset": 191,
+            "Size": 4
+        },
+        {
+            "Name": "lock_element_show_top",
+            "Type": "EInt32",
+            "Offset": 195,
+            "Size": 4
+        },
+        {
+            "Name": "unlock_element_show_top",
+            "Type": "EInt32",
+            "Offset": 199,
+            "Size": 4
+        },
+        {
+            "Name": "map_tips_show_type",
+            "Type": "EInt32",
+            "Offset": 203,
+            "Size": 4
+        },
+        {
+            "Name": "map_tips_param",
+            "Type": "EInt32",
+            "Offset": 207,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "is_challenge",
+            "Type": "EBool",
+            "Offset": 211,
+            "Size": 1
+        },
+        {
+            "Name": "element_text_name",
+            "Type": "ELocalizedString",
+            "Offset": 212,
+            "Size": 4
+        },
+        {
+            "Name": "world_map_NPCicon_des",
+            "Type": "EString",
+            "Offset": 216,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "worldmap_npc_des",
+            "Type": "ELocalizedString",
+            "Offset": 220,
+            "Size": 4
+        },
+        {
+            "Name": "picked_mark_tips_icon",
+            "Type": "EString",
+            "Offset": 224,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "unpicked_mark_tips_icon",
+            "Type": "EString",
+            "Offset": 228,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "unlock_warn_tips",
+            "Type": "EString",
+            "Offset": 232,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "dungeon_type_des",
+            "Type": "EString",
+            "Offset": 236,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "dungeon_title_bg",
+            "Type": "EString",
+            "Offset": 240,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "dungeon_interface_bg_path",
+            "Type": "EString",
+            "Offset": 244,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "zone_name_roco",
+            "Type": "EString",
+            "Offset": 248,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
+            "Name": "name_scale",
+            "Type": "EInt32",
+            "Offset": 252,
+            "Size": 4
+        },
+        {
+            "Name": "is_invisible",
+            "Type": "EInt32",
+            "Offset": 256,
+            "Size": 4
+        },
+        {
+            "Name": "area_id",
+            "Type": "EInt32",
+            "Offset": 260,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "pet_base_id",
+            "Type": "EInt32",
+            "Offset": 264,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "belong_to_season",
+            "Type": "EUint32",
+            "Offset": 268,
+            "Size": 4
+        },
+        {
+            "Name": "is_hide_init",
+            "Type": "EBool",
+            "Offset": 272,
+            "Size": 1
+        },
+        {
+            "Name": "bonus_default_track_loop",
+            "Type": "EInt32",
+            "Offset": 273,
+            "Size": 4
+        },
+        {
+            "Name": "default_track_type",
+            "Type": "EInt32",
+            "Offset": 277,
+            "Size": 4
+        },
+        {
+            "Name": "shine_rongduan_icon",
+            "Type": "EString",
+            "Offset": 281,
+            "Size": 4,
+            "CompressedSize": 4
+        }
+    ]
+}

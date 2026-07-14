@@ -1,0 +1,162 @@
+{
+    "Name": "AREA_CONF",
+    "Type": "EStruct",
+    "UniqueKey": "id",
+    "Properties": [
+        {
+            "Name": "id",
+            "Type": "EUint32",
+            "Offset": 0,
+            "Size": 4
+        },
+        {
+            "Name": "scene_res_id",
+            "Type": "EUint32",
+            "Offset": 4,
+            "Size": 4
+        },
+        {
+            "Name": "scene_id",
+            "Type": "EUint32",
+            "Offset": 8,
+            "Size": 4
+        },
+        {
+            "Name": "editor_name",
+            "Type": "EString",
+            "Offset": 12,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 3
+        },
+        {
+            "Name": "area_type",
+            "Type": "EInt32",
+            "Offset": 16,
+            "Size": 4
+        },
+        {
+            "Name": "is_visible",
+            "Type": "EBool",
+            "Offset": 20,
+            "Size": 1
+        },
+        {
+            "Name": "is_special",
+            "Type": "EBool",
+            "Offset": 21,
+            "Size": 1
+        },
+        {
+            "Name": "is_teleport",
+            "Type": "EBool",
+            "Offset": 22,
+            "Size": 1
+        },
+        {
+            "Name": "is_bt_use",
+            "Type": "EBool",
+            "Offset": 23,
+            "Size": 1
+        },
+        {
+            "Name": "area_layer",
+            "Type": "EInt32",
+            "Offset": 24,
+            "Size": 4
+        },
+        {
+            "Name": "stealth_on",
+            "Type": "EUint32",
+            "Offset": 28,
+            "Size": 4
+        },
+        {
+            "Name": "is_open",
+            "Type": "EInt32",
+            "Offset": 32,
+            "Size": 4
+        },
+        {
+            "Name": "area_height",
+            "Type": "EUint32",
+            "Offset": 36,
+            "Size": 4
+        },
+        {
+            "Name": "pos",
+            "Type": "EStruct",
+            "Offset": 40,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 70,
+            "Struct": {
+                "Name": "AREA_CONF.pos",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "position_xyz",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "DynamicArray": true
+                    },
+                    {
+                        "Name": "rotation_xyz",
+                        "Type": "EInt32",
+                        "Offset": 4,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "DynamicArray": true
+                    }
+                ]
+            }
+        },
+        {
+            "Name": "pos_empty",
+            "Type": "EStruct",
+            "Offset": 44,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 14,
+            "Struct": {
+                "Name": "AREA_CONF.pos_empty",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "position_xyz",
+                        "Type": "EInt32",
+                        "Offset": 0,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "DynamicArray": true
+                    },
+                    {
+                        "Name": "rotation_xyz",
+                        "Type": "EInt32",
+                        "Offset": 4,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "DynamicArray": true
+                    }
+                ]
+            }
+        },
+        {
+            "Name": "center_xyz",
+            "Type": "EInt32",
+            "Offset": 48,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "falcon_map_data_id",
+            "Type": "EString",
+            "Offset": 52,
+            "Size": 4,
+            "CompressedSize": 4
+        }
+    ]
+}
