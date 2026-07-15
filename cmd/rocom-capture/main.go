@@ -160,10 +160,15 @@ func (ls *layerState) settle(l gamedata.LayerInfo, ok bool, now time.Time) (game
 
 // ---- 眠枭之星收集判定(见 docs/data.md 3.4)----
 //
-// 已收集的星星服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
+// 星/光点:已收集的服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
 //
 //	收到某点的实体          ⇒ 未收集
 //	走到某点附近却没有实体  ⇒ 已收集
+//
+// 石像**不同**:本体收集后不消失、实体一直下发,「出现/消失」不携带收集信息;它的星是实体上的
+// 挂件,状态就在实体里(scene.NpcActor.Pendant),触碰收集时客户端发挂件交互(0x0272,带刷新行
+// id)。故石像看挂件定状态、只在挂件交互成功时判「刚收走」,不参与「实体离开=被收走」的判定;
+// 而 seen 的语义(true ⇒ 未收集)对石像同样成立(挂件已收的石像不置 seen),扫描逻辑无需分叉。
 //
 // AOI 是**按格子**下发的(配置里有「跨aoi拆分」的区域),不是圆形半径:实测多次出现「更远的实体
 // 下发了、更近的没下发」。故不能拿单一半径当 AOI 边界,只能取一个**保守判定半径**——4 份 pcap 里
@@ -332,6 +337,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	layerByConn := map[string]*layerState{} // connID -> 分层地图去抖状态(见 layerDebounce)
 	starByConn := map[string]*starTracker{} // connID -> 眠枭之星收集判定(见 starTracker)
 	starKnown := map[string]map[int32]int{} // account -> 已确认的星星状态(库内快照,只写增量)
+	pendantByConn := map[string]int32{}     // connID -> 最近一次挂件交互(0x0272)的刷新行 id,等回包确认
 	if saved, err := st.LoadSessionScenes(); err == nil {
 		for id, s := range saved {
 			sceneByConn[id] = s.Res
@@ -385,8 +391,25 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		st.SetStarStates(acc, diff)
 		srv.Hub().Broadcast("stars", acc, diff)
 	}
+	// starSee 收录一个星星系实体:星/光点按「出现 ⇒ 未收集」;石像按挂件状态定收集与否
+	// (本体常驻,出现不代表未收集),且不进 ts.actor——「实体离开 = 被收走」对石像不成立。
+	starSee := func(ts *starTracker, a scene.NpcActor, states map[int32]int) {
+		if a.IsStatue() {
+			if a.Pendant == scene.PendantCollected {
+				delete(ts.seen, a.RefreshID)
+				states[a.RefreshID] = store.StarCollected
+			} else { // 挂件未收集;个别实体缺挂件字段时也保守视作未收集(宁可多显示)
+				ts.seen[a.RefreshID] = true
+				states[a.RefreshID] = store.StarUncollected
+			}
+			return
+		}
+		ts.seen[a.RefreshID] = true
+		ts.actor[a.ActorID] = a.RefreshID
+		states[a.RefreshID] = store.StarUncollected
+	}
 	// starObserve 收下一个 AOI 通知里的星星实体进/离(0x0413/0x0414)。
-	// 实体进入 ⇒ 该点未收集;实体离开且玩家就在旁边 ⇒ 刚被收走(走远出 AOI 的离开不算,故看距离)。
+	// 实体进入 ⇒ 见 starSee;实体离开且玩家就在旁边 ⇒ 刚被收走(走远出 AOI 的离开不算,故看距离)。
 	starObserve := func(conn, acc string, body []byte, pos map[string]any) {
 		ts := starByConn[conn]
 		if ts == nil {
@@ -395,9 +418,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		states := map[int32]int{}
 		for _, a := range scene.ParseActorEnter(body) {
 			if a.IsStar() && a.RefreshID != 0 {
-				ts.seen[a.RefreshID] = true
-				ts.actor[a.ActorID] = a.RefreshID
-				states[a.RefreshID] = store.StarUncollected
+				starSee(ts, a, states)
 			}
 		}
 		for _, id := range scene.ParseActorLeave(body) {
@@ -559,18 +580,20 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			}
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpEnterSceneFinishAck:
-			// 周边实体快照:进场景/传送后一次性给出 AOI 内的实体。星星实体 ⇒ 那些点未收集。
+			// 周边实体快照:进场景/传送后一次性给出 AOI 内的实体。星/光点实体 ⇒ 那些点未收集;
+			// 石像实体按挂件状态直接定收集与否(见 starSee)。
 			ts := starByConn[m.Session]
 			if ts == nil {
 				continue
 			}
+			states := map[int32]int{}
 			for _, a := range scene.ParseSceneActors(m.AppBody) {
 				if a.IsStar() && a.RefreshID != 0 {
-					ts.seen[a.RefreshID] = true
-					ts.actor[a.ActorID] = a.RefreshID
+					starSee(ts, a, states)
 				}
 			}
 			ts.snapAt = m.Time
+			starSave(acc, states)
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpTeleportNotify:
 			tp, ok := scene.ParseTeleport(m.AppBody)
@@ -592,6 +615,26 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsBatchNotify:
 			starObserve(m.Session, acc, m.AppBody, lastPos[acc])
+			continue
+		case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcPendantInteractReq:
+			// 触碰石像上浮现的星:请求直接带石像刷新行 id,等回包(0x0273)确认后判已收集。
+			if rid, ok := scene.ParsePendantInteract(m.AppBody); ok {
+				pendantByConn[m.Session] = rid
+			}
+			continue
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpNpcPendantInteractRsp:
+			rid := pendantByConn[m.Session]
+			delete(pendantByConn, m.Session)
+			ts := starByConn[m.Session]
+			if rid == 0 || ts == nil || !scene.ParsePendantInteractRsp(m.AppBody) {
+				continue
+			}
+			// 只认当前场景确有该刷新点的 POI(其它 NPC 的挂件交互对不上星点,自然被滤掉)。
+			if starPos(db, ts.res, rid) == ([2]int32{}) {
+				continue
+			}
+			delete(ts.seen, rid)
+			starSave(acc, map[int32]int{rid: store.StarCollected})
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
 			// 同一个通知里既有区域进/出(选层),也有 AOI 实体进/离(星星收集判定)。

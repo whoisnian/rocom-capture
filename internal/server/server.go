@@ -225,7 +225,7 @@ type poiPoint struct {
 	St int     `json:"st,omitempty"` // 收集状态:0 未确认 / 1 未收集 / 2 已收集
 }
 
-// zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的蓝/黄/光点)。
+// zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的独立星/光点/石像)。
 type zoneProgress struct {
 	Camp int32  `json:"camp"` // 区域键(营地 id),与 poiPoint.Z 对应
 	Name string `json:"name"` // 区域名(商店街周边…)

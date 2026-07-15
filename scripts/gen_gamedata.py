@@ -388,13 +388,8 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
 #     refresh_type=4 → SCENE_OBJECT_CONF[param].position_xyz(眠枭庇护所,actor 名 BP_NPCOwl_*)
 # 注意 SCENE_OBJECT_AWARD 与 SCENE_OBJECT_CONF **id 相同但含义不同**(前者是可采集物),别取错表。
 #
-# 眠枭之星是特例:它那 4 行(30000-30003)没有 npc_refresh_ids,绑定方向是反的——
-# NPC_CONF.min_map_disappear 存的是 WORLD_MAP_CONF.id(字段名像「小地图消失距离」,实为外键:
-# 全表仅 9 行有此列,值 100% 是合法的 WORLD_MAP_CONF.id,且全是眠枭之星系 NPC)。故从 NPC 反查
-# 其刷新行再取坐标。A1=蓝、A2=黄(与 gen_icons.py 的 owl_worldmap_fruit_A1=蓝色精灵果实一致)。
-#
 # 图层清单(k=键 / n=中文 / icon=图标原始文件名,须在 gen_icons.py 的 WORLDMAP 组里 / on=默认开启)。
-# icon 同时是**匹配依据**:该图标出现在 WORLD_MAP_CONF 行的任意图标字段即算属于本图层。
+# 非星星图层的 icon 同时是**匹配依据**:该图标出现在 WORLD_MAP_CONF 行的任意图标字段即算属于本图层。
 POI_KINDS = [
     {"k": "mana",        "n": "魔力之源",       "icon": "Interestplace_Campinglan_png",         "on": True},
     {"k": "alchemy",     "n": "炼金釜",         "icon": "Alchemy_png",                          "on": True},
@@ -405,15 +400,32 @@ POI_KINDS = [
     {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png"},
 ]
 
+# 眠枭之星图层不走 WORLD_MAP 匹配,按 NPC_CONF id 白名单直取刷新行。口径 = 攻略/游戏总数:
+# 一颗星 = 独立星(55162/55163)+ 光点(55500/55510,交互后出一颗星)+ 石像(58308/58318,
+# 星星魔法命中后浮现一颗星,触碰收集;本体不消失,判定特殊,见 docs/data.md 3.4)。
+# 蓝 147 = 98(96@10003+2@10013 风眠圣所)+28+21;黄 228 = 138+55+35。
+# A1=蓝、A2=黄(WORLD_MAP 30000/30001 的图标为 lan/huang;当年靠 NPC_CONF.min_map_disappear
+# 反查发现这批 NPC——该字段名像「小地图消失距离」,实为 WORLD_MAP_CONF.id 外键)。
+# 明确**排除**(否则蓝会虚增到 224、黄 194,见 docs/data.md 3.3):
+#   - 55162 中 editor_name 带「眠枭石像N」的 94 行:石像关联的奖励星预设落点(51 单星 +
+#     43 多星行,Σmax_num=277),实测收集走石像实体的挂件、这些行未见刷出,不是常驻点位;
+#   - 50206「增加血上限_眠枭之星」(任务/隐藏特殊星,6 行)与 50240(editor_name「准备废弃的
+#     数据」,1 行 2 星):都不在游戏区域计数与攻略总数里;
+#   - 55196/55197(掉落版)、55530(挖光点):无刷新行,列出仅为完备。
+STAR_NPCS = {
+    "star_blue":   {55162: "眠枭之星", 55500: "眠枭之星光点", 58308: "眠枭石像"},
+    "star_yellow": {55163: "眠枭之星", 55510: "眠枭之星光点", 58318: "眠枭石像"},
+}
+
 npc_refresh = rows("NPC_REFRESH_CONTENT_CONF.json")
 scene_object = rows("SCENE_OBJECT_CONF.json")
-npc_conf = rows("NPC_CONF.json")
 world_map = rows("WORLD_MAP_CONF.json")
 
 # 只收「游戏里确实会显示」的元素:WORLD_MAP_CONF 有 9 个显示开关(大地图/小地图/罗盘 × 未探索/
 # 已探索/未完成)。全空 = 纯触发体,游戏从不画它——如魔力之源的 5 行「空npc,用于分层地图切换」
 # (wmc 54001-54005,散落在真实魔力之源 65-260m 外,不加此过滤会在图上多出 5 个假图标)。
-# 不能只看大地图开关:眠枭之星按设计只上小地图/罗盘(大地图三个开关全空),那样会被全部误杀。
+# 不能只看大地图开关:有的元素按设计只上小地图/罗盘(如眠枭之星,大地图三个开关全空)。
+# 该过滤只影响 WORLD_MAP 匹配的图层;眠枭之星走 STAR_NPCS 白名单,不经此表。
 SHOW_FLAGS = [f"{s}_in_{m}" for m in ("map", "minimap", "compass")
               for s in ("unexplored", "explored", "unfinished")]
 world_map_all = world_map  # 区域行(1-35)没有显示标志,会被下面滤掉,故先留一份原表给 zones 用
@@ -487,15 +499,22 @@ def _poi_pos(refresh_id):
 pois = {}
 for kind in POI_KINDS:
     icon, seen = kind["icon"], set()
-    wids = {k for k, w in world_map.items() if icon in json.dumps(w, ensure_ascii=False)}
-    # 正向:地图元素行自带刷新点
-    todo = [(w, r) for k, w in world_map.items() if k in wids for r in (w.get("npc_refresh_ids") or [])]
-    # 反向:NPC_CONF.min_map_disappear 指回地图元素行(眠枭之星)
-    npcs = {int(n["id"]) for n in npc_conf.values()
-            if n.get("min_map_disappear") and str(int(n["min_map_disappear"])) in wids}
-    if npcs:
-        todo += [(npc_conf[str(int(r["npc_id"]))], int(r["id"])) for r in npc_refresh.values()
-                 if r.get("npc_id") and int(r["npc_id"]) in npcs]
+    if kind["k"] in STAR_NPCS:
+        # 眠枭之星:按 npc 白名单直取刷新行(构成与排除项见 STAR_NPCS 注释)
+        star = STAR_NPCS[kind["k"]]
+        todo = []
+        for r in npc_refresh.values():
+            nid = int(r.get("npc_id") or 0)
+            if nid not in star:
+                continue
+            # 独立星里 editor_name 带「石像」的行是石像关联的奖励星预设落点(未见刷出),不算点位
+            if nid in (55162, 55163) and any("石像" in str(e) for e in (r.get("editor_name") or [])):
+                continue
+            todo.append(({"name": star[nid]}, int(r["id"])))
+    else:
+        wids = {k for k, w in world_map.items() if icon in json.dumps(w, ensure_ascii=False)}
+        # 地图元素行自带刷新点
+        todo = [(w, r) for k, w in world_map.items() if k in wids for r in (w.get("npc_refresh_ids") or [])]
     for owner, rid in todo:
         if rid in seen:
             continue
