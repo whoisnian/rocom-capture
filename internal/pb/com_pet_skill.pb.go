@@ -427,12 +427,13 @@ func (x *SkillRecord) GetRestraintCnt3() int32 {
 }
 
 type PetSkillInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkillData     []*PetSkillData        `protobuf:"bytes,1,rep,name=skill_data,json=skillData" json:"skill_data,omitempty"`
-	HappySkillIds []uint32               `protobuf:"varint,2,rep,name=happy_skill_ids,json=happySkillIds" json:"happy_skill_ids,omitempty"`
-	AngrySkillIds []uint32               `protobuf:"varint,3,rep,name=angry_skill_ids,json=angrySkillIds" json:"angry_skill_ids,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	SkillData                []*PetSkillData        `protobuf:"bytes,1,rep,name=skill_data,json=skillData" json:"skill_data,omitempty"`
+	HappySkillIds            []uint32               `protobuf:"varint,2,rep,name=happy_skill_ids,json=happySkillIds" json:"happy_skill_ids,omitempty"`
+	AngrySkillIds            []uint32               `protobuf:"varint,3,rep,name=angry_skill_ids,json=angrySkillIds" json:"angry_skill_ids,omitempty"`
+	UnlearnedSkillUseRecords []*PetSkillRecord      `protobuf:"bytes,4,rep,name=unlearned_skill_use_records,json=unlearnedSkillUseRecords" json:"unlearned_skill_use_records,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *PetSkillInfo) Reset() {
@@ -482,6 +483,13 @@ func (x *PetSkillInfo) GetHappySkillIds() []uint32 {
 func (x *PetSkillInfo) GetAngrySkillIds() []uint32 {
 	if x != nil {
 		return x.AngrySkillIds
+	}
+	return nil
+}
+
+func (x *PetSkillInfo) GetUnlearnedSkillUseRecords() []*PetSkillRecord {
+	if x != nil {
+		return x.UnlearnedSkillUseRecords
 	}
 	return nil
 }
@@ -808,12 +816,13 @@ const file_com_pet_skill_proto_rawDesc = "" +
 	"\aresult2\x18\x05 \x01(\rR\aresult2\x12%\n" +
 	"\x0erestraint_cnt1\x18\x06 \x01(\x05R\rrestraintCnt1\x12%\n" +
 	"\x0erestraint_cnt2\x18\a \x01(\x05R\rrestraintCnt2\x12%\n" +
-	"\x0erestraint_cnt3\x18\b \x01(\x05R\rrestraintCnt3\"\xb7\x01\n" +
+	"\x0erestraint_cnt3\x18\b \x01(\x05R\rrestraintCnt3\"\x8c\x02\n" +
 	"\fPetSkillInfo\x121\n" +
 	"\n" +
 	"skill_data\x18\x01 \x03(\v2\x12.Next.PetSkillDataR\tskillData\x12&\n" +
 	"\x0fhappy_skill_ids\x18\x02 \x03(\rR\rhappySkillIds\x12&\n" +
-	"\x0fangry_skill_ids\x18\x03 \x03(\rR\rangrySkillIds\"$\n" +
+	"\x0fangry_skill_ids\x18\x03 \x03(\rR\rangrySkillIds\x12S\n" +
+	"\x1bunlearned_skill_use_records\x18\x04 \x03(\v2\x14.Next.PetSkillRecordR\x18unlearnedSkillUseRecords\"$\n" +
 	"\vCOUNT_LIMIT\x12\x15\n" +
 	"\x10SKILL_DATA_COUNT\x10\xc8\x01\"F\n" +
 	"\vPetPosition\x12\x15\n" +
@@ -871,16 +880,17 @@ var file_com_pet_skill_proto_goTypes = []any{
 var file_com_pet_skill_proto_depIdxs = []int32{
 	1,  // 0: Next.PetSkillData.carryon_info:type_name -> Next.PetCarryonInfo
 	2,  // 1: Next.PetSkillInfo.skill_data:type_name -> Next.PetSkillData
-	11, // 2: Next.PetPosition.pos:type_name -> Next.Position
-	6,  // 3: Next.PetCastAura.pet_pos_info:type_name -> Next.PetPosition
-	7,  // 4: Next.PetCastAura.cast_info:type_name -> Next.CastInfo
-	6,  // 5: Next.PetRemoveAura.pet_pos_info:type_name -> Next.PetPosition
-	9,  // 6: Next.PetRemoveAura.remove_info:type_name -> Next.BattleRemoveAuraInfo
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	3,  // 2: Next.PetSkillInfo.unlearned_skill_use_records:type_name -> Next.PetSkillRecord
+	11, // 3: Next.PetPosition.pos:type_name -> Next.Position
+	6,  // 4: Next.PetCastAura.pet_pos_info:type_name -> Next.PetPosition
+	7,  // 5: Next.PetCastAura.cast_info:type_name -> Next.CastInfo
+	6,  // 6: Next.PetRemoveAura.pet_pos_info:type_name -> Next.PetPosition
+	9,  // 7: Next.PetRemoveAura.remove_info:type_name -> Next.BattleRemoveAuraInfo
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_com_pet_skill_proto_init() }

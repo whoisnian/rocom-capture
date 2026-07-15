@@ -398,24 +398,42 @@ POI_KINDS = [
     {"k": "owl_small",   "n": "小型眠枭庇护所", "icon": "img_dijimianxiao_weifangman_png"},
     {"k": "star_blue",   "n": "蓝色眠枭之星",   "icon": "img_miaoxianzhixing_lan_png"},
     {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png"},
+    {"k": "star_purple", "n": "紫色眠枭之星",   "icon": "img_miaoxianzhixing_zi_png"},
 ]
 
 # 眠枭之星图层不走 WORLD_MAP 匹配,按 NPC_CONF id 白名单直取刷新行。口径 = 攻略/游戏总数:
-# 一颗星 = 独立星(55162/55163)+ 光点(55500/55510,交互后出一颗星)+ 石像(58308/58318,
-# 星星魔法命中后浮现一颗星,触碰收集;本体不消失,判定特殊,见 docs/data.md 3.4)。
-# 蓝 147 = 98(96@10003+2@10013 风眠圣所)+28+21;黄 228 = 138+55+35。
-# A1=蓝、A2=黄(WORLD_MAP 30000/30001 的图标为 lan/huang;当年靠 NPC_CONF.min_map_disappear
-# 反查发现这批 NPC——该字段名像「小地图消失距离」,实为 WORLD_MAP_CONF.id 外键)。
+# 一颗星 = 独立星 + 光点(交互后出一颗星)+ 石像(星星魔法命中后浮现一颗星,触碰收集;
+# 本体不消失,判定特殊,见 docs/data.md 3.4)。
+# 蓝 147 = 98(96@10003+2@10013 风眠圣所)+28+21;黄 228 = 138+55+35;紫 104 = 60+26+18。
+# A1=蓝、A2=黄、A2-2=紫(WORLD_MAP 30000/30001/30004 的图标为 lan/huang/zi;靠
+# NPC_CONF.min_map_disappear 反查发现这批 NPC——该字段名像「小地图消失距离」,实为
+# WORLD_MAP_CONF.id 外键;石像无此绑定,从 NPC_PENDANT_CONF 的挂件星 npc_id 反推)。
 # 明确**排除**(否则蓝会虚增到 224、黄 194,见 docs/data.md 3.3):
-#   - 55162 中 editor_name 带「眠枭石像N」的 94 行:石像关联的奖励星预设落点(51 单星 +
-#     43 多星行,Σmax_num=277),实测收集走石像实体的挂件、这些行未见刷出,不是常驻点位;
-#   - 50206「增加血上限_眠枭之星」(任务/隐藏特殊星,6 行)与 50240(editor_name「准备废弃的
-#     数据」,1 行 2 星):都不在游戏区域计数与攻略总数里;
-#   - 55196/55197(掉落版)、55530(挖光点):无刷新行,列出仅为完备。
+#   - 独立星里**刷新区域是多顶点**的行:石像关联的奖励星预设落点(蓝 94 行:51 单星 + 43 多星,
+#     区域 2/6/12 顶点),实测收集走石像实体的挂件、这些行未见刷出,不是常驻点位。真星点的
+#     刷新区域全部只有 1 个顶点(三色全量验证),该几何判别与被剥离的 editor_name「眠枭石像N」
+#     标注完全重合,且对新版新增的星族免维护(紫独立星 60 行无奖励行);
+#   - 只带共享/无挂件的装饰石像 NPC(58303-58305/58313-58316/55633/55635/55636,共 248 行):
+#     行 id 不在 NPC_PENDANT_CONF 里 = 石像上没挂自己的星,不算点位(带星石像行 id 与挂件表
+#     行 id 一一对应,挂件星 npc=50206/50240/50270 分别为蓝/黄/紫);
+#   - 50206「增加血上限_眠枭之星」(任务/隐藏特殊星,6 行)与 50240(「准备废弃的数据」,
+#     1 行 2 星):虽是挂件星/特殊星 npc,不在攻略总数里,也不进游戏区域计数;
+#   - 55196/55197/55198(掉落版)、55530(挖光点)、50270(紫挂件星)、55002-55005:无启用刷新行。
 STAR_NPCS = {
     "star_blue":   {55162: "眠枭之星", 55500: "眠枭之星光点", 58308: "眠枭石像"},
     "star_yellow": {55163: "眠枭之星", 55510: "眠枭之星光点", 58318: "眠枭石像"},
+    "star_purple": {55601: "眠枭之星", 55602: "眠枭之星光点", 55632: "眠枭石像"},
 }
+STAR_STANDALONE = {55162, 55163, 55601}  # 独立星(要做多顶点奖励行排除的就这一形态)
+STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_CONF 里)
+
+npc_pendant = rows("NPC_PENDANT_CONF.json")
+
+# 2026-07 版起 editor_name 等策划字段从发布数据剥离;区域多边形识别改走该版前提取的快照
+# (行 id 跨版本稳定,实测新版行集与顶点均原样)。新增区域需人工补快照(现有新区无星星,不影响)。
+with open(os.path.join(os.path.dirname(__file__), "legacy_editor_names.json"), encoding="utf-8") as f:
+    _legacy = json.load(f)
+LEGACY_ZONE_POLYGON_AREAS = {int(k): v for k, v in _legacy["zone_polygon_areas"].items()}
 
 npc_refresh = rows("NPC_REFRESH_CONTENT_CONF.json")
 scene_object = rows("SCENE_OBJECT_CONF.json")
@@ -437,7 +455,8 @@ world_map = {k: w for k, w in world_map.items() if any(w.get(f) for f in SHOW_FL
 # 「每区域已收集/总数」(见 docs/data.md 3.4)。它用的区域键是该区域营地(魔力之源)的刷新点 id:
 #   WORLD_MAP_CONF 的 1-35 号行 = 区域行(zone_name + camp_refresh_id)。
 # 区域的**地理范围**不在区域行里(其 name_area_id 只是大地图上的地名锚点,单顶点),而是
-# AREA_CONF 里一批以区域名命名的多边形(editor_name[0] == zone_name,34/35 个区域有,缺「圣羽祭台」)。
+# AREA_CONF 里一批以区域名命名的多边形(editor_name[0] == zone_name,34/35 个区域有,缺「圣羽祭台」;
+# editor_name 剥离后靠 LEGACY_ZONE_POLYGON_AREAS 按行 id 回退。2026-07 版新增的 8 区没有星星,无需多边形)。
 # 星点落在哪个多边形内就属于哪个区域;落不进任何多边形的点 z=0(前端一律显示,不做区域隐藏)。
 #
 # 注意:配置里的候选星点(474)比服务器统计的总数(312)多——有些点位实际不刷。这不影响用途:
@@ -448,11 +467,12 @@ for v in world_map_all.values():
     if v.get("zone_name") and v.get("camp_refresh_id"):
         zone_name[int(v["camp_refresh_id"])] = v["zone_name"]
 _name2camp = {n: c for c, n in zone_name.items()}
-for v in area_conf.values():
+for k, v in area_conf.items():
     en = v.get("editor_name") or []
+    zn = en[0] if en and en[0] in _name2camp else LEGACY_ZONE_POLYGON_AREAS.get(int(k))
     pts = [p["position_xyz"] for p in (v.get("pos") or []) if p.get("position_xyz")]
-    if len(pts) >= 3 and en and en[0] in _name2camp and v.get("scene_res_id") == 10003:
-        zone_polys.setdefault(en[0], []).append([(int(p[0]), int(p[1])) for p in pts])
+    if len(pts) >= 3 and zn and v.get("scene_res_id") == 10003:
+        zone_polys.setdefault(zn, []).append([(int(p[0]), int(p[1])) for p in pts])
 
 
 def _in_poly(x, y, poly):
@@ -507,8 +527,14 @@ for kind in POI_KINDS:
             nid = int(r.get("npc_id") or 0)
             if nid not in star:
                 continue
-            # 独立星里 editor_name 带「石像」的行是石像关联的奖励星预设落点(未见刷出),不算点位
-            if nid in (55162, 55163) and any("石像" in str(e) for e in (r.get("editor_name") or [])):
+            # 独立星里石像关联的奖励星预设落点(未见刷出)不算点位:刷新区域是多顶点
+            # (真星点全部单顶点,判别依据见 STAR_NPCS 注释)
+            if nid in STAR_STANDALONE:
+                a = area_conf.get(str(int(r.get("refresh_param") or 0))) if r.get("refresh_type") == 1 else None
+                if a and len(a.get("pos") or []) > 1:
+                    continue
+            # 石像只算真挂着星的(行 id 在挂件表里);装饰石像 NPC 不在 STAR_NPCS,此查为防混入
+            if nid in STAR_STATUE and str(int(r["id"])) not in npc_pendant:
                 continue
             todo.append(({"name": star[nid]}, int(r["id"])))
     else:

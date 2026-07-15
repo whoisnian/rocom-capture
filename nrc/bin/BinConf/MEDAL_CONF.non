@@ -37,10 +37,9 @@
         },
         {
             "Name": "desc",
-            "Type": "EString",
+            "Type": "ELocalizedString",
             "Offset": 20,
-            "Size": 4,
-            "CompressedSize": 4
+            "Size": 4
         },
         {
             "Name": "flavor_text",

@@ -79,6 +79,7 @@ type PetTeam_PetInfo struct {
 	EquipInfos    []*PetSkillEquipInfo   `protobuf:"bytes,2,rep,name=equip_infos,json=equipInfos" json:"equip_infos,omitempty"`
 	IsTrialPet    *bool                  `protobuf:"varint,3,opt,name=is_trial_pet,json=isTrialPet" json:"is_trial_pet,omitempty"`
 	Type          *PetTypeInfo           `protobuf:"bytes,4,opt,name=type" json:"type,omitempty"`
+	RawPetGid     *uint32                `protobuf:"varint,5,opt,name=raw_pet_gid,json=rawPetGid" json:"raw_pet_gid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -141,6 +142,13 @@ func (x *PetTeam_PetInfo) GetType() *PetTypeInfo {
 	return nil
 }
 
+func (x *PetTeam_PetInfo) GetRawPetGid() uint32 {
+	if x != nil && x.RawPetGid != nil {
+		return *x.RawPetGid
+	}
+	return 0
+}
+
 type PetTeam struct {
 	state                        protoimpl.MessageState `protogen:"open.v1"`
 	PetInfos                     []*PetTeam_PetInfo     `protobuf:"bytes,2,rep,name=pet_infos,json=petInfos" json:"pet_infos,omitempty"`
@@ -154,6 +162,7 @@ type PetTeam struct {
 	MirrorFriendCardIconSelected *uint32                `protobuf:"varint,10,opt,name=mirror_friend_card_icon_selected,json=mirrorFriendCardIconSelected" json:"mirror_friend_card_icon_selected,omitempty"`
 	MirrorMagicId                *uint32                `protobuf:"varint,11,opt,name=mirror_magic_id,json=mirrorMagicId" json:"mirror_magic_id,omitempty"`
 	MirrorBossEvoItems           []uint32               `protobuf:"varint,12,rep,name=mirror_boss_evo_items,json=mirrorBossEvoItems" json:"mirror_boss_evo_items,omitempty"`
+	MirrorCopyTs                 *uint32                `protobuf:"varint,13,opt,name=mirror_copy_ts,json=mirrorCopyTs" json:"mirror_copy_ts,omitempty"`
 	unknownFields                protoimpl.UnknownFields
 	sizeCache                    protoimpl.SizeCache
 }
@@ -263,6 +272,13 @@ func (x *PetTeam) GetMirrorBossEvoItems() []uint32 {
 		return x.MirrorBossEvoItems
 	}
 	return nil
+}
+
+func (x *PetTeam) GetMirrorCopyTs() uint32 {
+	if x != nil && x.MirrorCopyTs != nil {
+		return *x.MirrorCopyTs
+	}
+	return 0
 }
 
 type PetSynchronInfo struct {
@@ -944,6 +960,7 @@ func (x *FriendPetTeamInfo) GetFriendIsMirrorUnlocked() bool {
 type FriendPetTeamIndex struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IndexString   *string                `protobuf:"bytes,1,opt,name=index_string,json=indexString" json:"index_string,omitempty"`
+	ShareBanUntil *uint32                `protobuf:"varint,3,opt,name=share_ban_until,json=shareBanUntil" json:"share_ban_until,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -983,6 +1000,13 @@ func (x *FriendPetTeamIndex) GetIndexString() string {
 		return *x.IndexString
 	}
 	return ""
+}
+
+func (x *FriendPetTeamIndex) GetShareBanUntil() uint32 {
+	if x != nil && x.ShareBanUntil != nil {
+		return *x.ShareBanUntil
+	}
+	return 0
 }
 
 type FriendPetTeamBufferFriendInfo struct {
@@ -1060,14 +1084,15 @@ const file_com_pet_team_proto_rawDesc = "" +
 	"\x12com_pet_team.proto\x12\x04Next\x1a\rcom_pet.proto\"5\n" +
 	"\x11PetSkillEquipInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x10\n" +
-	"\x03pos\x18\x02 \x01(\rR\x03pos\"\xad\x01\n" +
+	"\x03pos\x18\x02 \x01(\rR\x03pos\"\xcd\x01\n" +
 	"\x0fPetTeam_PetInfo\x12\x17\n" +
 	"\apet_gid\x18\x01 \x01(\rR\x06petGid\x128\n" +
 	"\vequip_infos\x18\x02 \x03(\v2\x17.Next.PetSkillEquipInfoR\n" +
 	"equipInfos\x12 \n" +
 	"\fis_trial_pet\x18\x03 \x01(\bR\n" +
 	"isTrialPet\x12%\n" +
-	"\x04type\x18\x04 \x01(\v2\x11.Next.PetTypeInfoR\x04type\"\xe7\x03\n" +
+	"\x04type\x18\x04 \x01(\v2\x11.Next.PetTypeInfoR\x04type\x12\x1e\n" +
+	"\vraw_pet_gid\x18\x05 \x01(\rR\trawPetGid\"\x8d\x04\n" +
 	"\aPetTeam\x122\n" +
 	"\tpet_infos\x18\x02 \x03(\v2\x15.Next.PetTeam_PetInfoR\bpetInfos\x12\x1b\n" +
 	"\tteam_name\x18\x03 \x01(\tR\bteamName\x12$\n" +
@@ -1080,7 +1105,8 @@ const file_com_pet_team_proto_rawDesc = "" +
 	" mirror_friend_card_icon_selected\x18\n" +
 	" \x01(\rR\x1cmirrorFriendCardIconSelected\x12&\n" +
 	"\x0fmirror_magic_id\x18\v \x01(\rR\rmirrorMagicId\x121\n" +
-	"\x15mirror_boss_evo_items\x18\f \x03(\rR\x12mirrorBossEvoItems\"=\n" +
+	"\x15mirror_boss_evo_items\x18\f \x03(\rR\x12mirrorBossEvoItems\x12$\n" +
+	"\x0emirror_copy_ts\x18\r \x01(\rR\fmirrorCopyTs\"=\n" +
 	"\x0fPetSynchronInfo\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\rR\x04type\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\rR\x06number\"\xa6\x01\n" +
@@ -1138,9 +1164,10 @@ const file_com_pet_team_proto_rawDesc = "" +
 	"friend_uin\x18\x04 \x01(\rR\tfriendUin\x12!\n" +
 	"\ffriend_level\x18\x05 \x01(\rR\vfriendLevel\x129\n" +
 	"\x19friend_card_icon_selected\x18\x06 \x01(\rR\x16friendCardIconSelected\x129\n" +
-	"\x19friend_is_mirror_unlocked\x18\a \x01(\bR\x16friendIsMirrorUnlocked\"7\n" +
+	"\x19friend_is_mirror_unlocked\x18\a \x01(\bR\x16friendIsMirrorUnlocked\"_\n" +
 	"\x12FriendPetTeamIndex\x12!\n" +
-	"\findex_string\x18\x01 \x01(\tR\vindexString\"\x8b\x01\n" +
+	"\findex_string\x18\x01 \x01(\tR\vindexString\x12&\n" +
+	"\x0fshare_ban_until\x18\x03 \x01(\rR\rshareBanUntil\"\x8b\x01\n" +
 	"\x1dFriendPetTeamBufferFriendInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\fR\x04name\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\rR\x05level\x12,\n" +

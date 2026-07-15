@@ -621,6 +621,58 @@ func (x *PlayerSceneInfo) GetCurrTime() int64 {
 	return 0
 }
 
+type OwlSanctuaryPetDiffInfo struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ClosenessExp   *int32                 `protobuf:"varint,1,opt,name=closeness_exp,json=closenessExp" json:"closeness_exp,omitempty"`
+	SpecialityData []int32                `protobuf:"varint,2,rep,name=speciality_data,json=specialityData" json:"speciality_data,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *OwlSanctuaryPetDiffInfo) Reset() {
+	*x = OwlSanctuaryPetDiffInfo{}
+	mi := &file_com_base_types_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwlSanctuaryPetDiffInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwlSanctuaryPetDiffInfo) ProtoMessage() {}
+
+func (x *OwlSanctuaryPetDiffInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_com_base_types_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwlSanctuaryPetDiffInfo.ProtoReflect.Descriptor instead.
+func (*OwlSanctuaryPetDiffInfo) Descriptor() ([]byte, []int) {
+	return file_com_base_types_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *OwlSanctuaryPetDiffInfo) GetClosenessExp() int32 {
+	if x != nil && x.ClosenessExp != nil {
+		return *x.ClosenessExp
+	}
+	return 0
+}
+
+func (x *OwlSanctuaryPetDiffInfo) GetSpecialityData() []int32 {
+	if x != nil {
+		return x.SpecialityData
+	}
+	return nil
+}
+
 var File_com_base_types_proto protoreflect.FileDescriptor
 
 const file_com_base_types_proto_rawDesc = "" +
@@ -672,7 +724,10 @@ const file_com_base_types_proto_rawDesc = "" +
 	"%destroy_failed_cellsvr_buspp_inst_ids\x18\v \x03(\x04R destroyFailedCellsvrBusppInstIds\x12\x1e\n" +
 	"\vtime_of_day\x18\f \x01(\x05R\ttimeOfDay\x12!\n" +
 	"\fweather_type\x18\r \x01(\x05R\vweatherType\x12\x1b\n" +
-	"\tcurr_time\x18\x0e \x01(\x03R\bcurrTime"
+	"\tcurr_time\x18\x0e \x01(\x03R\bcurrTime\"g\n" +
+	"\x17OwlSanctuaryPetDiffInfo\x12#\n" +
+	"\rcloseness_exp\x18\x01 \x01(\x05R\fclosenessExp\x12'\n" +
+	"\x0fspeciality_data\x18\x02 \x03(\x05R\x0especialityData"
 
 var (
 	file_com_base_types_proto_rawDescOnce sync.Once
@@ -686,19 +741,20 @@ func file_com_base_types_proto_rawDescGZIP() []byte {
 	return file_com_base_types_proto_rawDescData
 }
 
-var file_com_base_types_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_com_base_types_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_com_base_types_proto_goTypes = []any{
-	(*Position)(nil),        // 0: Next.Position
-	(*Position2D)(nil),      // 1: Next.Position2D
-	(*Point)(nil),           // 2: Next.Point
-	(*Rect)(nil),            // 3: Next.Rect
-	(*Rect2D)(nil),          // 4: Next.Rect2D
-	(*GlassInfo)(nil),       // 5: Next.GlassInfo
-	(*RecordItem)(nil),      // 6: Next.RecordItem
-	(*RecordItemList)(nil),  // 7: Next.RecordItemList
-	(*RecordFileData)(nil),  // 8: Next.RecordFileData
-	(*PlayerSceneInfo)(nil), // 9: Next.PlayerSceneInfo
-	(GlassType)(0),          // 10: dataconfig.GlassType
+	(*Position)(nil),                // 0: Next.Position
+	(*Position2D)(nil),              // 1: Next.Position2D
+	(*Point)(nil),                   // 2: Next.Point
+	(*Rect)(nil),                    // 3: Next.Rect
+	(*Rect2D)(nil),                  // 4: Next.Rect2D
+	(*GlassInfo)(nil),               // 5: Next.GlassInfo
+	(*RecordItem)(nil),              // 6: Next.RecordItem
+	(*RecordItemList)(nil),          // 7: Next.RecordItemList
+	(*RecordFileData)(nil),          // 8: Next.RecordFileData
+	(*PlayerSceneInfo)(nil),         // 9: Next.PlayerSceneInfo
+	(*OwlSanctuaryPetDiffInfo)(nil), // 10: Next.OwlSanctuaryPetDiffInfo
+	(GlassType)(0),                  // 11: dataconfig.GlassType
 }
 var file_com_base_types_proto_depIdxs = []int32{
 	0,  // 0: Next.Point.pos:type_name -> Next.Position
@@ -707,7 +763,7 @@ var file_com_base_types_proto_depIdxs = []int32{
 	0,  // 3: Next.Rect.size:type_name -> Next.Position
 	1,  // 4: Next.Rect2D.beg:type_name -> Next.Position2D
 	1,  // 5: Next.Rect2D.size:type_name -> Next.Position2D
-	10, // 6: Next.GlassInfo.glass_type:type_name -> dataconfig.GlassType
+	11, // 6: Next.GlassInfo.glass_type:type_name -> dataconfig.GlassType
 	6,  // 7: Next.RecordItemList.item_list:type_name -> Next.RecordItem
 	7,  // 8: Next.RecordFileData.battle_data:type_name -> Next.RecordItemList
 	2,  // 9: Next.PlayerSceneInfo.pt:type_name -> Next.Point
@@ -730,7 +786,7 @@ func file_com_base_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_com_base_types_proto_rawDesc), len(file_com_base_types_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

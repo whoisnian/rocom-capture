@@ -42,15 +42,9 @@
             "Size": 4
         },
         {
-            "Name": "monster_level_script",
-            "Type": "EInt32",
-            "Offset": 24,
-            "Size": 4
-        },
-        {
             "Name": "new_level",
             "Type": "EInt32",
-            "Offset": 28,
+            "Offset": 24,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -58,31 +52,31 @@
         {
             "Name": "difficulty",
             "Type": "EInt32",
-            "Offset": 32,
+            "Offset": 28,
             "Size": 4
         },
         {
             "Name": "shining_prob",
             "Type": "EUint32",
-            "Offset": 36,
+            "Offset": 32,
             "Size": 4
         },
         {
             "Name": "chaos_prob",
             "Type": "EUint32",
-            "Offset": 40,
+            "Offset": 36,
             "Size": 4
         },
         {
             "Name": "glass_prob",
             "Type": "EUint32",
-            "Offset": 44,
+            "Offset": 40,
             "Size": 4
         },
         {
             "Name": "custom_glass",
             "Type": "EStruct",
-            "Offset": 48,
+            "Offset": 44,
             "Size": 4,
             "CompressedSize": 4,
             "Struct": {
@@ -111,271 +105,77 @@
             }
         },
         {
-            "Name": "height_percent",
-            "Type": "EUint32",
-            "Offset": 52,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
             "Name": "voice_percent",
             "Type": "EUint32",
-            "Offset": 56,
+            "Offset": 48,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
-        },
-        {
-            "Name": "monster_carry_on",
-            "Type": "EStruct",
-            "Offset": 60,
-            "Size": 4,
-            "CompressedSize": 4,
-            "ArrayDim": 3,
-            "Struct": {
-                "Name": "MONSTER_CONF.monster_carry_on",
-                "Type": "EStruct",
-                "Properties": [
-                    {
-                        "Name": "carry_on_item",
-                        "Type": "EUint32",
-                        "Offset": 0,
-                        "Size": 4
-                    },
-                    {
-                        "Name": "carry_on_item_level",
-                        "Type": "EUint32",
-                        "Offset": 4,
-                        "Size": 4
-                    },
-                    {
-                        "Name": "carry_on_item_stage",
-                        "Type": "EUint32",
-                        "Offset": 8,
-                        "Size": 4
-                    }
-                ]
-            }
-        },
-        {
-            "Name": "habit_stage",
-            "Type": "EUint32",
-            "Offset": 64,
-            "Size": 4
-        },
-        {
-            "Name": "catch_pet_back_level",
-            "Type": "EUint32",
-            "Offset": 68,
-            "Size": 4
-        },
-        {
-            "Name": "active_skill1",
-            "Type": "EUint32",
-            "Offset": 72,
-            "Size": 4
-        },
-        {
-            "Name": "active_skill2",
-            "Type": "EUint32",
-            "Offset": 76,
-            "Size": 4
-        },
-        {
-            "Name": "active_skill3",
-            "Type": "EUint32",
-            "Offset": 80,
-            "Size": 4
-        },
-        {
-            "Name": "active_skill4",
-            "Type": "EUint32",
-            "Offset": 84,
-            "Size": 4
         },
         {
             "Name": "gender",
             "Type": "EUint32",
-            "Offset": 88,
+            "Offset": 52,
             "Size": 4
         },
         {
             "Name": "nature_id",
             "Type": "EUint32",
-            "Offset": 92,
+            "Offset": 56,
             "Size": 4
         },
         {
             "Name": "blood_id",
             "Type": "EUint32",
-            "Offset": 96,
+            "Offset": 60,
             "Size": 4
         },
         {
             "Name": "catch_difficulty",
             "Type": "EUint32",
-            "Offset": 100,
+            "Offset": 64,
             "Size": 4
         },
         {
             "Name": "Catch_difficulty_OverThreshold",
             "Type": "EUint32",
-            "Offset": 104,
+            "Offset": 68,
             "Size": 4
         },
         {
             "Name": "Catch_difficulty_UnderThreshold",
             "Type": "EUint32",
-            "Offset": 108,
+            "Offset": 72,
             "Size": 4
         },
         {
             "Name": "catch_prob_max",
             "Type": "EUint32",
-            "Offset": 112,
-            "Size": 4
-        },
-        {
-            "Name": "individuality_num",
-            "Type": "EUint32",
-            "Offset": 116,
-            "Size": 4
-        },
-        {
-            "Name": "break_times",
-            "Type": "EUint32",
-            "Offset": 120,
+            "Offset": 76,
             "Size": 4
         },
         {
             "Name": "inspire_time",
             "Type": "EUint32",
-            "Offset": 124,
+            "Offset": 80,
             "Size": 4
         },
         {
             "Name": "sharpen_data",
             "Type": "EUint32",
-            "Offset": 128,
+            "Offset": 84,
             "Size": 4
         },
         {
             "Name": "blunt_data",
             "Type": "EUint32",
-            "Offset": 132,
-            "Size": 4
-        },
-        {
-            "Name": "attr_enum_break_set",
-            "Type": "EUint32",
-            "Offset": 136,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
-            "Name": "individuality",
-            "Type": "EUint32",
-            "Offset": 140,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
-            "Name": "hp_max_plus",
-            "Type": "EUint32",
-            "Offset": 144,
-            "Size": 4
-        },
-        {
-            "Name": "phy_attack_plus",
-            "Type": "EUint32",
-            "Offset": 148,
-            "Size": 4
-        },
-        {
-            "Name": "spe_attack_plus",
-            "Type": "EUint32",
-            "Offset": 152,
-            "Size": 4
-        },
-        {
-            "Name": "phy_defence_plus",
-            "Type": "EUint32",
-            "Offset": 156,
-            "Size": 4
-        },
-        {
-            "Name": "spe_defence_plus",
-            "Type": "EUint32",
-            "Offset": 160,
-            "Size": 4
-        },
-        {
-            "Name": "speed_plus",
-            "Type": "EUint32",
-            "Offset": 164,
-            "Size": 4
-        },
-        {
-            "Name": "hp_max_upper_mag",
-            "Type": "EUint32",
-            "Offset": 168,
-            "Size": 4
-        },
-        {
-            "Name": "phy_attack_upper_mag",
-            "Type": "EUint32",
-            "Offset": 172,
-            "Size": 4
-        },
-        {
-            "Name": "spe_attack_upper_mag",
-            "Type": "EUint32",
-            "Offset": 176,
-            "Size": 4
-        },
-        {
-            "Name": "phy_defence_upper_mag",
-            "Type": "EUint32",
-            "Offset": 180,
-            "Size": 4
-        },
-        {
-            "Name": "spe_defence_upper_mag",
-            "Type": "EUint32",
-            "Offset": 184,
-            "Size": 4
-        },
-        {
-            "Name": "speed_upper_mag",
-            "Type": "EUint32",
-            "Offset": 188,
-            "Size": 4
-        },
-        {
-            "Name": "level_skill_id",
-            "Type": "EUint32",
-            "Offset": 192,
-            "Size": 4
-        },
-        {
-            "Name": "level_skill_find_enum",
-            "Type": "EInt32",
-            "Offset": 196,
-            "Size": 4
-        },
-        {
-            "Name": "skill_find_param",
-            "Type": "EUint32",
-            "Offset": 200,
+            "Offset": 88,
             "Size": 4
         },
         {
             "Name": "exp_award_fight_stage",
             "Type": "EUint32",
-            "Offset": 204,
+            "Offset": 92,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -383,110 +183,39 @@
         {
             "Name": "exp_award_catch_stage",
             "Type": "EUint32",
-            "Offset": 208,
+            "Offset": 96,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
-        },
-        {
-            "Name": "defeat_award",
-            "Type": "EUint32",
-            "Offset": 212,
-            "Size": 4
-        },
-        {
-            "Name": "catch_award",
-            "Type": "EUint32",
-            "Offset": 216,
-            "Size": 4
-        },
-        {
-            "Name": "glass_award",
-            "Type": "EUint32",
-            "Offset": 220,
-            "Size": 4
-        },
-        {
-            "Name": "exp_award_throwcatch_stage",
-            "Type": "EUint32",
-            "Offset": 224,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
-            "Name": "mf_behavior_tree_fight",
-            "Type": "EString",
-            "Offset": 228,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
-            "Name": "pre_type",
-            "Type": "EUint32",
-            "Offset": 232,
-            "Size": 4
-        },
-        {
-            "Name": "pre_num",
-            "Type": "EInt32",
-            "Offset": 236,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
-            "Name": "monster_bornmagic",
-            "Type": "EUint32",
-            "Offset": 240,
-            "Size": 4
-        },
-        {
-            "Name": "unit_skill",
-            "Type": "EUint32",
-            "Offset": 244,
-            "Size": 4
-        },
-        {
-            "Name": "bottle_reward_switch",
-            "Type": "EBool",
-            "Offset": 248,
-            "Size": 1
         },
         {
             "Name": "model_scale",
             "Type": "EUint32",
-            "Offset": 249,
+            "Offset": 100,
             "Size": 4
         },
         {
             "Name": "is_nightmare",
             "Type": "EUint32",
-            "Offset": 253,
+            "Offset": 104,
             "Size": 4
         },
         {
             "Name": "buff_icon_offset_z",
             "Type": "EInt32",
-            "Offset": 257,
+            "Offset": 108,
             "Size": 4
         },
         {
             "Name": "difficulty_level",
             "Type": "EUint32",
-            "Offset": 261,
+            "Offset": 112,
             "Size": 4
         },
         {
             "Name": "death_exist",
             "Type": "EUint32",
-            "Offset": 265,
-            "Size": 4
-        },
-        {
-            "Name": "monitor_data_version",
-            "Type": "EUint32",
-            "Offset": 269,
+            "Offset": 116,
             "Size": 4
         }
     ]

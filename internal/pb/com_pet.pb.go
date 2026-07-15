@@ -234,9 +234,10 @@ func (PetDataBitFlag) EnumDescriptor() ([]byte, []int) {
 type PetBusinessIdentity int32
 
 const (
-	PetBusinessIdentity_PBI_NONE       PetBusinessIdentity = 0
-	PetBusinessIdentity_PBI_HOME_PET   PetBusinessIdentity = 1
-	PetBusinessIdentity_PBI_HOME_GUARD PetBusinessIdentity = 2
+	PetBusinessIdentity_PBI_NONE         PetBusinessIdentity = 0
+	PetBusinessIdentity_PBI_HOME_PET     PetBusinessIdentity = 1
+	PetBusinessIdentity_PBI_HOME_GUARD   PetBusinessIdentity = 2
+	PetBusinessIdentity_PBI_PVE_CHANGING PetBusinessIdentity = 3
 )
 
 // Enum value maps for PetBusinessIdentity.
@@ -245,11 +246,13 @@ var (
 		0: "PBI_NONE",
 		1: "PBI_HOME_PET",
 		2: "PBI_HOME_GUARD",
+		3: "PBI_PVE_CHANGING",
 	}
 	PetBusinessIdentity_value = map[string]int32{
-		"PBI_NONE":       0,
-		"PBI_HOME_PET":   1,
-		"PBI_HOME_GUARD": 2,
+		"PBI_NONE":         0,
+		"PBI_HOME_PET":     1,
+		"PBI_HOME_GUARD":   2,
+		"PBI_PVE_CHANGING": 3,
 	}
 )
 
@@ -293,37 +296,52 @@ func (PetBusinessIdentity) EnumDescriptor() ([]byte, []int) {
 type PetStatusFlag int32
 
 const (
-	PetStatusFlag_THROW_IN_SCENE            PetStatusFlag = 1
-	PetStatusFlag_MIRACLE_CHANGING          PetStatusFlag = 2
-	PetStatusFlag_NEW_IN_BAG                PetStatusFlag = 4
-	PetStatusFlag_MONSTER_PET               PetStatusFlag = 8
-	PetStatusFlag_CAN_MODIFY_PET_NAME       PetStatusFlag = 16
-	PetStatusFlag_TASK_FORCE_LOCK           PetStatusFlag = 32
-	PetStatusFlag_TASK_TOGETHER_MARKING     PetStatusFlag = 64
-	PetStatusFlag_TASK_TOGETHER_IN_PROGRESS PetStatusFlag = 128
+	PetStatusFlag_THROW_IN_SCENE                      PetStatusFlag = 1
+	PetStatusFlag_MIRACLE_CHANGING                    PetStatusFlag = 2
+	PetStatusFlag_NEW_IN_BAG                          PetStatusFlag = 4
+	PetStatusFlag_MONSTER_PET                         PetStatusFlag = 8
+	PetStatusFlag_CAN_MODIFY_PET_NAME                 PetStatusFlag = 16
+	PetStatusFlag_TASK_FORCE_LOCK                     PetStatusFlag = 32
+	PetStatusFlag_TASK_TOGETHER_MARKING               PetStatusFlag = 64
+	PetStatusFlag_TASK_TOGETHER_IN_PROGRESS           PetStatusFlag = 128
+	PetStatusFlag_PET_IN_LORD_EVOLUTION               PetStatusFlag = 256
+	PetStatusFlag_PET_LORD_UNLOCK_AUTO_COMBAT_MONSTER PetStatusFlag = 512
+	PetStatusFlag_PET_LORD_UNLOCK_AUTO_COMBAT_BOSS    PetStatusFlag = 1024
+	PetStatusFlag_PET_BAN_USE_FLAG                    PetStatusFlag = 2048
+	PetStatusFlag_PET_IN_TRIAL_CHALLENGE              PetStatusFlag = 4096
 )
 
 // Enum value maps for PetStatusFlag.
 var (
 	PetStatusFlag_name = map[int32]string{
-		1:   "THROW_IN_SCENE",
-		2:   "MIRACLE_CHANGING",
-		4:   "NEW_IN_BAG",
-		8:   "MONSTER_PET",
-		16:  "CAN_MODIFY_PET_NAME",
-		32:  "TASK_FORCE_LOCK",
-		64:  "TASK_TOGETHER_MARKING",
-		128: "TASK_TOGETHER_IN_PROGRESS",
+		1:    "THROW_IN_SCENE",
+		2:    "MIRACLE_CHANGING",
+		4:    "NEW_IN_BAG",
+		8:    "MONSTER_PET",
+		16:   "CAN_MODIFY_PET_NAME",
+		32:   "TASK_FORCE_LOCK",
+		64:   "TASK_TOGETHER_MARKING",
+		128:  "TASK_TOGETHER_IN_PROGRESS",
+		256:  "PET_IN_LORD_EVOLUTION",
+		512:  "PET_LORD_UNLOCK_AUTO_COMBAT_MONSTER",
+		1024: "PET_LORD_UNLOCK_AUTO_COMBAT_BOSS",
+		2048: "PET_BAN_USE_FLAG",
+		4096: "PET_IN_TRIAL_CHALLENGE",
 	}
 	PetStatusFlag_value = map[string]int32{
-		"THROW_IN_SCENE":            1,
-		"MIRACLE_CHANGING":          2,
-		"NEW_IN_BAG":                4,
-		"MONSTER_PET":               8,
-		"CAN_MODIFY_PET_NAME":       16,
-		"TASK_FORCE_LOCK":           32,
-		"TASK_TOGETHER_MARKING":     64,
-		"TASK_TOGETHER_IN_PROGRESS": 128,
+		"THROW_IN_SCENE":                      1,
+		"MIRACLE_CHANGING":                    2,
+		"NEW_IN_BAG":                          4,
+		"MONSTER_PET":                         8,
+		"CAN_MODIFY_PET_NAME":                 16,
+		"TASK_FORCE_LOCK":                     32,
+		"TASK_TOGETHER_MARKING":               64,
+		"TASK_TOGETHER_IN_PROGRESS":           128,
+		"PET_IN_LORD_EVOLUTION":               256,
+		"PET_LORD_UNLOCK_AUTO_COMBAT_MONSTER": 512,
+		"PET_LORD_UNLOCK_AUTO_COMBAT_BOSS":    1024,
+		"PET_BAN_USE_FLAG":                    2048,
+		"PET_IN_TRIAL_CHALLENGE":              4096,
 	}
 )
 
@@ -1192,6 +1210,9 @@ type BlessingInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FromPlayerName *string                `protobuf:"bytes,1,opt,name=from_player_name,json=fromPlayerName" json:"from_player_name,omitempty"`
 	FromPetName    *string                `protobuf:"bytes,2,opt,name=from_pet_name,json=fromPetName" json:"from_pet_name,omitempty"`
+	FromPetBaseId  *uint32                `protobuf:"varint,3,opt,name=from_pet_base_id,json=fromPetBaseId" json:"from_pet_base_id,omitempty"`
+	FromPetConfId  *uint32                `protobuf:"varint,4,opt,name=from_pet_conf_id,json=fromPetConfId" json:"from_pet_conf_id,omitempty"`
+	FromPetNameSrc *PetNameSource         `protobuf:"varint,5,opt,name=from_pet_name_src,json=fromPetNameSrc,enum=dataconfig.PetNameSource" json:"from_pet_name_src,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1238,6 +1259,27 @@ func (x *BlessingInfo) GetFromPetName() string {
 		return *x.FromPetName
 	}
 	return ""
+}
+
+func (x *BlessingInfo) GetFromPetBaseId() uint32 {
+	if x != nil && x.FromPetBaseId != nil {
+		return *x.FromPetBaseId
+	}
+	return 0
+}
+
+func (x *BlessingInfo) GetFromPetConfId() uint32 {
+	if x != nil && x.FromPetConfId != nil {
+		return *x.FromPetConfId
+	}
+	return 0
+}
+
+func (x *BlessingInfo) GetFromPetNameSrc() PetNameSource {
+	if x != nil && x.FromPetNameSrc != nil {
+		return *x.FromPetNameSrc
+	}
+	return PetNameSource_PNS_PET_BASE
 }
 
 type ObtainShinyFashionInfo struct {
@@ -2073,6 +2115,7 @@ type PetSceneInfo struct {
 	CanTrigBondNone           *bool                  `protobuf:"varint,5,opt,name=can_trig_bond_none,json=canTrigBondNone,def=1" json:"can_trig_bond_none,omitempty"`
 	InteractCount             *int32                 `protobuf:"varint,6,opt,name=interact_count,json=interactCount" json:"interact_count,omitempty"`
 	LlmNatureTag              *PetLLMNatureTagInfo   `protobuf:"bytes,7,opt,name=llm_nature_tag,json=llmNatureTag" json:"llm_nature_tag,omitempty"`
+	ToughnessCdStartTimeSec   *int64                 `protobuf:"varint,8,opt,name=toughness_cd_start_time_sec,json=toughnessCdStartTimeSec" json:"toughness_cd_start_time_sec,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -2160,6 +2203,13 @@ func (x *PetSceneInfo) GetLlmNatureTag() *PetLLMNatureTagInfo {
 		return x.LlmNatureTag
 	}
 	return nil
+}
+
+func (x *PetSceneInfo) GetToughnessCdStartTimeSec() int64 {
+	if x != nil && x.ToughnessCdStartTimeSec != nil {
+		return *x.ToughnessCdStartTimeSec
+	}
+	return 0
 }
 
 type PetData struct {
@@ -2251,6 +2301,8 @@ type PetData struct {
 	PatchVersion             *int32                    `protobuf:"varint,99,opt,name=patch_version,json=patchVersion" json:"patch_version,omitempty"`
 	SceneInfo                *PetSceneInfo             `protobuf:"bytes,100,opt,name=scene_info,json=sceneInfo" json:"scene_info,omitempty"`
 	SeasonAddInfo            *SeasonBattleInfo         `protobuf:"bytes,101,opt,name=season_add_info,json=seasonAddInfo" json:"season_add_info,omitempty"`
+	PetLordInfo              *PetLordInfo              `protobuf:"bytes,102,opt,name=pet_lord_info,json=petLordInfo" json:"pet_lord_info,omitempty"`
+	OwlSanctuaryPetDiffInfo  *OwlSanctuaryPetDiffInfo  `protobuf:"bytes,103,opt,name=owl_sanctuary_pet_diff_info,json=owlSanctuaryPetDiffInfo" json:"owl_sanctuary_pet_diff_info,omitempty"`
 	LlmNatureTag             *PetLLMNatureTagInfo      `protobuf:"bytes,104,opt,name=llm_nature_tag,json=llmNatureTag" json:"llm_nature_tag,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
@@ -2896,6 +2948,20 @@ func (x *PetData) GetSceneInfo() *PetSceneInfo {
 func (x *PetData) GetSeasonAddInfo() *SeasonBattleInfo {
 	if x != nil {
 		return x.SeasonAddInfo
+	}
+	return nil
+}
+
+func (x *PetData) GetPetLordInfo() *PetLordInfo {
+	if x != nil {
+		return x.PetLordInfo
+	}
+	return nil
+}
+
+func (x *PetData) GetOwlSanctuaryPetDiffInfo() *OwlSanctuaryPetDiffInfo {
+	if x != nil {
+		return x.OwlSanctuaryPetDiffInfo
 	}
 	return nil
 }
@@ -5810,15 +5876,60 @@ func (x *PetBox) GetLock() bool {
 	return Default_PetBox_Lock
 }
 
+type PetBoxUnlockRecipe struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RecipeId      []uint32               `protobuf:"varint,1,rep,name=recipe_id,json=recipeId" json:"recipe_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PetBoxUnlockRecipe) Reset() {
+	*x = PetBoxUnlockRecipe{}
+	mi := &file_com_pet_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PetBoxUnlockRecipe) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PetBoxUnlockRecipe) ProtoMessage() {}
+
+func (x *PetBoxUnlockRecipe) ProtoReflect() protoreflect.Message {
+	mi := &file_com_pet_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PetBoxUnlockRecipe.ProtoReflect.Descriptor instead.
+func (*PetBoxUnlockRecipe) Descriptor() ([]byte, []int) {
+	return file_com_pet_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *PetBoxUnlockRecipe) GetRecipeId() []uint32 {
+	if x != nil {
+		return x.RecipeId
+	}
+	return nil
+}
+
 type PetBackpackInfo struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	EggGid         []uint32               `protobuf:"varint,1,rep,name=egg_gid,json=eggGid" json:"egg_gid,omitempty"`
-	Boxes          []*PetBox              `protobuf:"bytes,3,rep,name=boxes" json:"boxes,omitempty"`
-	LastOpenBoxId  *int32                 `protobuf:"varint,4,opt,name=last_open_box_id,json=lastOpenBoxId,def=1" json:"last_open_box_id,omitempty"`
-	MarkUnlockInfo *int64                 `protobuf:"varint,5,opt,name=mark_unlock_info,json=markUnlockInfo" json:"mark_unlock_info,omitempty"`
-	TidyRules      []PetBoxTidyRuleType   `protobuf:"varint,6,rep,name=tidy_rules,json=tidyRules,enum=dataconfig.PetBoxTidyRuleType" json:"tidy_rules,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	EggGid                        []uint32               `protobuf:"varint,1,rep,name=egg_gid,json=eggGid" json:"egg_gid,omitempty"`
+	Boxes                         []*PetBox              `protobuf:"bytes,3,rep,name=boxes" json:"boxes,omitempty"`
+	LastOpenBoxId                 *int32                 `protobuf:"varint,4,opt,name=last_open_box_id,json=lastOpenBoxId,def=1" json:"last_open_box_id,omitempty"`
+	MarkUnlockInfo                *int64                 `protobuf:"varint,5,opt,name=mark_unlock_info,json=markUnlockInfo" json:"mark_unlock_info,omitempty"`
+	TidyRules                     []PetBoxTidyRuleType   `protobuf:"varint,6,rep,name=tidy_rules,json=tidyRules,enum=dataconfig.PetBoxTidyRuleType" json:"tidy_rules,omitempty"`
+	UnlockedUsingSpecialRecipeNum *int32                 `protobuf:"varint,7,opt,name=unlocked_using_special_recipe_num,json=unlockedUsingSpecialRecipeNum" json:"unlocked_using_special_recipe_num,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 // Default values for PetBackpackInfo fields.
@@ -5828,7 +5939,7 @@ const (
 
 func (x *PetBackpackInfo) Reset() {
 	*x = PetBackpackInfo{}
-	mi := &file_com_pet_proto_msgTypes[62]
+	mi := &file_com_pet_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5840,7 +5951,7 @@ func (x *PetBackpackInfo) String() string {
 func (*PetBackpackInfo) ProtoMessage() {}
 
 func (x *PetBackpackInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[62]
+	mi := &file_com_pet_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5853,7 +5964,7 @@ func (x *PetBackpackInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PetBackpackInfo.ProtoReflect.Descriptor instead.
 func (*PetBackpackInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{62}
+	return file_com_pet_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *PetBackpackInfo) GetEggGid() []uint32 {
@@ -5891,6 +6002,13 @@ func (x *PetBackpackInfo) GetTidyRules() []PetBoxTidyRuleType {
 	return nil
 }
 
+func (x *PetBackpackInfo) GetUnlockedUsingSpecialRecipeNum() int32 {
+	if x != nil && x.UnlockedUsingSpecialRecipeNum != nil {
+		return *x.UnlockedUsingSpecialRecipeNum
+	}
+	return 0
+}
+
 type BallInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             *uint32                `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
@@ -5906,7 +6024,7 @@ type BallInfo struct {
 
 func (x *BallInfo) Reset() {
 	*x = BallInfo{}
-	mi := &file_com_pet_proto_msgTypes[63]
+	mi := &file_com_pet_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5918,7 +6036,7 @@ func (x *BallInfo) String() string {
 func (*BallInfo) ProtoMessage() {}
 
 func (x *BallInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[63]
+	mi := &file_com_pet_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5931,7 +6049,7 @@ func (x *BallInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BallInfo.ProtoReflect.Descriptor instead.
 func (*BallInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{63}
+	return file_com_pet_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *BallInfo) GetId() uint32 {
@@ -5994,7 +6112,7 @@ type CatchRateInfo struct {
 
 func (x *CatchRateInfo) Reset() {
 	*x = CatchRateInfo{}
-	mi := &file_com_pet_proto_msgTypes[64]
+	mi := &file_com_pet_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6006,7 +6124,7 @@ func (x *CatchRateInfo) String() string {
 func (*CatchRateInfo) ProtoMessage() {}
 
 func (x *CatchRateInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[64]
+	mi := &file_com_pet_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6019,7 +6137,7 @@ func (x *CatchRateInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CatchRateInfo.ProtoReflect.Descriptor instead.
 func (*CatchRateInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{64}
+	return file_com_pet_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *CatchRateInfo) GetMonsterId() uint32 {
@@ -6056,7 +6174,7 @@ type ZoneCatchResult struct {
 
 func (x *ZoneCatchResult) Reset() {
 	*x = ZoneCatchResult{}
-	mi := &file_com_pet_proto_msgTypes[65]
+	mi := &file_com_pet_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6068,7 +6186,7 @@ func (x *ZoneCatchResult) String() string {
 func (*ZoneCatchResult) ProtoMessage() {}
 
 func (x *ZoneCatchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[65]
+	mi := &file_com_pet_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6081,7 +6199,7 @@ func (x *ZoneCatchResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ZoneCatchResult.ProtoReflect.Descriptor instead.
 func (*ZoneCatchResult) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{65}
+	return file_com_pet_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ZoneCatchResult) GetIsCatched() bool {
@@ -6129,7 +6247,7 @@ type PetSkillUseInfo struct {
 
 func (x *PetSkillUseInfo) Reset() {
 	*x = PetSkillUseInfo{}
-	mi := &file_com_pet_proto_msgTypes[66]
+	mi := &file_com_pet_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6141,7 +6259,7 @@ func (x *PetSkillUseInfo) String() string {
 func (*PetSkillUseInfo) ProtoMessage() {}
 
 func (x *PetSkillUseInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[66]
+	mi := &file_com_pet_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6154,7 +6272,7 @@ func (x *PetSkillUseInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PetSkillUseInfo.ProtoReflect.Descriptor instead.
 func (*PetSkillUseInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{66}
+	return file_com_pet_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *PetSkillUseInfo) GetSkillId() uint32 {
@@ -6182,7 +6300,7 @@ type RankSeasonPetUseInfo struct {
 
 func (x *RankSeasonPetUseInfo) Reset() {
 	*x = RankSeasonPetUseInfo{}
-	mi := &file_com_pet_proto_msgTypes[67]
+	mi := &file_com_pet_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6194,7 +6312,7 @@ func (x *RankSeasonPetUseInfo) String() string {
 func (*RankSeasonPetUseInfo) ProtoMessage() {}
 
 func (x *RankSeasonPetUseInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[67]
+	mi := &file_com_pet_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6207,7 +6325,7 @@ func (x *RankSeasonPetUseInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RankSeasonPetUseInfo.ProtoReflect.Descriptor instead.
 func (*RankSeasonPetUseInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{67}
+	return file_com_pet_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *RankSeasonPetUseInfo) GetPetBaseCfgId() uint32 {
@@ -6240,7 +6358,7 @@ type PlayerPetMonitorInfo struct {
 
 func (x *PlayerPetMonitorInfo) Reset() {
 	*x = PlayerPetMonitorInfo{}
-	mi := &file_com_pet_proto_msgTypes[68]
+	mi := &file_com_pet_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6252,7 +6370,7 @@ func (x *PlayerPetMonitorInfo) String() string {
 func (*PlayerPetMonitorInfo) ProtoMessage() {}
 
 func (x *PlayerPetMonitorInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[68]
+	mi := &file_com_pet_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6265,7 +6383,7 @@ func (x *PlayerPetMonitorInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerPetMonitorInfo.ProtoReflect.Descriptor instead.
 func (*PlayerPetMonitorInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{68}
+	return file_com_pet_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *PlayerPetMonitorInfo) GetDailyInfo() *PlayerPetMonitorDailyInfo {
@@ -6286,7 +6404,7 @@ type PlayerPetMonitorDailyInfo struct {
 
 func (x *PlayerPetMonitorDailyInfo) Reset() {
 	*x = PlayerPetMonitorDailyInfo{}
-	mi := &file_com_pet_proto_msgTypes[69]
+	mi := &file_com_pet_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6298,7 +6416,7 @@ func (x *PlayerPetMonitorDailyInfo) String() string {
 func (*PlayerPetMonitorDailyInfo) ProtoMessage() {}
 
 func (x *PlayerPetMonitorDailyInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[69]
+	mi := &file_com_pet_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6311,7 +6429,7 @@ func (x *PlayerPetMonitorDailyInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerPetMonitorDailyInfo.ProtoReflect.Descriptor instead.
 func (*PlayerPetMonitorDailyInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{69}
+	return file_com_pet_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *PlayerPetMonitorDailyInfo) GetObtainShinyCnt() int32 {
@@ -6344,7 +6462,7 @@ type PetTaskInfo struct {
 
 func (x *PetTaskInfo) Reset() {
 	*x = PetTaskInfo{}
-	mi := &file_com_pet_proto_msgTypes[70]
+	mi := &file_com_pet_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6356,7 +6474,7 @@ func (x *PetTaskInfo) String() string {
 func (*PetTaskInfo) ProtoMessage() {}
 
 func (x *PetTaskInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[70]
+	mi := &file_com_pet_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6369,7 +6487,7 @@ func (x *PetTaskInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PetTaskInfo.ProtoReflect.Descriptor instead.
 func (*PetTaskInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{70}
+	return file_com_pet_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *PetTaskInfo) GetTogetherTask() []*PetTogetherTaskInfo {
@@ -6390,7 +6508,7 @@ type PetTogetherTaskInfo struct {
 
 func (x *PetTogetherTaskInfo) Reset() {
 	*x = PetTogetherTaskInfo{}
-	mi := &file_com_pet_proto_msgTypes[71]
+	mi := &file_com_pet_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6402,7 +6520,7 @@ func (x *PetTogetherTaskInfo) String() string {
 func (*PetTogetherTaskInfo) ProtoMessage() {}
 
 func (x *PetTogetherTaskInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[71]
+	mi := &file_com_pet_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6415,7 +6533,7 @@ func (x *PetTogetherTaskInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PetTogetherTaskInfo.ProtoReflect.Descriptor instead.
 func (*PetTogetherTaskInfo) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{71}
+	return file_com_pet_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *PetTogetherTaskInfo) GetGid() uint32 {
@@ -6440,36 +6558,41 @@ func (x *PetTogetherTaskInfo) GetIsInTaskArea() bool {
 }
 
 type SceneBasePetData struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Gid               *int32                 `protobuf:"varint,1,opt,name=gid" json:"gid,omitempty"`
-	Nature            *int32                 `protobuf:"varint,2,opt,name=nature" json:"nature,omitempty"`
-	Height            *int32                 `protobuf:"varint,3,opt,name=height" json:"height,omitempty"`
-	Weight            *int32                 `protobuf:"varint,4,opt,name=weight" json:"weight,omitempty"`
-	Level             *int32                 `protobuf:"varint,5,opt,name=level" json:"level,omitempty"`
-	MutationType      *int32                 `protobuf:"varint,6,opt,name=mutation_type,json=mutationType" json:"mutation_type,omitempty"`
-	Name              []byte                 `protobuf:"bytes,7,opt,name=name" json:"name,omitempty"`
-	BaseConfId        *int32                 `protobuf:"varint,8,opt,name=base_conf_id,json=baseConfId" json:"base_conf_id,omitempty"`
-	BloodType         *int32                 `protobuf:"varint,9,opt,name=blood_type,json=bloodType" json:"blood_type,omitempty"`
-	TalentRank        *uint32                `protobuf:"varint,10,opt,name=talent_rank,json=talentRank" json:"talent_rank,omitempty"`
-	MedalConfId       *uint32                `protobuf:"varint,11,opt,name=medal_conf_id,json=medalConfId" json:"medal_conf_id,omitempty"`
-	MedalFxLevel      *uint32                `protobuf:"varint,12,opt,name=medal_fx_level,json=medalFxLevel" json:"medal_fx_level,omitempty"`
-	SpecialityId      *uint32                `protobuf:"varint,14,opt,name=speciality_id,json=specialityId" json:"speciality_id,omitempty"`
-	RealSpecialityIds []uint32               `protobuf:"varint,16,rep,name=real_speciality_ids,json=realSpecialityIds" json:"real_speciality_ids,omitempty"`
-	GlassInfo         *GlassInfo             `protobuf:"bytes,17,opt,name=glass_info,json=glassInfo" json:"glass_info,omitempty"`
-	ClosenessLv       *int32                 `protobuf:"varint,18,opt,name=closeness_lv,json=closenessLv" json:"closeness_lv,omitempty"`
-	Gender            *uint32                `protobuf:"varint,19,opt,name=gender" json:"gender,omitempty"`
-	Voice             *int32                 `protobuf:"varint,20,opt,name=voice" json:"voice,omitempty"`
-	ClosenessExp      *int32                 `protobuf:"varint,21,opt,name=closeness_exp,json=closenessExp" json:"closeness_exp,omitempty"`
-	SceneInfo         *PetSceneInfo          `protobuf:"bytes,22,opt,name=scene_info,json=sceneInfo" json:"scene_info,omitempty"`
-	NameSrc           *PetNameSource         `protobuf:"varint,23,opt,name=name_src,json=nameSrc,enum=dataconfig.PetNameSource" json:"name_src,omitempty"`
-	LlmNatureTag      *PetLLMNatureTagInfo   `protobuf:"bytes,28,opt,name=llm_nature_tag,json=llmNatureTag" json:"llm_nature_tag,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Gid                *int32                 `protobuf:"varint,1,opt,name=gid" json:"gid,omitempty"`
+	Nature             *int32                 `protobuf:"varint,2,opt,name=nature" json:"nature,omitempty"`
+	Height             *int32                 `protobuf:"varint,3,opt,name=height" json:"height,omitempty"`
+	Weight             *int32                 `protobuf:"varint,4,opt,name=weight" json:"weight,omitempty"`
+	Level              *int32                 `protobuf:"varint,5,opt,name=level" json:"level,omitempty"`
+	MutationType       *int32                 `protobuf:"varint,6,opt,name=mutation_type,json=mutationType" json:"mutation_type,omitempty"`
+	Name               []byte                 `protobuf:"bytes,7,opt,name=name" json:"name,omitempty"`
+	BaseConfId         *int32                 `protobuf:"varint,8,opt,name=base_conf_id,json=baseConfId" json:"base_conf_id,omitempty"`
+	BloodType          *int32                 `protobuf:"varint,9,opt,name=blood_type,json=bloodType" json:"blood_type,omitempty"`
+	TalentRank         *uint32                `protobuf:"varint,10,opt,name=talent_rank,json=talentRank" json:"talent_rank,omitempty"`
+	MedalConfId        *uint32                `protobuf:"varint,11,opt,name=medal_conf_id,json=medalConfId" json:"medal_conf_id,omitempty"`
+	MedalFxLevel       *uint32                `protobuf:"varint,12,opt,name=medal_fx_level,json=medalFxLevel" json:"medal_fx_level,omitempty"`
+	SpecialityId       *uint32                `protobuf:"varint,14,opt,name=speciality_id,json=specialityId" json:"speciality_id,omitempty"`
+	RealSpecialityIds  []uint32               `protobuf:"varint,16,rep,name=real_speciality_ids,json=realSpecialityIds" json:"real_speciality_ids,omitempty"`
+	GlassInfo          *GlassInfo             `protobuf:"bytes,17,opt,name=glass_info,json=glassInfo" json:"glass_info,omitempty"`
+	ClosenessLv        *int32                 `protobuf:"varint,18,opt,name=closeness_lv,json=closenessLv" json:"closeness_lv,omitempty"`
+	Gender             *uint32                `protobuf:"varint,19,opt,name=gender" json:"gender,omitempty"`
+	Voice              *int32                 `protobuf:"varint,20,opt,name=voice" json:"voice,omitempty"`
+	ClosenessExp       *int32                 `protobuf:"varint,21,opt,name=closeness_exp,json=closenessExp" json:"closeness_exp,omitempty"`
+	SceneInfo          *PetSceneInfo          `protobuf:"bytes,22,opt,name=scene_info,json=sceneInfo" json:"scene_info,omitempty"`
+	NameSrc            *PetNameSource         `protobuf:"varint,23,opt,name=name_src,json=nameSrc,enum=dataconfig.PetNameSource" json:"name_src,omitempty"`
+	PetStatusFlags     *int32                 `protobuf:"varint,24,opt,name=pet_status_flags,json=petStatusFlags" json:"pet_status_flags,omitempty"`
+	ConfId             *uint32                `protobuf:"varint,25,opt,name=conf_id,json=confId" json:"conf_id,omitempty"`
+	LastBreakthroughLv *uint32                `protobuf:"varint,26,opt,name=last_breakthrough_lv,json=lastBreakthroughLv" json:"last_breakthrough_lv,omitempty"`
+	InspireLv          *uint32                `protobuf:"varint,27,opt,name=inspire_lv,json=inspireLv" json:"inspire_lv,omitempty"`
+	LlmNatureTag       *PetLLMNatureTagInfo   `protobuf:"bytes,28,opt,name=llm_nature_tag,json=llmNatureTag" json:"llm_nature_tag,omitempty"`
+	Energy             *int32                 `protobuf:"varint,29,opt,name=energy" json:"energy,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *SceneBasePetData) Reset() {
 	*x = SceneBasePetData{}
-	mi := &file_com_pet_proto_msgTypes[72]
+	mi := &file_com_pet_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6481,7 +6604,7 @@ func (x *SceneBasePetData) String() string {
 func (*SceneBasePetData) ProtoMessage() {}
 
 func (x *SceneBasePetData) ProtoReflect() protoreflect.Message {
-	mi := &file_com_pet_proto_msgTypes[72]
+	mi := &file_com_pet_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6494,7 +6617,7 @@ func (x *SceneBasePetData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SceneBasePetData.ProtoReflect.Descriptor instead.
 func (*SceneBasePetData) Descriptor() ([]byte, []int) {
-	return file_com_pet_proto_rawDescGZIP(), []int{72}
+	return file_com_pet_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *SceneBasePetData) GetGid() int32 {
@@ -6644,9 +6767,128 @@ func (x *SceneBasePetData) GetNameSrc() PetNameSource {
 	return PetNameSource_PNS_PET_BASE
 }
 
+func (x *SceneBasePetData) GetPetStatusFlags() int32 {
+	if x != nil && x.PetStatusFlags != nil {
+		return *x.PetStatusFlags
+	}
+	return 0
+}
+
+func (x *SceneBasePetData) GetConfId() uint32 {
+	if x != nil && x.ConfId != nil {
+		return *x.ConfId
+	}
+	return 0
+}
+
+func (x *SceneBasePetData) GetLastBreakthroughLv() uint32 {
+	if x != nil && x.LastBreakthroughLv != nil {
+		return *x.LastBreakthroughLv
+	}
+	return 0
+}
+
+func (x *SceneBasePetData) GetInspireLv() uint32 {
+	if x != nil && x.InspireLv != nil {
+		return *x.InspireLv
+	}
+	return 0
+}
+
 func (x *SceneBasePetData) GetLlmNatureTag() *PetLLMNatureTagInfo {
 	if x != nil {
 		return x.LlmNatureTag
+	}
+	return nil
+}
+
+func (x *SceneBasePetData) GetEnergy() int32 {
+	if x != nil && x.Energy != nil {
+		return *x.Energy
+	}
+	return 0
+}
+
+type PetLordInfo struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	BeforeLordBaseid   *uint32                `protobuf:"varint,1,opt,name=before_lord_baseid,json=beforeLordBaseid" json:"before_lord_baseid,omitempty"`
+	LordItemId         *uint32                `protobuf:"varint,2,opt,name=lord_item_id,json=lordItemId" json:"lord_item_id,omitempty"`
+	BeforeLordHeight   *uint32                `protobuf:"varint,3,opt,name=before_lord_height,json=beforeLordHeight" json:"before_lord_height,omitempty"`
+	BeforeLordWeight   *uint32                `protobuf:"varint,4,opt,name=before_lord_weight,json=beforeLordWeight" json:"before_lord_weight,omitempty"`
+	BeforeLordName     []byte                 `protobuf:"bytes,5,opt,name=before_lord_name,json=beforeLordName" json:"before_lord_name,omitempty"`
+	BeforeSkillDamType []SkillDamType         `protobuf:"varint,6,rep,name=before_skill_dam_type,json=beforeSkillDamType,enum=dataconfig.SkillDamType" json:"before_skill_dam_type,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PetLordInfo) Reset() {
+	*x = PetLordInfo{}
+	mi := &file_com_pet_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PetLordInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PetLordInfo) ProtoMessage() {}
+
+func (x *PetLordInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_com_pet_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PetLordInfo.ProtoReflect.Descriptor instead.
+func (*PetLordInfo) Descriptor() ([]byte, []int) {
+	return file_com_pet_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *PetLordInfo) GetBeforeLordBaseid() uint32 {
+	if x != nil && x.BeforeLordBaseid != nil {
+		return *x.BeforeLordBaseid
+	}
+	return 0
+}
+
+func (x *PetLordInfo) GetLordItemId() uint32 {
+	if x != nil && x.LordItemId != nil {
+		return *x.LordItemId
+	}
+	return 0
+}
+
+func (x *PetLordInfo) GetBeforeLordHeight() uint32 {
+	if x != nil && x.BeforeLordHeight != nil {
+		return *x.BeforeLordHeight
+	}
+	return 0
+}
+
+func (x *PetLordInfo) GetBeforeLordWeight() uint32 {
+	if x != nil && x.BeforeLordWeight != nil {
+		return *x.BeforeLordWeight
+	}
+	return 0
+}
+
+func (x *PetLordInfo) GetBeforeLordName() []byte {
+	if x != nil {
+		return x.BeforeLordName
+	}
+	return nil
+}
+
+func (x *PetLordInfo) GetBeforeSkillDamType() []SkillDamType {
+	if x != nil {
+		return x.BeforeSkillDamType
 	}
 	return nil
 }
@@ -6721,10 +6963,13 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x14last_killed_pet_name\x18\x03 \x01(\fR\x11lastKilledPetName\"Z\n" +
 	"\x17LegendFirstWinAloneInfo\x12\x19\n" +
 	"\bwin_time\x18\x01 \x01(\rR\awinTime\x12$\n" +
-	"\x0ebattle_conf_id\x18\x02 \x01(\rR\fbattleConfId\"\\\n" +
+	"\x0ebattle_conf_id\x18\x02 \x01(\rR\fbattleConfId\"\xf4\x01\n" +
 	"\fBlessingInfo\x12(\n" +
 	"\x10from_player_name\x18\x01 \x01(\tR\x0efromPlayerName\x12\"\n" +
-	"\rfrom_pet_name\x18\x02 \x01(\tR\vfromPetName\"Y\n" +
+	"\rfrom_pet_name\x18\x02 \x01(\tR\vfromPetName\x12'\n" +
+	"\x10from_pet_base_id\x18\x03 \x01(\rR\rfromPetBaseId\x12'\n" +
+	"\x10from_pet_conf_id\x18\x04 \x01(\rR\rfromPetConfId\x12D\n" +
+	"\x11from_pet_name_src\x18\x05 \x01(\x0e2\x19.dataconfig.PetNameSourceR\x0efromPetNameSrc\"Y\n" +
 	"\x16ObtainShinyFashionInfo\x12\x1f\n" +
 	"\vobtain_time\x18\x01 \x01(\rR\n" +
 	"obtainTime\x12\x1e\n" +
@@ -6784,7 +7029,7 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x0fmain_nature_tag\x18\x02 \x01(\x05R\rmainNatureTag\x122\n" +
 	"\x15llm_interaction_count\x18\x03 \x01(\x05R\x13llmInteractionCount\x128\n" +
 	"\x19last_base_week_decay_time\x18\x04 \x01(\x03R\x15lastBaseWeekDecayTime\x12:\n" +
-	"\x1alast_quick_week_decay_time\x18\x05 \x01(\x03R\x16lastQuickWeekDecayTime\"\xe0\x02\n" +
+	"\x1alast_quick_week_decay_time\x18\x05 \x01(\x03R\x16lastQuickWeekDecayTime\"\x9e\x03\n" +
 	"\fPetSceneInfo\x12\x15\n" +
 	"\x06npc_id\x18\x01 \x01(\x04R\x05npcId\x12+\n" +
 	"\x11interact_quantity\x18\x02 \x01(\x05R\x10interactQuantity\x12>\n" +
@@ -6792,7 +7037,8 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x12can_trig_bond_name\x18\x04 \x01(\b:\x04trueR\x0fcanTrigBondName\x121\n" +
 	"\x12can_trig_bond_none\x18\x05 \x01(\b:\x04trueR\x0fcanTrigBondNone\x12%\n" +
 	"\x0einteract_count\x18\x06 \x01(\x05R\rinteractCount\x12?\n" +
-	"\x0ellm_nature_tag\x18\a \x01(\v2\x19.Next.PetLLMNatureTagInfoR\fllmNatureTag\"\xc3\x1d\n" +
+	"\x0ellm_nature_tag\x18\a \x01(\v2\x19.Next.PetLLMNatureTagInfoR\fllmNatureTag\x12<\n" +
+	"\x1btoughness_cd_start_time_sec\x18\b \x01(\x03R\x17toughnessCdStartTimeSec\"\xd7\x1e\n" +
 	"\aPetData\x12\x10\n" +
 	"\x03gid\x18\x01 \x01(\rR\x03gid\x12\x17\n" +
 	"\aconf_id\x18\x02 \x01(\rR\x06confId\x12\x12\n" +
@@ -6895,7 +7141,9 @@ const file_com_pet_proto_rawDesc = "" +
 	"\rpatch_version\x18c \x01(\x05R\fpatchVersion\x121\n" +
 	"\n" +
 	"scene_info\x18d \x01(\v2\x12.Next.PetSceneInfoR\tsceneInfo\x12>\n" +
-	"\x0fseason_add_info\x18e \x01(\v2\x16.Next.SeasonBattleInfoR\rseasonAddInfo\x12?\n" +
+	"\x0fseason_add_info\x18e \x01(\v2\x16.Next.SeasonBattleInfoR\rseasonAddInfo\x125\n" +
+	"\rpet_lord_info\x18f \x01(\v2\x11.Next.PetLordInfoR\vpetLordInfo\x12[\n" +
+	"\x1bowl_sanctuary_pet_diff_info\x18g \x01(\v2\x1d.Next.OwlSanctuaryPetDiffInfoR\x17owlSanctuaryPetDiffInfo\x12?\n" +
 	"\x0ellm_nature_tag\x18h \x01(\v2\x19.Next.PetLLMNatureTagInfoR\fllmNatureTag\"\x8d\x04\n" +
 	"\x16ActivityPartnerPetData\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\fR\x04name\x12\x19\n" +
@@ -7196,14 +7444,17 @@ const file_com_pet_proto_rawDesc = "" +
 	"\vvacancy_num\x18\x04 \x01(\x05R\n" +
 	"vacancyNum\x12\x19\n" +
 	"\bbox_name\x18\x05 \x01(\fR\aboxName\x12\x19\n" +
-	"\x04lock\x18\x06 \x01(\b:\x05falseR\x04lock\"\xe3\x01\n" +
+	"\x04lock\x18\x06 \x01(\b:\x05falseR\x04lock\"1\n" +
+	"\x12PetBoxUnlockRecipe\x12\x1b\n" +
+	"\trecipe_id\x18\x01 \x03(\rR\brecipeId\"\xad\x02\n" +
 	"\x0fPetBackpackInfo\x12\x17\n" +
 	"\aegg_gid\x18\x01 \x03(\rR\x06eggGid\x12\"\n" +
 	"\x05boxes\x18\x03 \x03(\v2\f.Next.PetBoxR\x05boxes\x12*\n" +
 	"\x10last_open_box_id\x18\x04 \x01(\x05:\x011R\rlastOpenBoxId\x12(\n" +
 	"\x10mark_unlock_info\x18\x05 \x01(\x03R\x0emarkUnlockInfo\x12=\n" +
 	"\n" +
-	"tidy_rules\x18\x06 \x03(\x0e2\x1e.dataconfig.PetBoxTidyRuleTypeR\ttidyRules\"\xdb\x01\n" +
+	"tidy_rules\x18\x06 \x03(\x0e2\x1e.dataconfig.PetBoxTidyRuleTypeR\ttidyRules\x12H\n" +
+	"!unlocked_using_special_recipe_num\x18\a \x01(\x05R\x1dunlockedUsingSpecialRecipeNum\"\xdb\x01\n" +
 	"\bBallInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\fR\x04name\x12\x1b\n" +
@@ -7245,7 +7496,7 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x13PetTogetherTaskInfo\x12\x10\n" +
 	"\x03gid\x18\x01 \x01(\rR\x03gid\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\rR\x06taskId\x12%\n" +
-	"\x0fis_in_task_area\x18\x03 \x01(\bR\fisInTaskArea\"\x8c\x06\n" +
+	"\x0fis_in_task_area\x18\x03 \x01(\bR\fisInTaskArea\"\xb8\a\n" +
 	"\x10SceneBasePetData\x12\x10\n" +
 	"\x03gid\x18\x01 \x01(\x05R\x03gid\x12\x16\n" +
 	"\x06nature\x18\x02 \x01(\x05R\x06nature\x12\x16\n" +
@@ -7273,8 +7524,22 @@ const file_com_pet_proto_rawDesc = "" +
 	"\rcloseness_exp\x18\x15 \x01(\x05R\fclosenessExp\x121\n" +
 	"\n" +
 	"scene_info\x18\x16 \x01(\v2\x12.Next.PetSceneInfoR\tsceneInfo\x124\n" +
-	"\bname_src\x18\x17 \x01(\x0e2\x19.dataconfig.PetNameSourceR\anameSrc\x12?\n" +
-	"\x0ellm_nature_tag\x18\x1c \x01(\v2\x19.Next.PetLLMNatureTagInfoR\fllmNatureTag*f\n" +
+	"\bname_src\x18\x17 \x01(\x0e2\x19.dataconfig.PetNameSourceR\anameSrc\x12(\n" +
+	"\x10pet_status_flags\x18\x18 \x01(\x05R\x0epetStatusFlags\x12\x17\n" +
+	"\aconf_id\x18\x19 \x01(\rR\x06confId\x120\n" +
+	"\x14last_breakthrough_lv\x18\x1a \x01(\rR\x12lastBreakthroughLv\x12\x1d\n" +
+	"\n" +
+	"inspire_lv\x18\x1b \x01(\rR\tinspireLv\x12?\n" +
+	"\x0ellm_nature_tag\x18\x1c \x01(\v2\x19.Next.PetLLMNatureTagInfoR\fllmNatureTag\x12\x16\n" +
+	"\x06energy\x18\x1d \x01(\x05R\x06energy\"\xb0\x02\n" +
+	"\vPetLordInfo\x12,\n" +
+	"\x12before_lord_baseid\x18\x01 \x01(\rR\x10beforeLordBaseid\x12 \n" +
+	"\flord_item_id\x18\x02 \x01(\rR\n" +
+	"lordItemId\x12,\n" +
+	"\x12before_lord_height\x18\x03 \x01(\rR\x10beforeLordHeight\x12,\n" +
+	"\x12before_lord_weight\x18\x04 \x01(\rR\x10beforeLordWeight\x12(\n" +
+	"\x10before_lord_name\x18\x05 \x01(\fR\x0ebeforeLordName\x12K\n" +
+	"\x15before_skill_dam_type\x18\x06 \x03(\x0e2\x18.dataconfig.SkillDamTypeR\x12beforeSkillDamType*f\n" +
 	"\x11PetEvolutionState\x12\x16\n" +
 	"\x12EM_EVOLUTION_ADDED\x10\x00\x12 \n" +
 	"\x1cEM_EVOLUTION_SUBMIT_MATERIAL\x10\x01\x12\x17\n" +
@@ -7297,11 +7562,12 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x1cPDBF_PET_HAS_BACKTRACK_ITEMS\x10\x80\b\x12\x1c\n" +
 	"\x17PDBF_PET_IS_FROM_SEASON\x10\x80\x10\x12\x1b\n" +
 	"\x16PDBF_PET_PAUSE_EVOLUTE\x10\x80 \x12\x18\n" +
-	"\x13PDBF_PET_AFTER_INIT\x10\x80@*I\n" +
+	"\x13PDBF_PET_AFTER_INIT\x10\x80@*_\n" +
 	"\x13PetBusinessIdentity\x12\f\n" +
 	"\bPBI_NONE\x10\x00\x12\x10\n" +
 	"\fPBI_HOME_PET\x10\x01\x12\x12\n" +
-	"\x0ePBI_HOME_GUARD\x10\x02*\xc3\x01\n" +
+	"\x0ePBI_HOME_GUARD\x10\x02\x12\x14\n" +
+	"\x10PBI_PVE_CHANGING\x10\x03*\xe4\x02\n" +
 	"\rPetStatusFlag\x12\x12\n" +
 	"\x0eTHROW_IN_SCENE\x10\x01\x12\x14\n" +
 	"\x10MIRACLE_CHANGING\x10\x02\x12\x0e\n" +
@@ -7311,7 +7577,12 @@ const file_com_pet_proto_rawDesc = "" +
 	"\x13CAN_MODIFY_PET_NAME\x10\x10\x12\x13\n" +
 	"\x0fTASK_FORCE_LOCK\x10 \x12\x19\n" +
 	"\x15TASK_TOGETHER_MARKING\x10@\x12\x1e\n" +
-	"\x19TASK_TOGETHER_IN_PROGRESS\x10\x80\x01"
+	"\x19TASK_TOGETHER_IN_PROGRESS\x10\x80\x01\x12\x1a\n" +
+	"\x15PET_IN_LORD_EVOLUTION\x10\x80\x02\x12(\n" +
+	"#PET_LORD_UNLOCK_AUTO_COMBAT_MONSTER\x10\x80\x04\x12%\n" +
+	" PET_LORD_UNLOCK_AUTO_COMBAT_BOSS\x10\x80\b\x12\x15\n" +
+	"\x10PET_BAN_USE_FLAG\x10\x80\x10\x12\x1b\n" +
+	"\x16PET_IN_TRIAL_CHALLENGE\x10\x80 "
 
 var (
 	file_com_pet_proto_rawDescOnce sync.Once
@@ -7326,7 +7597,7 @@ func file_com_pet_proto_rawDescGZIP() []byte {
 }
 
 var file_com_pet_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_com_pet_proto_msgTypes = make([]protoimpl.MessageInfo, 73)
+var file_com_pet_proto_msgTypes = make([]protoimpl.MessageInfo, 75)
 var file_com_pet_proto_goTypes = []any{
 	(PetEvolutionState)(0),                      // 0: Next.PetEvolutionState
 	(PetNatureAttrChangeWay)(0),                 // 1: Next.PetNatureAttrChangeWay
@@ -7396,28 +7667,31 @@ var file_com_pet_proto_goTypes = []any{
 	(*PetCatchInfo)(nil),                        // 65: Next.PetCatchInfo
 	(*PetBoxPetChange)(nil),                     // 66: Next.PetBoxPetChange
 	(*PetBox)(nil),                              // 67: Next.PetBox
-	(*PetBackpackInfo)(nil),                     // 68: Next.PetBackpackInfo
-	(*BallInfo)(nil),                            // 69: Next.BallInfo
-	(*CatchRateInfo)(nil),                       // 70: Next.CatchRateInfo
-	(*ZoneCatchResult)(nil),                     // 71: Next.ZoneCatchResult
-	(*PetSkillUseInfo)(nil),                     // 72: Next.PetSkillUseInfo
-	(*RankSeasonPetUseInfo)(nil),                // 73: Next.RankSeasonPetUseInfo
-	(*PlayerPetMonitorInfo)(nil),                // 74: Next.PlayerPetMonitorInfo
-	(*PlayerPetMonitorDailyInfo)(nil),           // 75: Next.PlayerPetMonitorDailyInfo
-	(*PetTaskInfo)(nil),                         // 76: Next.PetTaskInfo
-	(*PetTogetherTaskInfo)(nil),                 // 77: Next.PetTogetherTaskInfo
-	(*SceneBasePetData)(nil),                    // 78: Next.SceneBasePetData
-	(PetNameSource)(0),                          // 79: dataconfig.PetNameSource
-	(SkillDamType)(0),                           // 80: dataconfig.SkillDamType
-	(*PetSkillInfo)(nil),                        // 81: Next.PetSkillInfo
-	(*CheerMonsterInitInfo)(nil),                // 82: Next.CheerMonsterInitInfo
-	(PetPartnerMarkType)(0),                     // 83: dataconfig.PetPartnerMarkType
-	(*GlassInfo)(nil),                           // 84: Next.GlassInfo
-	(*SeasonBattleInfo)(nil),                    // 85: Next.SeasonBattleInfo
-	(*PetSkillData)(nil),                        // 86: Next.PetSkillData
-	(ReportCoinRatio)(0),                        // 87: dataconfig.ReportCoinRatio
-	(WarehouseMarkType)(0),                      // 88: dataconfig.WarehouseMarkType
-	(PetBoxTidyRuleType)(0),                     // 89: dataconfig.PetBoxTidyRuleType
+	(*PetBoxUnlockRecipe)(nil),                  // 68: Next.PetBoxUnlockRecipe
+	(*PetBackpackInfo)(nil),                     // 69: Next.PetBackpackInfo
+	(*BallInfo)(nil),                            // 70: Next.BallInfo
+	(*CatchRateInfo)(nil),                       // 71: Next.CatchRateInfo
+	(*ZoneCatchResult)(nil),                     // 72: Next.ZoneCatchResult
+	(*PetSkillUseInfo)(nil),                     // 73: Next.PetSkillUseInfo
+	(*RankSeasonPetUseInfo)(nil),                // 74: Next.RankSeasonPetUseInfo
+	(*PlayerPetMonitorInfo)(nil),                // 75: Next.PlayerPetMonitorInfo
+	(*PlayerPetMonitorDailyInfo)(nil),           // 76: Next.PlayerPetMonitorDailyInfo
+	(*PetTaskInfo)(nil),                         // 77: Next.PetTaskInfo
+	(*PetTogetherTaskInfo)(nil),                 // 78: Next.PetTogetherTaskInfo
+	(*SceneBasePetData)(nil),                    // 79: Next.SceneBasePetData
+	(*PetLordInfo)(nil),                         // 80: Next.PetLordInfo
+	(PetNameSource)(0),                          // 81: dataconfig.PetNameSource
+	(SkillDamType)(0),                           // 82: dataconfig.SkillDamType
+	(*PetSkillInfo)(nil),                        // 83: Next.PetSkillInfo
+	(*CheerMonsterInitInfo)(nil),                // 84: Next.CheerMonsterInitInfo
+	(PetPartnerMarkType)(0),                     // 85: dataconfig.PetPartnerMarkType
+	(*GlassInfo)(nil),                           // 86: Next.GlassInfo
+	(*SeasonBattleInfo)(nil),                    // 87: Next.SeasonBattleInfo
+	(*OwlSanctuaryPetDiffInfo)(nil),             // 88: Next.OwlSanctuaryPetDiffInfo
+	(*PetSkillData)(nil),                        // 89: Next.PetSkillData
+	(ReportCoinRatio)(0),                        // 90: dataconfig.ReportCoinRatio
+	(WarehouseMarkType)(0),                      // 91: dataconfig.WarehouseMarkType
+	(PetBoxTidyRuleType)(0),                     // 92: dataconfig.PetBoxTidyRuleType
 }
 var file_com_pet_proto_depIdxs = []int32{
 	6,  // 0: Next.PetAttributeInfo.hp:type_name -> Next.PetAttributeData
@@ -7428,98 +7702,102 @@ var file_com_pet_proto_depIdxs = []int32{
 	6,  // 5: Next.PetAttributeInfo.speed:type_name -> Next.PetAttributeData
 	8,  // 6: Next.PetAbilityInfo.ability_data:type_name -> Next.PetAbilityData
 	11, // 7: Next.PossessionInfo.item:type_name -> Next.Possession
-	14, // 8: Next.PetKeyExperience.evolute_info:type_name -> Next.PetEvoluteInfo
-	15, // 9: Next.PetKeyExperience.pvp_first_win_info:type_name -> Next.PvpFirstWinInfo
-	16, // 10: Next.PetKeyExperience.legend_first_win_alone_info:type_name -> Next.LegendFirstWinAloneInfo
-	17, // 11: Next.PetKeyExperience.blessing_info:type_name -> Next.BlessingInfo
-	18, // 12: Next.PetKeyExperience.obtain_shiny_fashion_info:type_name -> Next.ObtainShinyFashionInfo
-	19, // 13: Next.PetKeyExperience.backtrack_record_info:type_name -> Next.PetBackTrackRecordInfo
-	21, // 14: Next.PetAdditionalNewAttrList.addi_attr_data:type_name -> Next.PetAdditionalNewAttrInfo
-	23, // 15: Next.PetClosenessInfo.history_info_list:type_name -> Next.PetClosenessHistoryInfo
-	25, // 16: Next.PetEvolutionNeedInfo.defeat_info:type_name -> Next.DefeatInfo
-	26, // 17: Next.PetEvolutionNeedInfo.interact_info:type_name -> Next.InteractInfo
-	29, // 18: Next.PetLLMSingleNatureTagInfo.tag_history:type_name -> Next.PetLLMTagHistoryInfo
-	30, // 19: Next.PetLLMNatureTagInfo.tag_info_list:type_name -> Next.PetLLMSingleNatureTagInfo
-	31, // 20: Next.PetSceneInfo.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
-	79, // 21: Next.PetData.name_src:type_name -> dataconfig.PetNameSource
-	80, // 22: Next.PetData.skill_dam_type:type_name -> dataconfig.SkillDamType
-	81, // 23: Next.PetData.skill:type_name -> Next.PetSkillInfo
-	9,  // 24: Next.PetData.ability:type_name -> Next.PetAbilityInfo
-	7,  // 25: Next.PetData.attribute_info:type_name -> Next.PetAttributeInfo
-	22, // 26: Next.PetData.attribute_new_info:type_name -> Next.PetAdditionalNewAttrList
-	0,  // 27: Next.PetData.evolution_stage:type_name -> Next.PetEvolutionState
-	10, // 28: Next.PetData.ai_info:type_name -> Next.BattleAIInitInfo
-	12, // 29: Next.PetData.possession:type_name -> Next.PossessionInfo
-	82, // 30: Next.PetData.cheer_info:type_name -> Next.CheerMonsterInitInfo
-	13, // 31: Next.PetData.stat:type_name -> Next.PetStatistics
-	81, // 32: Next.PetData.all_skill:type_name -> Next.PetSkillInfo
-	20, // 33: Next.PetData.key_experience:type_name -> Next.PetKeyExperience
-	24, // 34: Next.PetData.closeness_info:type_name -> Next.PetClosenessInfo
-	83, // 35: Next.PetData.partner_mark:type_name -> dataconfig.PetPartnerMarkType
-	27, // 36: Next.PetData.evlution_need_info:type_name -> Next.PetEvolutionNeedInfo
-	84, // 37: Next.PetData.glass_info:type_name -> Next.GlassInfo
-	28, // 38: Next.PetData.cheer_point_info:type_name -> Next.PetCheerPointInfo
-	44, // 39: Next.PetData.together_catch_info:type_name -> Next.TogetherCatchInfo
-	37, // 40: Next.PetData.type:type_name -> Next.PetTypeInfo
-	34, // 41: Next.PetData.activity_partner_pet_data:type_name -> Next.ActivityPartnerPetData
-	1,  // 42: Next.PetData.nature_attr_change_way:type_name -> Next.PetNatureAttrChangeWay
-	32, // 43: Next.PetData.scene_info:type_name -> Next.PetSceneInfo
-	85, // 44: Next.PetData.season_add_info:type_name -> Next.SeasonBattleInfo
-	31, // 45: Next.PetData.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
-	20, // 46: Next.ActivityPartnerPetData.key_experience:type_name -> Next.PetKeyExperience
-	24, // 47: Next.ActivityPartnerPetData.closeness_info:type_name -> Next.PetClosenessInfo
-	44, // 48: Next.ActivityPartnerPetData.together_catch_info:type_name -> Next.TogetherCatchInfo
-	80, // 49: Next.TrialPetBrief.unit_type:type_name -> dataconfig.SkillDamType
-	35, // 50: Next.TrialPet.brief:type_name -> Next.TrialPetBrief
-	33, // 51: Next.TrialPet.pets:type_name -> Next.PetData
-	5,  // 52: Next.PetTypeInfo.type:type_name -> Next.PetTypeInfo.ENUM
-	41, // 53: Next.PetEnvEnergyInfo.env_info:type_name -> Next.EnvEnergyInfo
-	20, // 54: Next.PetSpecialExData.key_experience:type_name -> Next.PetKeyExperience
-	24, // 55: Next.PetSpecialExData.closeness_info:type_name -> Next.PetClosenessInfo
-	44, // 56: Next.PetSpecialExData.together_catch_info:type_name -> Next.TogetherCatchInfo
-	79, // 57: Next.PetBriefInfo.name_src:type_name -> dataconfig.PetNameSource
-	80, // 58: Next.PetBriefInfo.skill_dam_type:type_name -> dataconfig.SkillDamType
-	81, // 59: Next.PetBriefInfo.skill:type_name -> Next.PetSkillInfo
-	7,  // 60: Next.PetBriefInfo.attribute_info:type_name -> Next.PetAttributeInfo
-	22, // 61: Next.PetBriefInfo.attribute_new_info:type_name -> Next.PetAdditionalNewAttrList
-	83, // 62: Next.PetBriefInfo.partner_mark:type_name -> dataconfig.PetPartnerMarkType
-	84, // 63: Next.PetBriefInfo.glass_info:type_name -> Next.GlassInfo
-	44, // 64: Next.PetBriefInfo.together_catch_info:type_name -> Next.TogetherCatchInfo
-	1,  // 65: Next.PetBriefInfo.nature_attr_change_way:type_name -> Next.PetNatureAttrChangeWay
-	46, // 66: Next.PetBacktrack.snap_shot:type_name -> Next.PetBriefInfo
-	49, // 67: Next.PetBacktrack.used_items:type_name -> Next.PetUsedItems
-	48, // 68: Next.PetBacktrack.show_info:type_name -> Next.PetBacktrackShowInfo
-	80, // 69: Next.PetBacktrackShowInfo.skill_dam_type:type_name -> dataconfig.SkillDamType
-	84, // 70: Next.PetBacktrackShowInfo.glass_info:type_name -> Next.GlassInfo
-	79, // 71: Next.PetBacktrackShowInfo.name_src:type_name -> dataconfig.PetNameSource
-	46, // 72: Next.PetTravelInfo.pet_briefs:type_name -> Next.PetBriefInfo
-	52, // 73: Next.PetStatisticsInfo_PetStatisticsData.mutation_count:type_name -> Next.MutationCount
-	53, // 74: Next.PetStatisticsInfo.pet_statistics_data:type_name -> Next.PetStatisticsInfo_PetStatisticsData
-	33, // 75: Next.PetDataInfoList.pet_data:type_name -> Next.PetData
-	33, // 76: Next.DeletedPetInfo.pet_data:type_name -> Next.PetData
-	56, // 77: Next.DeletedPetList.delete_pets:type_name -> Next.DeletedPetInfo
-	86, // 78: Next.PetSpecialData.skill_data:type_name -> Next.PetSkillData
-	79, // 79: Next.PetSpecialData.pet_name_src:type_name -> dataconfig.PetNameSource
-	87, // 80: Next.ReportInfo.rcr:type_name -> dataconfig.ReportCoinRatio
-	46, // 81: Next.PetReportInfo.pet_brief:type_name -> Next.PetBriefInfo
-	59, // 82: Next.PetReportInfo.report_infos:type_name -> Next.ReportInfo
-	62, // 83: Next.PetHabitInfo.habit_group:type_name -> Next.PetHabitGroup
-	88, // 84: Next.PetBox.mark_type:type_name -> dataconfig.WarehouseMarkType
-	67, // 85: Next.PetBackpackInfo.boxes:type_name -> Next.PetBox
-	89, // 86: Next.PetBackpackInfo.tidy_rules:type_name -> dataconfig.PetBoxTidyRuleType
-	84, // 87: Next.ZoneCatchResult.glass_info:type_name -> Next.GlassInfo
-	72, // 88: Next.RankSeasonPetUseInfo.pet_skill_use_info:type_name -> Next.PetSkillUseInfo
-	75, // 89: Next.PlayerPetMonitorInfo.daily_info:type_name -> Next.PlayerPetMonitorDailyInfo
-	77, // 90: Next.PetTaskInfo.together_task:type_name -> Next.PetTogetherTaskInfo
-	84, // 91: Next.SceneBasePetData.glass_info:type_name -> Next.GlassInfo
-	32, // 92: Next.SceneBasePetData.scene_info:type_name -> Next.PetSceneInfo
-	79, // 93: Next.SceneBasePetData.name_src:type_name -> dataconfig.PetNameSource
-	31, // 94: Next.SceneBasePetData.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
-	95, // [95:95] is the sub-list for method output_type
-	95, // [95:95] is the sub-list for method input_type
-	95, // [95:95] is the sub-list for extension type_name
-	95, // [95:95] is the sub-list for extension extendee
-	0,  // [0:95] is the sub-list for field type_name
+	81, // 8: Next.BlessingInfo.from_pet_name_src:type_name -> dataconfig.PetNameSource
+	14, // 9: Next.PetKeyExperience.evolute_info:type_name -> Next.PetEvoluteInfo
+	15, // 10: Next.PetKeyExperience.pvp_first_win_info:type_name -> Next.PvpFirstWinInfo
+	16, // 11: Next.PetKeyExperience.legend_first_win_alone_info:type_name -> Next.LegendFirstWinAloneInfo
+	17, // 12: Next.PetKeyExperience.blessing_info:type_name -> Next.BlessingInfo
+	18, // 13: Next.PetKeyExperience.obtain_shiny_fashion_info:type_name -> Next.ObtainShinyFashionInfo
+	19, // 14: Next.PetKeyExperience.backtrack_record_info:type_name -> Next.PetBackTrackRecordInfo
+	21, // 15: Next.PetAdditionalNewAttrList.addi_attr_data:type_name -> Next.PetAdditionalNewAttrInfo
+	23, // 16: Next.PetClosenessInfo.history_info_list:type_name -> Next.PetClosenessHistoryInfo
+	25, // 17: Next.PetEvolutionNeedInfo.defeat_info:type_name -> Next.DefeatInfo
+	26, // 18: Next.PetEvolutionNeedInfo.interact_info:type_name -> Next.InteractInfo
+	29, // 19: Next.PetLLMSingleNatureTagInfo.tag_history:type_name -> Next.PetLLMTagHistoryInfo
+	30, // 20: Next.PetLLMNatureTagInfo.tag_info_list:type_name -> Next.PetLLMSingleNatureTagInfo
+	31, // 21: Next.PetSceneInfo.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
+	81, // 22: Next.PetData.name_src:type_name -> dataconfig.PetNameSource
+	82, // 23: Next.PetData.skill_dam_type:type_name -> dataconfig.SkillDamType
+	83, // 24: Next.PetData.skill:type_name -> Next.PetSkillInfo
+	9,  // 25: Next.PetData.ability:type_name -> Next.PetAbilityInfo
+	7,  // 26: Next.PetData.attribute_info:type_name -> Next.PetAttributeInfo
+	22, // 27: Next.PetData.attribute_new_info:type_name -> Next.PetAdditionalNewAttrList
+	0,  // 28: Next.PetData.evolution_stage:type_name -> Next.PetEvolutionState
+	10, // 29: Next.PetData.ai_info:type_name -> Next.BattleAIInitInfo
+	12, // 30: Next.PetData.possession:type_name -> Next.PossessionInfo
+	84, // 31: Next.PetData.cheer_info:type_name -> Next.CheerMonsterInitInfo
+	13, // 32: Next.PetData.stat:type_name -> Next.PetStatistics
+	83, // 33: Next.PetData.all_skill:type_name -> Next.PetSkillInfo
+	20, // 34: Next.PetData.key_experience:type_name -> Next.PetKeyExperience
+	24, // 35: Next.PetData.closeness_info:type_name -> Next.PetClosenessInfo
+	85, // 36: Next.PetData.partner_mark:type_name -> dataconfig.PetPartnerMarkType
+	27, // 37: Next.PetData.evlution_need_info:type_name -> Next.PetEvolutionNeedInfo
+	86, // 38: Next.PetData.glass_info:type_name -> Next.GlassInfo
+	28, // 39: Next.PetData.cheer_point_info:type_name -> Next.PetCheerPointInfo
+	44, // 40: Next.PetData.together_catch_info:type_name -> Next.TogetherCatchInfo
+	37, // 41: Next.PetData.type:type_name -> Next.PetTypeInfo
+	34, // 42: Next.PetData.activity_partner_pet_data:type_name -> Next.ActivityPartnerPetData
+	1,  // 43: Next.PetData.nature_attr_change_way:type_name -> Next.PetNatureAttrChangeWay
+	32, // 44: Next.PetData.scene_info:type_name -> Next.PetSceneInfo
+	87, // 45: Next.PetData.season_add_info:type_name -> Next.SeasonBattleInfo
+	80, // 46: Next.PetData.pet_lord_info:type_name -> Next.PetLordInfo
+	88, // 47: Next.PetData.owl_sanctuary_pet_diff_info:type_name -> Next.OwlSanctuaryPetDiffInfo
+	31, // 48: Next.PetData.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
+	20, // 49: Next.ActivityPartnerPetData.key_experience:type_name -> Next.PetKeyExperience
+	24, // 50: Next.ActivityPartnerPetData.closeness_info:type_name -> Next.PetClosenessInfo
+	44, // 51: Next.ActivityPartnerPetData.together_catch_info:type_name -> Next.TogetherCatchInfo
+	82, // 52: Next.TrialPetBrief.unit_type:type_name -> dataconfig.SkillDamType
+	35, // 53: Next.TrialPet.brief:type_name -> Next.TrialPetBrief
+	33, // 54: Next.TrialPet.pets:type_name -> Next.PetData
+	5,  // 55: Next.PetTypeInfo.type:type_name -> Next.PetTypeInfo.ENUM
+	41, // 56: Next.PetEnvEnergyInfo.env_info:type_name -> Next.EnvEnergyInfo
+	20, // 57: Next.PetSpecialExData.key_experience:type_name -> Next.PetKeyExperience
+	24, // 58: Next.PetSpecialExData.closeness_info:type_name -> Next.PetClosenessInfo
+	44, // 59: Next.PetSpecialExData.together_catch_info:type_name -> Next.TogetherCatchInfo
+	81, // 60: Next.PetBriefInfo.name_src:type_name -> dataconfig.PetNameSource
+	82, // 61: Next.PetBriefInfo.skill_dam_type:type_name -> dataconfig.SkillDamType
+	83, // 62: Next.PetBriefInfo.skill:type_name -> Next.PetSkillInfo
+	7,  // 63: Next.PetBriefInfo.attribute_info:type_name -> Next.PetAttributeInfo
+	22, // 64: Next.PetBriefInfo.attribute_new_info:type_name -> Next.PetAdditionalNewAttrList
+	85, // 65: Next.PetBriefInfo.partner_mark:type_name -> dataconfig.PetPartnerMarkType
+	86, // 66: Next.PetBriefInfo.glass_info:type_name -> Next.GlassInfo
+	44, // 67: Next.PetBriefInfo.together_catch_info:type_name -> Next.TogetherCatchInfo
+	1,  // 68: Next.PetBriefInfo.nature_attr_change_way:type_name -> Next.PetNatureAttrChangeWay
+	46, // 69: Next.PetBacktrack.snap_shot:type_name -> Next.PetBriefInfo
+	49, // 70: Next.PetBacktrack.used_items:type_name -> Next.PetUsedItems
+	48, // 71: Next.PetBacktrack.show_info:type_name -> Next.PetBacktrackShowInfo
+	82, // 72: Next.PetBacktrackShowInfo.skill_dam_type:type_name -> dataconfig.SkillDamType
+	86, // 73: Next.PetBacktrackShowInfo.glass_info:type_name -> Next.GlassInfo
+	81, // 74: Next.PetBacktrackShowInfo.name_src:type_name -> dataconfig.PetNameSource
+	46, // 75: Next.PetTravelInfo.pet_briefs:type_name -> Next.PetBriefInfo
+	52, // 76: Next.PetStatisticsInfo_PetStatisticsData.mutation_count:type_name -> Next.MutationCount
+	53, // 77: Next.PetStatisticsInfo.pet_statistics_data:type_name -> Next.PetStatisticsInfo_PetStatisticsData
+	33, // 78: Next.PetDataInfoList.pet_data:type_name -> Next.PetData
+	33, // 79: Next.DeletedPetInfo.pet_data:type_name -> Next.PetData
+	56, // 80: Next.DeletedPetList.delete_pets:type_name -> Next.DeletedPetInfo
+	89, // 81: Next.PetSpecialData.skill_data:type_name -> Next.PetSkillData
+	81, // 82: Next.PetSpecialData.pet_name_src:type_name -> dataconfig.PetNameSource
+	90, // 83: Next.ReportInfo.rcr:type_name -> dataconfig.ReportCoinRatio
+	46, // 84: Next.PetReportInfo.pet_brief:type_name -> Next.PetBriefInfo
+	59, // 85: Next.PetReportInfo.report_infos:type_name -> Next.ReportInfo
+	62, // 86: Next.PetHabitInfo.habit_group:type_name -> Next.PetHabitGroup
+	91, // 87: Next.PetBox.mark_type:type_name -> dataconfig.WarehouseMarkType
+	67, // 88: Next.PetBackpackInfo.boxes:type_name -> Next.PetBox
+	92, // 89: Next.PetBackpackInfo.tidy_rules:type_name -> dataconfig.PetBoxTidyRuleType
+	86, // 90: Next.ZoneCatchResult.glass_info:type_name -> Next.GlassInfo
+	73, // 91: Next.RankSeasonPetUseInfo.pet_skill_use_info:type_name -> Next.PetSkillUseInfo
+	76, // 92: Next.PlayerPetMonitorInfo.daily_info:type_name -> Next.PlayerPetMonitorDailyInfo
+	78, // 93: Next.PetTaskInfo.together_task:type_name -> Next.PetTogetherTaskInfo
+	86, // 94: Next.SceneBasePetData.glass_info:type_name -> Next.GlassInfo
+	32, // 95: Next.SceneBasePetData.scene_info:type_name -> Next.PetSceneInfo
+	81, // 96: Next.SceneBasePetData.name_src:type_name -> dataconfig.PetNameSource
+	31, // 97: Next.SceneBasePetData.llm_nature_tag:type_name -> Next.PetLLMNatureTagInfo
+	82, // 98: Next.PetLordInfo.before_skill_dam_type:type_name -> dataconfig.SkillDamType
+	99, // [99:99] is the sub-list for method output_type
+	99, // [99:99] is the sub-list for method input_type
+	99, // [99:99] is the sub-list for extension type_name
+	99, // [99:99] is the sub-list for extension extendee
+	0,  // [0:99] is the sub-list for field type_name
 }
 
 func init() { file_com_pet_proto_init() }
@@ -7539,7 +7817,7 @@ func file_com_pet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_com_pet_proto_rawDesc), len(file_com_pet_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   73,
+			NumMessages:   75,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

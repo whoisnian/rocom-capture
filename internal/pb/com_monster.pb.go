@@ -84,17 +84,18 @@ func (MonsterSettleStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type MonsterDiffInfo struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Height               *int32                 `protobuf:"varint,1,opt,name=height" json:"height,omitempty"`
-	Weight               *int32                 `protobuf:"varint,2,opt,name=weight" json:"weight,omitempty"`
-	Nature               *int32                 `protobuf:"varint,3,opt,name=nature" json:"nature,omitempty"`
-	MutationType         *int32                 `protobuf:"varint,4,opt,name=mutation_type,json=mutationType" json:"mutation_type,omitempty"`
-	BloodMixSkillDamType *uint32                `protobuf:"varint,5,opt,name=blood_mix_skill_dam_type,json=bloodMixSkillDamType" json:"blood_mix_skill_dam_type,omitempty"`
-	GlassInfo            *GlassInfo             `protobuf:"bytes,7,opt,name=glass_info,json=glassInfo" json:"glass_info,omitempty"`
-	Voice                *int32                 `protobuf:"varint,8,opt,name=voice" json:"voice,omitempty"`
-	Gender               *int32                 `protobuf:"varint,9,opt,name=gender" json:"gender,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                   protoimpl.MessageState   `protogen:"open.v1"`
+	Height                  *int32                   `protobuf:"varint,1,opt,name=height" json:"height,omitempty"`
+	Weight                  *int32                   `protobuf:"varint,2,opt,name=weight" json:"weight,omitempty"`
+	Nature                  *int32                   `protobuf:"varint,3,opt,name=nature" json:"nature,omitempty"`
+	MutationType            *int32                   `protobuf:"varint,4,opt,name=mutation_type,json=mutationType" json:"mutation_type,omitempty"`
+	BloodMixSkillDamType    *uint32                  `protobuf:"varint,5,opt,name=blood_mix_skill_dam_type,json=bloodMixSkillDamType" json:"blood_mix_skill_dam_type,omitempty"`
+	GlassInfo               *GlassInfo               `protobuf:"bytes,7,opt,name=glass_info,json=glassInfo" json:"glass_info,omitempty"`
+	Voice                   *int32                   `protobuf:"varint,8,opt,name=voice" json:"voice,omitempty"`
+	Gender                  *int32                   `protobuf:"varint,9,opt,name=gender" json:"gender,omitempty"`
+	OwlSanctuaryPetDiffInfo *OwlSanctuaryPetDiffInfo `protobuf:"bytes,10,opt,name=owl_sanctuary_pet_diff_info,json=owlSanctuaryPetDiffInfo" json:"owl_sanctuary_pet_diff_info,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *MonsterDiffInfo) Reset() {
@@ -181,6 +182,13 @@ func (x *MonsterDiffInfo) GetGender() int32 {
 		return *x.Gender
 	}
 	return 0
+}
+
+func (x *MonsterDiffInfo) GetOwlSanctuaryPetDiffInfo() *OwlSanctuaryPetDiffInfo {
+	if x != nil {
+		return x.OwlSanctuaryPetDiffInfo
+	}
+	return nil
 }
 
 type CheerMonsterInitInfo struct {
@@ -295,7 +303,7 @@ var File_com_monster_proto protoreflect.FileDescriptor
 
 const file_com_monster_proto_rawDesc = "" +
 	"\n" +
-	"\x11com_monster.proto\x12\x04Next\x1a\x14com_base_types.proto\"\x94\x02\n" +
+	"\x11com_monster.proto\x12\x04Next\x1a\x14com_base_types.proto\"\xf1\x02\n" +
 	"\x0fMonsterDiffInfo\x12\x16\n" +
 	"\x06height\x18\x01 \x01(\x05R\x06height\x12\x16\n" +
 	"\x06weight\x18\x02 \x01(\x05R\x06weight\x12\x16\n" +
@@ -305,7 +313,9 @@ const file_com_monster_proto_rawDesc = "" +
 	"\n" +
 	"glass_info\x18\a \x01(\v2\x0f.Next.GlassInfoR\tglassInfo\x12\x14\n" +
 	"\x05voice\x18\b \x01(\x05R\x05voice\x12\x16\n" +
-	"\x06gender\x18\t \x01(\x05R\x06gender\"\xae\x02\n" +
+	"\x06gender\x18\t \x01(\x05R\x06gender\x12[\n" +
+	"\x1bowl_sanctuary_pet_diff_info\x18\n" +
+	" \x01(\v2\x1d.Next.OwlSanctuaryPetDiffInfoR\x17owlSanctuaryPetDiffInfo\"\xae\x02\n" +
 	"\x14CheerMonsterInitInfo\x12\x17\n" +
 	"\aconf_id\x18\x01 \x01(\rR\x06confId\x12\x10\n" +
 	"\x03sid\x18\x02 \x01(\x04R\x03sid\x12\x10\n" +
@@ -338,19 +348,21 @@ func file_com_monster_proto_rawDescGZIP() []byte {
 var file_com_monster_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_com_monster_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_com_monster_proto_goTypes = []any{
-	(MonsterSettleStatus)(0),     // 0: Next.MonsterSettleStatus
-	(*MonsterDiffInfo)(nil),      // 1: Next.MonsterDiffInfo
-	(*CheerMonsterInitInfo)(nil), // 2: Next.CheerMonsterInitInfo
-	(*GlassInfo)(nil),            // 3: Next.GlassInfo
+	(MonsterSettleStatus)(0),        // 0: Next.MonsterSettleStatus
+	(*MonsterDiffInfo)(nil),         // 1: Next.MonsterDiffInfo
+	(*CheerMonsterInitInfo)(nil),    // 2: Next.CheerMonsterInitInfo
+	(*GlassInfo)(nil),               // 3: Next.GlassInfo
+	(*OwlSanctuaryPetDiffInfo)(nil), // 4: Next.OwlSanctuaryPetDiffInfo
 }
 var file_com_monster_proto_depIdxs = []int32{
 	3, // 0: Next.MonsterDiffInfo.glass_info:type_name -> Next.GlassInfo
-	1, // 1: Next.CheerMonsterInitInfo.monster_diff_info:type_name -> Next.MonsterDiffInfo
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 1: Next.MonsterDiffInfo.owl_sanctuary_pet_diff_info:type_name -> Next.OwlSanctuaryPetDiffInfo
+	1, // 2: Next.CheerMonsterInitInfo.monster_diff_info:type_name -> Next.MonsterDiffInfo
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_com_monster_proto_init() }

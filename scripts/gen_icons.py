@@ -65,8 +65,10 @@ WORLDMAP = {
     "img_gaojimianxiao_weifangman_png":     "大型眠枭庇护所",
     "img_mianxiaozhixing_huang_png":        "黄色眠枭之星",
     "img_miaoxianzhixing_lan_png":          "蓝色眠枭之星",
+    "img_miaoxianzhixing_zi_png":           "紫色眠枭之星",
     "owl_worldmap_fruit_A1_png":            "蓝色精灵果实",
     "owl_worldmap_fruit_A2_png":            "黄色精灵果实",
+    "owl_worldmap_fruit_A3_png":            "紫色精灵果实",
 }
 
 
@@ -145,8 +147,16 @@ def copy_texture(ref: str, dst: str) -> str | None:
 
 # ── 各组:枚举图标资产引用 ─────────────────────────────────
 
-def icon_refs(table: str, field: str):
+# filter 组只收 names.json filter_icons 实际输出的三组(与 gen_gamedata 同一白名单):
+# 2026-07 版 PET_FILTER_CONF 新增 PetBloodType 组(游戏内血脉筛选),其图标与 PET_BLOOD_CONF
+# 的血脉主图标同为 XueMai 图集精灵,照单全收会往 img/filter 重复转码 21 张 img/blood 已有的图。
+FILTER_ENUMS = {"SkillDamType", "AttributeType", "PetPartnerMarkType"}
+
+
+def icon_refs(table: str, field: str, enums: set | None = None):
     for r in load_rows(table).values():
+        if enums and r.get("filter_enum_name") not in enums:
+            continue
         ic = r.get(field)
         if isinstance(ic, str) and ic:
             m = re.search(r"/Game/[^']+", ic)
@@ -181,7 +191,7 @@ def main():
     if not os.path.isdir(SRC):
         sys.exit(f"源目录不存在: {SRC}(可传下载根目录或用 IMG_SRC 指定)")
     total = 0
-    total += gen_group("filter", icon_refs("PET_FILTER_CONF", "filter_icon"), crop_sprite)
+    total += gen_group("filter", icon_refs("PET_FILTER_CONF", "filter_icon", FILTER_ENUMS), crop_sprite)
     total += gen_group("blood", icon_refs("PET_BLOOD_CONF", "icon"), crop_sprite)
     total += gen_group("static", list(STATIC), crop_sprite)
     total += gen_group("worldmap", list(WORLDMAP), crop_sprite)

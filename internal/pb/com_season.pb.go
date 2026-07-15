@@ -39,6 +39,7 @@ type BoxMonsterInfo struct {
 	Height          *int32                 `protobuf:"varint,14,opt,name=height" json:"height,omitempty"`
 	Weight          *int32                 `protobuf:"varint,15,opt,name=weight" json:"weight,omitempty"`
 	Voice           *int32                 `protobuf:"varint,16,opt,name=voice" json:"voice,omitempty"`
+	NameSrc         *PetNameSource         `protobuf:"varint,17,opt,name=name_src,json=nameSrc,enum=dataconfig.PetNameSource" json:"name_src,omitempty"`
 	RefreshBatchId  *uint64                `protobuf:"varint,30,opt,name=refresh_batch_id,json=refreshBatchId" json:"refresh_batch_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -186,6 +187,13 @@ func (x *BoxMonsterInfo) GetVoice() int32 {
 	return 0
 }
 
+func (x *BoxMonsterInfo) GetNameSrc() PetNameSource {
+	if x != nil && x.NameSrc != nil {
+		return *x.NameSrc
+	}
+	return PetNameSource_PNS_PET_BASE
+}
+
 func (x *BoxMonsterInfo) GetRefreshBatchId() uint64 {
 	if x != nil && x.RefreshBatchId != nil {
 		return *x.RefreshBatchId
@@ -199,6 +207,7 @@ type SeasonPetInfo struct {
 	IsShiny        *bool                  `protobuf:"varint,2,opt,name=is_shiny,json=isShiny" json:"is_shiny,omitempty"`
 	IsFantastic    *bool                  `protobuf:"varint,3,opt,name=is_fantastic,json=isFantastic" json:"is_fantastic,omitempty"`
 	MixBlood       *int32                 `protobuf:"varint,4,opt,name=mix_blood,json=mixBlood" json:"mix_blood,omitempty"`
+	DeleteTime     *uint32                `protobuf:"varint,5,opt,name=delete_time,json=deleteTime" json:"delete_time,omitempty"`
 	RefreshBatchId *uint64                `protobuf:"varint,20,opt,name=refresh_batch_id,json=refreshBatchId" json:"refresh_batch_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -262,7 +271,122 @@ func (x *SeasonPetInfo) GetMixBlood() int32 {
 	return 0
 }
 
+func (x *SeasonPetInfo) GetDeleteTime() uint32 {
+	if x != nil && x.DeleteTime != nil {
+		return *x.DeleteTime
+	}
+	return 0
+}
+
 func (x *SeasonPetInfo) GetRefreshBatchId() uint64 {
+	if x != nil && x.RefreshBatchId != nil {
+		return *x.RefreshBatchId
+	}
+	return 0
+}
+
+type LineBallMonsterInfo struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	IsShiny         *bool                  `protobuf:"varint,1,opt,name=is_shiny,json=isShiny" json:"is_shiny,omitempty"`
+	IsFantastic     *bool                  `protobuf:"varint,2,opt,name=is_fantastic,json=isFantastic" json:"is_fantastic,omitempty"`
+	IsNightmare     *bool                  `protobuf:"varint,3,opt,name=is_nightmare,json=isNightmare" json:"is_nightmare,omitempty"`
+	PetContentId    *int32                 `protobuf:"varint,4,opt,name=pet_content_id,json=petContentId" json:"pet_content_id,omitempty"`
+	BelongSeason    *int32                 `protobuf:"varint,5,opt,name=belong_season,json=belongSeason" json:"belong_season,omitempty"`
+	PetSpecialityId *int32                 `protobuf:"varint,6,opt,name=pet_speciality_id,json=petSpecialityId" json:"pet_speciality_id,omitempty"`
+	PetTalentRank   *int32                 `protobuf:"varint,7,opt,name=pet_talent_rank,json=petTalentRank" json:"pet_talent_rank,omitempty"`
+	MixBlood        *int32                 `protobuf:"varint,8,opt,name=mix_blood,json=mixBlood" json:"mix_blood,omitempty"`
+	RefreshBatchId  *uint64                `protobuf:"varint,20,opt,name=refresh_batch_id,json=refreshBatchId" json:"refresh_batch_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LineBallMonsterInfo) Reset() {
+	*x = LineBallMonsterInfo{}
+	mi := &file_com_season_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LineBallMonsterInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LineBallMonsterInfo) ProtoMessage() {}
+
+func (x *LineBallMonsterInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_com_season_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LineBallMonsterInfo.ProtoReflect.Descriptor instead.
+func (*LineBallMonsterInfo) Descriptor() ([]byte, []int) {
+	return file_com_season_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *LineBallMonsterInfo) GetIsShiny() bool {
+	if x != nil && x.IsShiny != nil {
+		return *x.IsShiny
+	}
+	return false
+}
+
+func (x *LineBallMonsterInfo) GetIsFantastic() bool {
+	if x != nil && x.IsFantastic != nil {
+		return *x.IsFantastic
+	}
+	return false
+}
+
+func (x *LineBallMonsterInfo) GetIsNightmare() bool {
+	if x != nil && x.IsNightmare != nil {
+		return *x.IsNightmare
+	}
+	return false
+}
+
+func (x *LineBallMonsterInfo) GetPetContentId() int32 {
+	if x != nil && x.PetContentId != nil {
+		return *x.PetContentId
+	}
+	return 0
+}
+
+func (x *LineBallMonsterInfo) GetBelongSeason() int32 {
+	if x != nil && x.BelongSeason != nil {
+		return *x.BelongSeason
+	}
+	return 0
+}
+
+func (x *LineBallMonsterInfo) GetPetSpecialityId() int32 {
+	if x != nil && x.PetSpecialityId != nil {
+		return *x.PetSpecialityId
+	}
+	return 0
+}
+
+func (x *LineBallMonsterInfo) GetPetTalentRank() int32 {
+	if x != nil && x.PetTalentRank != nil {
+		return *x.PetTalentRank
+	}
+	return 0
+}
+
+func (x *LineBallMonsterInfo) GetMixBlood() int32 {
+	if x != nil && x.MixBlood != nil {
+		return *x.MixBlood
+	}
+	return 0
+}
+
+func (x *LineBallMonsterInfo) GetRefreshBatchId() uint64 {
 	if x != nil && x.RefreshBatchId != nil {
 		return *x.RefreshBatchId
 	}
@@ -272,6 +396,7 @@ func (x *SeasonPetInfo) GetRefreshBatchId() uint64 {
 type SeasonBattleInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BoxInfo       *BoxMonsterInfo        `protobuf:"bytes,1,opt,name=box_info,json=boxInfo" json:"box_info,omitempty"`
+	LineBallInfo  *LineBallMonsterInfo   `protobuf:"bytes,2,opt,name=line_ball_info,json=lineBallInfo" json:"line_ball_info,omitempty"`
 	SeasonPetInfo *SeasonPetInfo         `protobuf:"bytes,10,opt,name=season_pet_info,json=seasonPetInfo" json:"season_pet_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -279,7 +404,7 @@ type SeasonBattleInfo struct {
 
 func (x *SeasonBattleInfo) Reset() {
 	*x = SeasonBattleInfo{}
-	mi := &file_com_season_proto_msgTypes[2]
+	mi := &file_com_season_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +416,7 @@ func (x *SeasonBattleInfo) String() string {
 func (*SeasonBattleInfo) ProtoMessage() {}
 
 func (x *SeasonBattleInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_com_season_proto_msgTypes[2]
+	mi := &file_com_season_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,12 +429,19 @@ func (x *SeasonBattleInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SeasonBattleInfo.ProtoReflect.Descriptor instead.
 func (*SeasonBattleInfo) Descriptor() ([]byte, []int) {
-	return file_com_season_proto_rawDescGZIP(), []int{2}
+	return file_com_season_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SeasonBattleInfo) GetBoxInfo() *BoxMonsterInfo {
 	if x != nil {
 		return x.BoxInfo
+	}
+	return nil
+}
+
+func (x *SeasonBattleInfo) GetLineBallInfo() *LineBallMonsterInfo {
+	if x != nil {
+		return x.LineBallInfo
 	}
 	return nil
 }
@@ -325,7 +457,7 @@ var File_com_season_proto protoreflect.FileDescriptor
 
 const file_com_season_proto_rawDesc = "" +
 	"\n" +
-	"\x10com_season.proto\x12\x04Next\x1a\x15com_battle_enum.proto\x1a\x0exls_enum.proto\"\xe0\x04\n" +
+	"\x10com_season.proto\x12\x04Next\x1a\x15com_battle_enum.proto\x1a\x0exls_enum.proto\"\x96\x05\n" +
 	"\x0eBoxMonsterInfo\x12(\n" +
 	"\bbox_type\x18\x01 \x01(\x0e2\r.Next.BoxTypeR\aboxType\x12\x19\n" +
 	"\bis_shiny\x18\x02 \x01(\bR\aisShiny\x12!\n" +
@@ -345,16 +477,30 @@ const file_com_season_proto_rawDesc = "" +
 	"\x06gender\x18\r \x01(\rR\x06gender\x12\x16\n" +
 	"\x06height\x18\x0e \x01(\x05R\x06height\x12\x16\n" +
 	"\x06weight\x18\x0f \x01(\x05R\x06weight\x12\x14\n" +
-	"\x05voice\x18\x10 \x01(\x05R\x05voice\x12(\n" +
-	"\x10refresh_batch_id\x18\x1e \x01(\x04R\x0erefreshBatchId\"\xb7\x01\n" +
+	"\x05voice\x18\x10 \x01(\x05R\x05voice\x124\n" +
+	"\bname_src\x18\x11 \x01(\x0e2\x19.dataconfig.PetNameSourceR\anameSrc\x12(\n" +
+	"\x10refresh_batch_id\x18\x1e \x01(\x04R\x0erefreshBatchId\"\xd8\x01\n" +
 	"\rSeasonPetInfo\x12!\n" +
 	"\fis_nightmare\x18\x01 \x01(\bR\visNightmare\x12\x19\n" +
 	"\bis_shiny\x18\x02 \x01(\bR\aisShiny\x12!\n" +
 	"\fis_fantastic\x18\x03 \x01(\bR\visFantastic\x12\x1b\n" +
-	"\tmix_blood\x18\x04 \x01(\x05R\bmixBlood\x12(\n" +
-	"\x10refresh_batch_id\x18\x14 \x01(\x04R\x0erefreshBatchId\"\x80\x01\n" +
+	"\tmix_blood\x18\x04 \x01(\x05R\bmixBlood\x12\x1f\n" +
+	"\vdelete_time\x18\x05 \x01(\rR\n" +
+	"deleteTime\x12(\n" +
+	"\x10refresh_batch_id\x18\x14 \x01(\x04R\x0erefreshBatchId\"\xdc\x02\n" +
+	"\x13LineBallMonsterInfo\x12\x19\n" +
+	"\bis_shiny\x18\x01 \x01(\bR\aisShiny\x12!\n" +
+	"\fis_fantastic\x18\x02 \x01(\bR\visFantastic\x12!\n" +
+	"\fis_nightmare\x18\x03 \x01(\bR\visNightmare\x12$\n" +
+	"\x0epet_content_id\x18\x04 \x01(\x05R\fpetContentId\x12#\n" +
+	"\rbelong_season\x18\x05 \x01(\x05R\fbelongSeason\x12*\n" +
+	"\x11pet_speciality_id\x18\x06 \x01(\x05R\x0fpetSpecialityId\x12&\n" +
+	"\x0fpet_talent_rank\x18\a \x01(\x05R\rpetTalentRank\x12\x1b\n" +
+	"\tmix_blood\x18\b \x01(\x05R\bmixBlood\x12(\n" +
+	"\x10refresh_batch_id\x18\x14 \x01(\x04R\x0erefreshBatchId\"\xc1\x01\n" +
 	"\x10SeasonBattleInfo\x12/\n" +
-	"\bbox_info\x18\x01 \x01(\v2\x14.Next.BoxMonsterInfoR\aboxInfo\x12;\n" +
+	"\bbox_info\x18\x01 \x01(\v2\x14.Next.BoxMonsterInfoR\aboxInfo\x12?\n" +
+	"\x0eline_ball_info\x18\x02 \x01(\v2\x19.Next.LineBallMonsterInfoR\flineBallInfo\x12;\n" +
 	"\x0fseason_pet_info\x18\n" +
 	" \x01(\v2\x13.Next.SeasonPetInfoR\rseasonPetInfo"
 
@@ -370,26 +516,30 @@ func file_com_season_proto_rawDescGZIP() []byte {
 	return file_com_season_proto_rawDescData
 }
 
-var file_com_season_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_com_season_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_com_season_proto_goTypes = []any{
-	(*BoxMonsterInfo)(nil),   // 0: Next.BoxMonsterInfo
-	(*SeasonPetInfo)(nil),    // 1: Next.SeasonPetInfo
-	(*SeasonBattleInfo)(nil), // 2: Next.SeasonBattleInfo
-	(BoxType)(0),             // 3: Next.BoxType
-	(PetRarityType)(0),       // 4: Next.PetRarityType
-	(PetMutationType)(0),     // 5: Next.PetMutationType
+	(*BoxMonsterInfo)(nil),      // 0: Next.BoxMonsterInfo
+	(*SeasonPetInfo)(nil),       // 1: Next.SeasonPetInfo
+	(*LineBallMonsterInfo)(nil), // 2: Next.LineBallMonsterInfo
+	(*SeasonBattleInfo)(nil),    // 3: Next.SeasonBattleInfo
+	(BoxType)(0),                // 4: Next.BoxType
+	(PetRarityType)(0),          // 5: Next.PetRarityType
+	(PetMutationType)(0),        // 6: Next.PetMutationType
+	(PetNameSource)(0),          // 7: dataconfig.PetNameSource
 }
 var file_com_season_proto_depIdxs = []int32{
-	3, // 0: Next.BoxMonsterInfo.box_type:type_name -> Next.BoxType
-	4, // 1: Next.BoxMonsterInfo.pet_rarity_type:type_name -> Next.PetRarityType
-	5, // 2: Next.BoxMonsterInfo.pet_mutation_type:type_name -> Next.PetMutationType
-	0, // 3: Next.SeasonBattleInfo.box_info:type_name -> Next.BoxMonsterInfo
-	1, // 4: Next.SeasonBattleInfo.season_pet_info:type_name -> Next.SeasonPetInfo
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4, // 0: Next.BoxMonsterInfo.box_type:type_name -> Next.BoxType
+	5, // 1: Next.BoxMonsterInfo.pet_rarity_type:type_name -> Next.PetRarityType
+	6, // 2: Next.BoxMonsterInfo.pet_mutation_type:type_name -> Next.PetMutationType
+	7, // 3: Next.BoxMonsterInfo.name_src:type_name -> dataconfig.PetNameSource
+	0, // 4: Next.SeasonBattleInfo.box_info:type_name -> Next.BoxMonsterInfo
+	2, // 5: Next.SeasonBattleInfo.line_ball_info:type_name -> Next.LineBallMonsterInfo
+	1, // 6: Next.SeasonBattleInfo.season_pet_info:type_name -> Next.SeasonPetInfo
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_com_season_proto_init() }
@@ -405,7 +555,7 @@ func file_com_season_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_com_season_proto_rawDesc), len(file_com_season_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

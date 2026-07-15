@@ -10,116 +10,117 @@
             "Size": 4
         },
         {
-            "Name": "editor_name",
+            "Name": "path",
             "Type": "EString",
             "Offset": 4,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "path",
+            "Name": "lua_class",
             "Type": "EString",
             "Offset": 8,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "lua_class",
+            "Name": "icon",
             "Type": "EString",
             "Offset": 12,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "icon",
+            "Name": "shiny_icon",
             "Type": "EString",
             "Offset": 16,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "shiny_icon",
+            "Name": "big_icon",
             "Type": "EString",
             "Offset": 20,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "big_icon",
+            "Name": "big_shiny_icon",
             "Type": "EString",
             "Offset": 24,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "big_shiny_icon",
+            "Name": "ui_icon",
             "Type": "EString",
             "Offset": 28,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "ui_icon",
+            "Name": "small_icon",
             "Type": "EString",
             "Offset": 32,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "small_icon",
+            "Name": "tired_small_icon",
             "Type": "EString",
             "Offset": 36,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "tired_small_icon",
-            "Type": "EString",
-            "Offset": 40,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
             "Name": "anim_conf_id",
             "Type": "EUint32",
-            "Offset": 44,
+            "Offset": 40,
             "Size": 4
         },
         {
             "Name": "capsule_radius",
             "Type": "EUint32",
-            "Offset": 48,
+            "Offset": 44,
             "Size": 4
         },
         {
             "Name": "capsule_halfheight",
             "Type": "EUint32",
-            "Offset": 52,
+            "Offset": 48,
             "Size": 4
         },
         {
             "Name": "SMR",
             "Type": "EUint32",
-            "Offset": 56,
+            "Offset": 52,
             "Size": 4
         },
         {
             "Name": "model_scale",
             "Type": "EUint32",
-            "Offset": 60,
+            "Offset": 56,
             "Size": 4
         },
         {
             "Name": "exclude_nav_flag",
             "Type": "EUint32",
-            "Offset": 64,
+            "Offset": 60,
             "Size": 4
         },
         {
             "Name": "habitat_flag",
             "Type": "EInt32",
-            "Offset": 68,
+            "Offset": 64,
             "Size": 4
+        },
+        {
+            "Name": "pet_habitat_flag",
+            "Type": "EInt32",
+            "Offset": 68,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
         },
         {
             "Name": "mimic_editor_name",
@@ -207,6 +208,59 @@
             "Type": "EInt32",
             "Offset": 117,
             "Size": 4
+        },
+        {
+            "Name": "lock_offset",
+            "Type": "EUint32",
+            "Offset": 121,
+            "Size": 4
+        },
+        {
+            "Name": "nature_to_morph_target_data",
+            "Type": "EStruct",
+            "Offset": 125,
+            "Size": 4,
+            "CompressedSize": 4,
+            "ArrayDim": 2,
+            "Struct": {
+                "Name": "MODEL_CONF.nature_to_morph_target_data",
+                "Type": "EStruct",
+                "Properties": [
+                    {
+                        "Name": "nature_id",
+                        "Type": "EUint32",
+                        "Offset": 0,
+                        "Size": 4
+                    },
+                    {
+                        "Name": "morph_target_data",
+                        "Type": "EStruct",
+                        "Offset": 4,
+                        "Size": 4,
+                        "CompressedSize": 4,
+                        "ArrayDim": 8,
+                        "Struct": {
+                            "Name": "MODEL_CONF.nature_to_morph_target_data.morph_target_data",
+                            "Type": "EStruct",
+                            "Properties": [
+                                {
+                                    "Name": "morph_target_name",
+                                    "Type": "EString",
+                                    "Offset": 0,
+                                    "Size": 4,
+                                    "CompressedSize": 4
+                                },
+                                {
+                                    "Name": "morph_target_value",
+                                    "Type": "EInt32",
+                                    "Offset": 4,
+                                    "Size": 4
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
         }
     ]
 }

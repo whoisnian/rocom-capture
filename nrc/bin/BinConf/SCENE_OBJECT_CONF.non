@@ -10,24 +10,24 @@
             "Size": 4
         },
         {
-            "Name": "editor_name",
-            "Type": "EString",
-            "Offset": 4,
-            "Size": 4,
-            "CompressedSize": 4,
-            "ArrayDim": 3
-        },
-        {
             "Name": "scene_cfg_id",
             "Type": "EUint32",
-            "Offset": 8,
+            "Offset": 4,
             "Size": 4
         },
         {
             "Name": "scene_res_conf_id",
             "Type": "EUint32",
-            "Offset": 12,
+            "Offset": 8,
             "Size": 4
+        },
+        {
+            "Name": "scene_res_conf_ids",
+            "Type": "EUint32",
+            "Offset": 12,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
         },
         {
             "Name": "scene_export_id",
@@ -85,14 +85,6 @@
             "Offset": 44,
             "Size": 4,
             "CompressedSize": 4
-        },
-        {
-            "Name": "scene_res_conf_ids",
-            "Type": "EUint32",
-            "Offset": 48,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
         }
     ]
 }

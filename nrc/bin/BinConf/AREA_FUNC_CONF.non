@@ -58,36 +58,50 @@
             "Size": 4
         },
         {
-            "Name": "battle_source",
+            "Name": "second_name_text",
             "Type": "EString",
             "Offset": 32,
             "Size": 4,
             "CompressedSize": 4
         },
         {
-            "Name": "bgm_id",
-            "Type": "EInt32",
+            "Name": "second_name_background_umg",
+            "Type": "EString",
             "Offset": 36,
-            "Size": 4
+            "Size": 4,
+            "CompressedSize": 4
         },
         {
-            "Name": "bgm_area_state",
+            "Name": "battle_source",
             "Type": "EString",
             "Offset": 40,
             "Size": 4,
             "CompressedSize": 4
         },
         {
+            "Name": "bgm_id",
+            "Type": "EInt32",
+            "Offset": 44,
+            "Size": 4
+        },
+        {
+            "Name": "bgm_area_state",
+            "Type": "EString",
+            "Offset": 48,
+            "Size": 4,
+            "CompressedSize": 4
+        },
+        {
             "Name": "switch_group_name",
             "Type": "EString",
-            "Offset": 44,
+            "Offset": 52,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "area_bgm",
             "Type": "EStruct",
-            "Offset": 48,
+            "Offset": 56,
             "Size": 4,
             "CompressedSize": 4,
             "ArrayDim": 3,
@@ -120,33 +134,33 @@
         {
             "Name": "bgm_priority",
             "Type": "EInt32",
-            "Offset": 52,
+            "Offset": 60,
             "Size": 4
         },
         {
             "Name": "amb_events",
             "Type": "EString",
-            "Offset": 56,
+            "Offset": 64,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "amb_switch",
             "Type": "EString",
-            "Offset": 60,
+            "Offset": 68,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "amb_switch_priority",
             "Type": "EInt32",
-            "Offset": 64,
+            "Offset": 72,
             "Size": 4
         },
         {
             "Name": "scene_effect",
             "Type": "EStruct",
-            "Offset": 68,
+            "Offset": 76,
             "Size": 4,
             "CompressedSize": 4,
             "ArrayDim": 3,
@@ -178,14 +192,14 @@
         {
             "Name": "water_platform",
             "Type": "EString",
-            "Offset": 72,
+            "Offset": 80,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "area_ban_magic",
             "Type": "EInt32",
-            "Offset": 76,
+            "Offset": 84,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -193,7 +207,7 @@
         {
             "Name": "ban_roleplay_tools",
             "Type": "EInt32",
-            "Offset": 80,
+            "Offset": 88,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true

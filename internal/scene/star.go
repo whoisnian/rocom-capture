@@ -23,19 +23,19 @@ const (
 	OpNpcPendantInteractRsp = 0x0273 // ZONE_SCENE_NPC_PENDANT_INTERACT_RSP,s2c:回包(ret=0 成功)
 )
 
-// 眠枭之星的 NPC_CONF id:A1=蓝、A2=黄;「之星」「光点」「石像」三种形态都算一颗星
-// (光点交互后出一颗星;石像被星星魔法命中后浮现一颗星,触碰收集)。
-// 与 gen_gamedata.py 的 STAR_NPCS 同一批;蓝 147/黄 228 的构成见 docs/data.md 3.3。
+// 眠枭之星的 NPC_CONF id:A1=蓝、A2=黄、A2-2=紫(2026-07 版新区);「之星」「光点」「石像」
+// 三种形态都算一颗星(光点交互后出一颗星;石像被星星魔法命中后浮现一颗星,触碰收集)。
+// 与 gen_gamedata.py 的 STAR_NPCS 同一批;蓝 147/黄 228/紫 104 的构成见 docs/data.md 3.3。
 var starNpc = map[int32]bool{
-	55162: true, 55163: true, // 独立星
-	55500: true, 55510: true, // 光点
-	58308: true, 58318: true, // 石像
+	55162: true, 55163: true, 55601: true, // 独立星
+	55500: true, 55510: true, 55602: true, // 光点
+	58308: true, 58318: true, 55632: true, // 石像
 }
 
 // 石像与星/光点的**实体行为不同**(见 docs/data.md 3.4):石像本体收集后不消失、实体一直下发,
 // 「出现/消失」不携带任何收集信息;它的星是实体上的**挂件**(pendant),状态在 ActorInfo 里
 // (见 NpcActor.Pendant),收集动作是 c2s 挂件交互(OpNpcPendantInteractReq)。
-var statueNpc = map[int32]bool{58308: true, 58318: true}
+var statueNpc = map[int32]bool{58308: true, 58318: true, 55632: true}
 
 // 挂件(石像的星)状态,ActorInfo 的 NpcPendantItemInfo.status 取值(pcap 实测)。
 const (
@@ -205,7 +205,7 @@ func ParseActorLeave(body []byte) []uint64 {
 // ZoneProgress 是某区域某类星星的收集进度(服务器口径,进场景包下发)。
 type ZoneProgress struct {
 	Camp  int32 // 区域键 = 该区域营地(魔力之源)的刷新点 id;names.json 的 zones 给中文名
-	NpcID int32 // 星星 NPC id(独立星 55162/55163、光点 55500/55510、石像 58308/58318 各自一条)
+	NpcID int32 // 星星 NPC id(独立星/光点/石像各自一条,id 清单见 starNpc)
 	Got   int32 // 已收集
 	Total int32 // 总数(服务器口径,少数点不计区域,见 docs/data.md 3.4)
 }

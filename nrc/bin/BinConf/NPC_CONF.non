@@ -35,23 +35,9 @@
             "CompressedSize": 4
         },
         {
-            "Name": "editor_name",
-            "Type": "EString",
-            "Offset": 20,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
-            "Name": "editor_name_1",
-            "Type": "EString",
-            "Offset": 24,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
             "Name": "npc_tag",
             "Type": "EInt32",
-            "Offset": 28,
+            "Offset": 20,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -59,311 +45,254 @@
         {
             "Name": "model_conf",
             "Type": "EUint32",
-            "Offset": 32,
+            "Offset": 24,
             "Size": 4
         },
         {
             "Name": "original_action",
             "Type": "EString",
-            "Offset": 36,
+            "Offset": 28,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "original_emotion",
             "Type": "EString",
-            "Offset": 40,
+            "Offset": 32,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "item_quality",
             "Type": "EUint32",
-            "Offset": 44,
+            "Offset": 36,
             "Size": 4
         },
         {
             "Name": "npc_group_id",
             "Type": "EUint32",
-            "Offset": 48,
+            "Offset": 40,
             "Size": 4
         },
         {
             "Name": "LocationTag",
             "Type": "EInt32",
-            "Offset": 52,
+            "Offset": 44,
             "Size": 4
         },
         {
             "Name": "behavior_tree",
             "Type": "EString",
-            "Offset": 56,
+            "Offset": 48,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "mf_behavior_tree",
             "Type": "EString",
-            "Offset": 60,
+            "Offset": 52,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "ai_perform_group",
             "Type": "EInt32",
-            "Offset": 64,
+            "Offset": 56,
             "Size": 4
         },
         {
             "Name": "shining_ai_conf",
             "Type": "EInt32",
-            "Offset": 68,
+            "Offset": 60,
             "Size": 4
-        },
-        {
-            "Name": "enable_server_ai",
-            "Type": "EBool",
-            "Offset": 72,
-            "Size": 1
         },
         {
             "Name": "icon",
             "Type": "EString",
-            "Offset": 73,
+            "Offset": 64,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "BulkySizeType",
             "Type": "EInt32",
-            "Offset": 77,
+            "Offset": 68,
             "Size": 4
         },
         {
             "Name": "bulky",
             "Type": "EInt32",
-            "Offset": 81,
-            "Size": 4
-        },
-        {
-            "Name": "aoi_distance",
-            "Type": "EInt32",
-            "Offset": 85,
+            "Offset": 72,
             "Size": 4
         },
         {
             "Name": "act",
             "Type": "EString",
-            "Offset": 89,
+            "Offset": 76,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "show_name_type",
             "Type": "EInt32",
-            "Offset": 93,
+            "Offset": 80,
             "Size": 4
         },
         {
             "Name": "show_name",
             "Type": "EUint32",
-            "Offset": 97,
+            "Offset": 84,
             "Size": 4
         },
         {
             "Name": "show_level",
             "Type": "EUint32",
-            "Offset": 101,
+            "Offset": 88,
             "Size": 4
         },
         {
             "Name": "npc_level",
             "Type": "EUint32",
-            "Offset": 105,
+            "Offset": 92,
             "Size": 4
         },
         {
             "Name": "npc_worldtitle",
             "Type": "EString",
-            "Offset": 109,
+            "Offset": 96,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "title_icon_path",
             "Type": "EString",
-            "Offset": 113,
+            "Offset": 100,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "icon_show_distance",
             "Type": "EUint32",
-            "Offset": 117,
+            "Offset": 104,
             "Size": 4
         },
         {
             "Name": "icon_height",
             "Type": "EInt32",
-            "Offset": 121,
+            "Offset": 108,
             "Size": 4
         },
         {
             "Name": "npc_nameplate_show_distance",
             "Type": "EUint32",
-            "Offset": 125,
+            "Offset": 112,
             "Size": 4
         },
         {
             "Name": "visible_distance",
             "Type": "EUint32",
-            "Offset": 129,
+            "Offset": 116,
             "Size": 4
         },
         {
             "Name": "npc_speed",
             "Type": "EUint32",
-            "Offset": 133,
+            "Offset": 120,
             "Size": 4
         },
         {
             "Name": "min_map_disappear",
             "Type": "EInt32",
-            "Offset": 137,
+            "Offset": 124,
             "Size": 4
         },
         {
             "Name": "map_show_type",
             "Type": "EInt32",
-            "Offset": 141,
-            "Size": 4
-        },
-        {
-            "Name": "npc_act_type",
-            "Type": "EInt32",
-            "Offset": 145,
+            "Offset": 128,
             "Size": 4
         },
         {
             "Name": "model_scale",
             "Type": "EUint32",
-            "Offset": 149,
+            "Offset": 132,
             "Size": 4
         },
         {
             "Name": "fx_locate",
             "Type": "EUint32",
-            "Offset": 153,
+            "Offset": 136,
             "Size": 4
         },
         {
             "Name": "fx_source",
             "Type": "EString",
-            "Offset": 157,
+            "Offset": 140,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "not_turn_face",
             "Type": "EUint32",
-            "Offset": 161,
+            "Offset": 144,
             "Size": 4
-        },
-        {
-            "Name": "stop_distance",
-            "Type": "EUint32",
-            "Offset": 165,
-            "Size": 4
-        },
-        {
-            "Name": "appear_perform",
-            "Type": "EString",
-            "Offset": 169,
-            "Size": 4,
-            "CompressedSize": 4
         },
         {
             "Name": "emerge_ani",
             "Type": "EString",
-            "Offset": 173,
+            "Offset": 148,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "disappear_ani",
             "Type": "EString",
-            "Offset": 177,
+            "Offset": 152,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "emerge_skill",
             "Type": "EString",
-            "Offset": 181,
+            "Offset": 156,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "disappear_skill",
             "Type": "EString",
-            "Offset": 185,
+            "Offset": 160,
             "Size": 4,
             "CompressedSize": 4
-        },
-        {
-            "Name": "emerge_act",
-            "Type": "EString",
-            "Offset": 189,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
-            "Name": "disappear_act",
-            "Type": "EString",
-            "Offset": 193,
-            "Size": 4,
-            "CompressedSize": 4
-        },
-        {
-            "Name": "delay_disappear_performance",
-            "Type": "EBool",
-            "Offset": 197,
-            "Size": 1
-        },
-        {
-            "Name": "respond_distance",
-            "Type": "EUint32",
-            "Offset": 198,
-            "Size": 4
         },
         {
             "Name": "lock_on_ground",
             "Type": "EUint32",
-            "Offset": 202,
+            "Offset": 164,
             "Size": 4
         },
         {
             "Name": "forbid_collision",
             "Type": "EUint32",
-            "Offset": 206,
+            "Offset": 168,
             "Size": 4
         },
         {
             "Name": "npc_interact_type",
             "Type": "EInt32",
-            "Offset": 210,
+            "Offset": 172,
             "Size": 4
         },
         {
             "Name": "monster_fightflee_type",
             "Type": "EInt32",
-            "Offset": 214,
+            "Offset": 176,
             "Size": 4
         },
         {
             "Name": "interactable_feature",
             "Type": "EInt32",
-            "Offset": 218,
+            "Offset": 180,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -371,45 +300,27 @@
         {
             "Name": "throwing_interact_type",
             "Type": "EInt32",
-            "Offset": 222,
+            "Offset": 184,
             "Size": 4
         },
         {
             "Name": "monster_hit_type",
             "Type": "EInt32",
-            "Offset": 226,
+            "Offset": 188,
             "Size": 4
         },
         {
             "Name": "option_id",
             "Type": "EUint32",
-            "Offset": 230,
+            "Offset": 192,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
         },
         {
-            "Name": "reset_npc",
-            "Type": "EInt32",
-            "Offset": 234,
-            "Size": 4
-        },
-        {
-            "Name": "reset_interval",
-            "Type": "EUint32",
-            "Offset": 238,
-            "Size": 4
-        },
-        {
-            "Name": "reset_in_view",
-            "Type": "EUint32",
-            "Offset": 242,
-            "Size": 4
-        },
-        {
             "Name": "aura_id",
             "Type": "EUint32",
-            "Offset": 246,
+            "Offset": 196,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -417,76 +328,64 @@
         {
             "Name": "can_hide_in_sequence",
             "Type": "EUint32",
-            "Offset": 250,
+            "Offset": 200,
             "Size": 4
         },
         {
             "Name": "dont_hide_in_battle",
             "Type": "EUint32",
-            "Offset": 254,
+            "Offset": 204,
             "Size": 4
         },
         {
             "Name": "can_hide_in_player_condition",
             "Type": "EUint32",
-            "Offset": 258,
+            "Offset": 208,
             "Size": 4
         },
         {
             "Name": "can_hide_in_minigame",
             "Type": "EUint32",
-            "Offset": 262,
+            "Offset": 212,
             "Size": 4
         },
         {
             "Name": "can_hide_in_pvp",
             "Type": "EUint32",
-            "Offset": 266,
-            "Size": 4
-        },
-        {
-            "Name": "aoi_weight",
-            "Type": "EUint32",
-            "Offset": 270,
+            "Offset": 216,
             "Size": 4
         },
         {
             "Name": "traverse_data_type",
             "Type": "EInt32",
-            "Offset": 274,
+            "Offset": 220,
             "Size": 4
         },
         {
             "Name": "traverse_data_param",
             "Type": "EUint32",
-            "Offset": 278,
+            "Offset": 224,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
         },
         {
-            "Name": "is_levelup_manual",
-            "Type": "EUint32",
-            "Offset": 282,
-            "Size": 4
-        },
-        {
             "Name": "battle_ai",
             "Type": "EString",
-            "Offset": 286,
+            "Offset": 228,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "auto_escape",
             "Type": "EInt32",
-            "Offset": 290,
+            "Offset": 232,
             "Size": 4
         },
         {
             "Name": "escape_params",
             "Type": "EUint32",
-            "Offset": 294,
+            "Offset": 236,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -494,13 +393,13 @@
         {
             "Name": "escape_dialogue",
             "Type": "EUint32",
-            "Offset": 298,
+            "Offset": 240,
             "Size": 4
         },
         {
             "Name": "overtime_action",
             "Type": "EStruct",
-            "Offset": 302,
+            "Offset": 244,
             "Size": 4,
             "CompressedSize": 4,
             "ArrayDim": 3,
@@ -531,47 +430,39 @@
             }
         },
         {
-            "Name": "npc_skill",
-            "Type": "EUint32",
-            "Offset": 306,
-            "Size": 4,
-            "CompressedSize": 4,
-            "DynamicArray": true
-        },
-        {
             "Name": "trace_icon_offset",
             "Type": "EInt32",
-            "Offset": 310,
+            "Offset": 248,
             "Size": 4
         },
         {
             "Name": "world_nature",
             "Type": "EInt32",
-            "Offset": 314,
+            "Offset": 252,
             "Size": 4
         },
         {
             "Name": "mimic_target",
             "Type": "EInt32",
-            "Offset": 318,
+            "Offset": 256,
             "Size": 4
         },
         {
             "Name": "mimic_skill",
             "Type": "EInt32",
-            "Offset": 322,
+            "Offset": 260,
             "Size": 4
         },
         {
             "Name": "world_hide",
             "Type": "EInt32",
-            "Offset": 326,
+            "Offset": 264,
             "Size": 4
         },
         {
             "Name": "world_hide_param",
             "Type": "EInt32",
-            "Offset": 330,
+            "Offset": 268,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -579,13 +470,13 @@
         {
             "Name": "shining_world_hide",
             "Type": "EInt32",
-            "Offset": 334,
+            "Offset": 272,
             "Size": 4
         },
         {
             "Name": "shining_world_hide_param",
             "Type": "EInt32",
-            "Offset": 338,
+            "Offset": 276,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -593,13 +484,13 @@
         {
             "Name": "shining_mimic_target",
             "Type": "EInt32",
-            "Offset": 342,
+            "Offset": 280,
             "Size": 4
         },
         {
             "Name": "ai_group_param",
             "Type": "EStruct",
-            "Offset": 346,
+            "Offset": 284,
             "Size": 4,
             "CompressedSize": 4,
             "ArrayDim": 6,
@@ -639,13 +530,13 @@
         {
             "Name": "nightmare_ai_group",
             "Type": "EInt32",
-            "Offset": 350,
+            "Offset": 288,
             "Size": 4
         },
         {
             "Name": "ai_group_role_id",
             "Type": "EInt32",
-            "Offset": 354,
+            "Offset": 292,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -653,25 +544,25 @@
         {
             "Name": "is_clean_ani",
             "Type": "EUint32",
-            "Offset": 358,
+            "Offset": 296,
             "Size": 4
         },
         {
             "Name": "is_ai_loading_high_priority",
             "Type": "EUint32",
-            "Offset": 362,
+            "Offset": 300,
             "Size": 4
         },
         {
             "Name": "is_pve_npc_around",
             "Type": "EUint32",
-            "Offset": 366,
+            "Offset": 304,
             "Size": 4
         },
         {
             "Name": "special_audio_tag",
             "Type": "EInt32",
-            "Offset": 370,
+            "Offset": 308,
             "Size": 4,
             "CompressedSize": 4,
             "DynamicArray": true
@@ -679,51 +570,67 @@
         {
             "Name": "freeze_movement_when_spawn",
             "Type": "EBool",
-            "Offset": 374,
+            "Offset": 312,
             "Size": 1
         },
         {
             "Name": "npc_trampling_lawn_comp",
             "Type": "EInt32",
-            "Offset": 375,
+            "Offset": 313,
             "Size": 4
         },
         {
             "Name": "npc_role_type",
             "Type": "EInt32",
-            "Offset": 379,
+            "Offset": 317,
             "Size": 4
         },
         {
             "Name": "ai_random_pool_id",
             "Type": "EUint32",
-            "Offset": 383,
+            "Offset": 321,
             "Size": 4
         },
         {
             "Name": "opacity_rate",
             "Type": "EUint32",
-            "Offset": 387,
+            "Offset": 325,
             "Size": 4
         },
         {
             "Name": "fresnel_color",
             "Type": "EString",
-            "Offset": 391,
+            "Offset": 329,
             "Size": 4,
             "CompressedSize": 4
         },
         {
             "Name": "fresnel_intensity",
             "Type": "EUint32",
-            "Offset": 395,
+            "Offset": 333,
             "Size": 4
         },
         {
             "Name": "fresnel_exponent",
             "Type": "EUint32",
-            "Offset": 399,
+            "Offset": 337,
             "Size": 4
+        },
+        {
+            "Name": "ai_lordevo_perform_groups",
+            "Type": "EInt32",
+            "Offset": 341,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
+        },
+        {
+            "Name": "enter_battle_excluded_bas_list",
+            "Type": "EInt32",
+            "Offset": 345,
+            "Size": 4,
+            "CompressedSize": 4,
+            "DynamicArray": true
         }
     ]
 }
