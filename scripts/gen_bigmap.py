@@ -1,4 +1,4 @@
-"""把 FModel 导出的大地图瓦片 PNG 拼成整图 webp,落到 internal/gamedata/data/img/bigmap/(编译期 embed)。
+"""把解包出的大地图瓦片 PNG 拼成整图 webp,落到 internal/gamedata/data/img/bigmap/(编译期 embed)。
 
 游戏把每张大地图切成 4x4 共 16 张 1024² 瓦片,**行主序**编号(piece = row*4 + col + 1,
 见客户端 BigMapUtils.GetMapPieceIdByPos)。网页端不需要复刻客户端的分块按需加载,
@@ -14,7 +14,7 @@
 webp 转码是确定性的,故与 gen_images.py 一致**默认跳过已存在的 webp**(常规重跑零改动),
 换 quality/尺寸时用 --force 强制重编。
 
-前置:在 FModel 里把 BigMap/Raw/Texture/Maps 目录以 **PNG** 导出。运行(需 uv 管理的 pillow):
+前置:scripts/unpack.sh 全量解包(纹理已导出为 PNG)。运行(需 uv 管理的 pillow):
     uv run python scripts/gen_bigmap.py [PNG源目录] [--force]
 """
 import json
@@ -25,11 +25,9 @@ from PIL import Image
 
 FORCE = "--force" in sys.argv[1:]
 _pos = [a for a in sys.argv[1:] if not a.startswith("-")]
-SRC = _pos[0] if _pos else os.environ.get(
-    "BIGMAP_SRC",
-    os.path.expanduser(
-        "~/Downloads/NRC/Content/NewRoco/Modules/System/BigMap/Raw/Texture/Maps"),
-)
+PARSED = os.environ.get("ROCOM_PARSED", os.path.expanduser("~/Downloads/rocom/parsed"))
+SRC = _pos[0] if _pos else os.path.join(
+    PARSED, "NRC", "Content", "NewRoco", "Modules", "System", "BigMap", "Raw", "Texture", "Maps")
 NAMES = "internal/gamedata/data/names.json"
 OUT = "internal/gamedata/data/img/bigmap"
 # 分层地图(洞穴/地下层)切片源与输出:每层一张 1024² 单图(非 4x4 瓦片),直接转码不拼接。
@@ -100,8 +98,7 @@ def main():
     maps, layers = names["maps"], names.get("layers", {})
 
     if not os.path.isdir(SRC):
-        sys.exit(f"源目录不存在: {SRC}\n请先在 FModel 里把 BigMap 的 Maps 目录以 PNG 导出,"
-                 f"或用 BIGMAP_SRC 指定。")
+        sys.exit(f"源目录不存在: {SRC}\n请先跑 scripts/unpack.sh 解包,或传源目录/设 ROCOM_PARSED。")
 
     stat = {"done": 0, "kept": 0, "miss": 0}
     for res, e in sorted(maps.items()):

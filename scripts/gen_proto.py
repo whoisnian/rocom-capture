@@ -1,12 +1,12 @@
-"""从游戏描述符 nrc/all.pb 生成宠物相关 Go 结构体(internal/pb)。
+"""从游戏描述符 all.pb 生成宠物相关 Go 结构体(internal/pb)。
 
-nrc/all.pb 是 FModel 提取的 google.protobuf.FileDescriptorSet(游戏运行时 pb.loadufsfile
+all.pb 是解包出的 google.protobuf.FileDescriptorSet(游戏运行时 pb.loadufsfile
 加载的同一份),含字段号/类型,直接喂给 protoc 即可生成 Go,无需 .proto 文本、无需 fix_proto。
 com_pet.proto 的依赖闭包由描述符**动态求取**(随 all.pb 版本而变,避免硬编码失配)。
 protoc 解析 rpc_options.proto 需要 well-known 的 descriptor.proto,本脚本在内存里补进描述符集。
 
 运行(需 uv 管理的 protobuf 依赖):  uv run python scripts/gen_proto.py
-更新游戏版本:用 FModel 重新提取 all.pb 覆盖 nrc/all.pb 再跑本脚本(或设 NRC_PB_DIR 指向别处)。
+更新游戏版本:重跑 scripts/unpack.sh 刷新解包目录再跑本脚本(源目录用 ROCOM_PARSED 覆盖)。
 """
 import os
 import subprocess
@@ -20,7 +20,8 @@ PKG = "github.com/whoisnian/rocom-capture/internal/pb"
 OUT = "internal/pb"
 # 解析根:com_pet(PetData/背包) + com_pet_team(大世界队伍 PetTeamInfo)。闭包动态合并求取。
 ROOTS = ["com_pet.proto", "com_pet_team.proto"]
-ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "nrc"), "all.pb")
+PARSED = os.environ.get("ROCOM_PARSED", os.path.expanduser("~/Downloads/rocom/parsed"))
+ALL_PB = os.path.join(PARSED, "NRC", "Content", "ScriptC", "Data", "PB", "all.pb")
 DESCRIPTORPB_GO = "google.golang.org/protobuf/types/descriptorpb"
 
 

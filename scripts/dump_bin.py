@@ -1,9 +1,9 @@
-"""把 FModel 解包目录下的全部游戏二进制配置批量解码为 JSON(调试/查数据用,不产 repo 生成物)。
+"""把解包目录下的全部游戏二进制配置批量解码为 JSON(调试/查数据用,不产 repo 生成物)。
 
-~/Downloads/NRC 更新后跑一次,之后查数据直接 grep/jq JSON,免得每张表都临时调 decode_bin 重新解析:
+scripts/unpack.sh 重新解包后跑一次,之后查数据直接 grep/jq JSON,免得每张表都临时调 decode_bin 重新解析:
 
-    uv run python scripts/dump_bin.py            # 默认源 ~/Downloads/NRC/Content/ScriptC/Data/Bin
-    uv run python scripts/dump_bin.py <Bin目录>  # 或用 NRC_RAW_BIN 指定
+    uv run python scripts/dump_bin.py            # 默认源 ~/Downloads/rocom/parsed/NRC/Content/ScriptC/Data/Bin
+    uv run python scripts/dump_bin.py <Bin目录>  # 或用 ROCOM_PARSED 覆盖解包根
     uv run python scripts/dump_bin.py --force    # 忽略增量,全部重解
 
 - 输入: <Bin>/BinDataCompressed/*.bytes + BinConf/*.non(schema)+ BinLocalize/dev_CN(本地化,有则用)
@@ -21,8 +21,8 @@ import decode_bin  # vendored 解码器(scripts/decode_bin.py,纯标准库)
 
 FORCE = "--force" in sys.argv
 _pos = [a for a in sys.argv[1:] if not a.startswith("-")]
-SRC = _pos[0] if _pos else os.environ.get(
-    "NRC_RAW_BIN", os.path.expanduser("~/Downloads/NRC/Content/ScriptC/Data/Bin"))
+PARSED = os.environ.get("ROCOM_PARSED", os.path.expanduser("~/Downloads/rocom/parsed"))
+SRC = _pos[0] if _pos else os.path.join(PARSED, "NRC", "Content", "ScriptC", "Data", "Bin")
 OUT = os.path.join(SRC, "Json")
 
 
@@ -52,7 +52,7 @@ def dump_one(base: str) -> str | None:
 def main():
     conf_dir = os.path.join(SRC, "BinConf")
     if not os.path.isdir(conf_dir):
-        sys.exit(f"源目录不存在: {conf_dir}(可传 Bin 目录或用 NRC_RAW_BIN 指定)")
+        sys.exit(f"源目录不存在: {conf_dir}(可传 Bin 目录或用 ROCOM_PARSED 覆盖解包根)")
     bases = sorted(n[:-4] for n in os.listdir(conf_dir) if n.endswith(".non")
                    and os.path.exists(os.path.join(SRC, "BinDataCompressed", n[:-4] + ".bytes")))
     os.makedirs(OUT, exist_ok=True)

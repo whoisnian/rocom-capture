@@ -2,8 +2,8 @@
 洛克王国 .bytes / .non 二进制配置文件解码器
 参考 CUE4Parse FRocoBinData.cs 实现
 
-[vendored] 本文件为社区解码器原样收录(供 scripts/gen_gamedata.py 解码 nrc/bin/ 下的
-游戏配置)。经实测:对当前 FModel 提取的 Bin 数据,本解码器与 pak-public-kit 版逐表 100%
+[vendored] 本文件为社区解码器原样收录(供 scripts/gen_gamedata.py 等解码解包目录
+Bin 下的游戏配置)。经实测:对当前解包出的 Bin 数据,本解码器与 pak-public-kit 版逐表 100%
 一致(MONSTER/PET/MEDAL/特长),且 ELocalizedString 本地化正确(pak-public-kit 早期产出的
 PET_CONF 名整体错位一位,本解码器与两个独立 world-data 源一致)。详见 docs/data.md。
 

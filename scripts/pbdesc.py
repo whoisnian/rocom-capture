@@ -1,6 +1,6 @@
-"""读取游戏自带的 protobuf 描述符 nrc/all.pb(FileDescriptorSet),供生成脚本共用。
+"""读取游戏自带的 protobuf 描述符 all.pb(FileDescriptorSet),供生成脚本共用。
 
-依赖 protobuf(uv 管理)。all.pb 是 FModel 从客户端提取的描述符,含字段号/类型/枚举。
+依赖 protobuf(uv 管理)。all.pb 是解包目录里的游戏描述符,含字段号/类型/枚举。
 """
 from google.protobuf import descriptor_pb2
 

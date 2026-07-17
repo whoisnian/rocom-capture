@@ -1,13 +1,13 @@
 """统一 UI 图标生成器:裁切/转码解包图标为 webp,落到 internal/gamedata/data/img/<组>/。
 
 两种资源机制:
-  - 图集精灵(Paper2D PaperSprite):本身不含像素,从图集(Texture2D)按 UV 裁一块。UV 取自 FModel
-    的 Save Properties(.json),图集取自 Save Texture(PNG)。用于 filter / blood / static。
-  - 整张贴图(Texture2D):Save Texture 出的 PNG 直接转码(同宠物头像),无需裁切。用于 medal。
+  - 图集精灵(Paper2D PaperSprite):本身不含像素,从图集(Texture2D)按 UV 裁一块。UV 取自
+    解包出的属性 .json,图集取自解包出的 PNG。用于 filter / blood / static。
+  - 整张贴图(Texture2D):解包出的 PNG 直接转码(同宠物头像),无需裁切。用于 medal。
 
 **命名保持原始解包文件名**:webp 文件名即游戏资产名(如 `ui_icon_species_04_png.webp` /
 `img_huo_png.webp` / `img_MedalIcon_Huge.webp`),按 basename **去重**(多个枚举值/id 复用同一资产
-时只存一份)。语义映射(enum/id → 文件名)由 gen_gamedata.py 从 vendored 配置写进 names.json 的
+时只存一份)。语义映射(enum/id → 文件名)由 gen_gamedata.py 从解包配置写进 names.json 的
 `filter_icons`/`blood_icons`/`medal_icons`;本脚本只产图,不涉及 enum/id。
 
 各组数据源:
@@ -18,13 +18,9 @@
   - medal:    MEDAL_CONF.icon(BagItem 奖牌小图,整张贴图)            → img/medal/
 
 webp 转码确定性(同 libwebp 下同源字节一致),默认跳过已存在;--force 强制重编(见 gen_images.py)。
-前置(FModel,导到下载根 SRC):
-  - Save Properties(.json)+ Save Texture(图集 PNG):Common/Icon/Species/Frames、
-    PetUI/Raw/Atlas/PetUI/Frames、Common/CommonStatic/Frames、Common/Icon/XueMai/Frames、
-    System/BigMap/Raw/Atlas/WorldMapNpc/Frames 及各 Textures/。
-  - Save Texture(PNG):Common/Icon/BagItem(奖牌小图)。
+前置:scripts/unpack.sh 全量解包(uasset → 属性 .json,纹理 → PNG,同名同目录)。
 运行(需 uv 管理的 pillow):
-    uv run python scripts/gen_icons.py [下载根目录] [--force]
+    uv run python scripts/gen_icons.py [解包根目录(含 Content 的一级,默认 parsed/NRC)] [--force]
 """
 import os
 import re
@@ -33,12 +29,13 @@ import sys
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import decode_bin  # vendored 解码器(nrc/bin 的 .bytes)
+import decode_bin  # vendored 解码器(解 Bin 目录的 .bytes)
 
 FORCE = "--force" in sys.argv[1:]
 _pos = [a for a in sys.argv[1:] if not a.startswith("-")]
-SRC = _pos[0] if _pos else os.environ.get("IMG_SRC", os.path.expanduser("~/Downloads/NRC"))
-BIN_DIR = os.environ.get("NRC_BIN_DIR", "nrc/bin")
+PARSED = os.environ.get("ROCOM_PARSED", os.path.expanduser("~/Downloads/rocom/parsed"))
+SRC = _pos[0] if _pos else os.path.join(PARSED, "NRC")
+BIN_DIR = os.path.join(SRC, "Content", "ScriptC", "Data", "Bin")
 OUT_ROOT = os.environ.get("IMG_OUT", "internal/gamedata/data/img")
 QUALITY = 90  # 与 gen_images 一致;UI 图标够用且体积小
 
@@ -96,20 +93,33 @@ def basename(ref: str) -> str:
     return os.path.basename(game_to_src(ref))
 
 
+# basename 回退只在本脚本用到的图集/图目录内检索:全量解包树里同名资产遍地都是
+# (如 Alchemy_png 在 CompassIcon/WorldMapNpc 两图集同名不同图),全树索引会选错;
+# 限定目录即复刻旧选择性导出的唯一性,顺带免去数十万文件的全树遍历。
+ATLAS_DIRS = [
+    "NewRoco/Modules/System/Common/Icon/Species",
+    "NewRoco/Modules/System/Common/Icon/XueMai",
+    "NewRoco/Modules/System/Common/CommonStatic",
+    "NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI",
+    "NewRoco/Modules/System/BigMap/Raw/Atlas/WorldMapNpc",
+    "NewRoco/Modules/System/Common/Icon/BagItem",
+]
+
 _by_base: dict[str, dict[str, str]] = {}
 
 
 def find(ref: str, ext: str) -> str:
-    """定位解包文件:先按引用完整路径,再按 basename 回退(同名精灵散在多处/只导出等价一份时)。"""
+    """定位解包文件:先按引用完整路径,再按 basename 在 ATLAS_DIRS 内回退(同名精灵散在多处时)。"""
     p = game_to_src(ref) + ext
     if os.path.exists(p):
         return p
     if ext not in _by_base:
         idx = {}
-        for root, _, files in os.walk(SRC):
-            for f in files:
-                if f.endswith(ext):
-                    idx.setdefault(f, os.path.join(root, f))
+        for d in ATLAS_DIRS:
+            for root, _, files in os.walk(os.path.join(SRC, "Content", d)):
+                for f in files:
+                    if f.endswith(ext):
+                        idx.setdefault(f, os.path.join(root, f))
         _by_base[ext] = idx
     return _by_base[ext].get(os.path.basename(p), "")
 
@@ -125,7 +135,7 @@ def crop_sprite(ref: str, dst: str) -> str | None:
     if sp is None:
         return "非 PaperSprite"
     P = sp["Properties"]
-    uv = P.get("BakedSourceUV") or {"X": 0, "Y": 0}  # 零值被 FModel 省略,默认 (0,0)
+    uv = P.get("BakedSourceUV") or {"X": 0, "Y": 0}  # 零值在导出 JSON 里被省略,默认 (0,0)
     dim = P["BakedSourceDimension"]
     png = find(P["BakedSourceTexture"]["ObjectPath"], ".png")
     if not png:
@@ -189,7 +199,7 @@ def gen_group(group: str, refs, writer) -> int:
 
 def main():
     if not os.path.isdir(SRC):
-        sys.exit(f"源目录不存在: {SRC}(可传下载根目录或用 IMG_SRC 指定)")
+        sys.exit(f"源目录不存在: {SRC}\n请先跑 scripts/unpack.sh 解包,或传解包根目录/设 ROCOM_PARSED。")
     total = 0
     total += gen_group("filter", icon_refs("PET_FILTER_CONF", "filter_icon", FILTER_ENUMS), crop_sprite)
     total += gen_group("blood", icon_refs("PET_BLOOD_CONF", "icon"), crop_sprite)
@@ -198,7 +208,7 @@ def main():
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
-        sys.exit(f"未产出任何 webp:确认已在 FModel 导出到 {SRC} 对应目录。")
+        sys.exit(f"未产出任何 webp:确认 {SRC} 下已有 unpack.sh 的全量解包产物。")
 
 
 if __name__ == "__main__":

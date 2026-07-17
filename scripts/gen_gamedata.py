@@ -1,17 +1,17 @@
 """提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
 
-数据全部来自随仓库提交的游戏解包产物(FModel 从 Windows 客户端提取),不依赖任何外部仓库:
-- 名称表: nrc/bin/ 下游戏自有二进制配置(`.bytes` 数据 + `.non` schema + dev_CN 本地化),
+数据全部来自本机解包目录(scripts/unpack.sh 从游戏 pak 导出,默认 ~/Downloads/rocom/parsed):
+- 名称表: ScriptC/Data/Bin 下游戏自有二进制配置(`.bytes` 数据 + `.non` schema + dev_CN 本地化),
           用 vendored 的 scripts/decode_bin.py 解码(参考 CUE4Parse FRocoBinData.cs):
   - 种类:   MONSTER_CONF + PET_CONF      id -> name
   - 性格:   AUDIO_NATURE_CONF            nature_id -> name
   - 奖牌:   MEDAL_CONF                   id -> {name, desc}
   - 系别/天分/标记/特长: PET_FILTER_CONF 的 filter_enum_value -> filter_desc / PET_TALENT_CONF
-- 枚举/opcode: 游戏描述符 nrc/all.pb(ZoneSvrCmd、SkillDamType 等),经 scripts/pbdesc.py 读取。
+- 枚举/opcode: 游戏描述符 all.pb(ZoneSvrCmd、SkillDamType 等),经 scripts/pbdesc.py 读取。
 
-opcode/枚举与字段号(internal/pb)同出 nrc/all.pb(见 gen_proto.py),与 internal/pb 天然同版本。
+opcode/枚举与字段号(internal/pb)同出 all.pb(见 gen_proto.py),与 internal/pb 天然同版本。
 运行(需 uv 管理的 protobuf 依赖):  uv run python scripts/gen_gamedata.py
-更新到新版本游戏:用 FModel 重新提取覆盖 nrc/bin/ 与 nrc/all.pb 再跑本脚本(原因见 docs/data.md)。
+更新到新版本游戏:重跑 scripts/unpack.sh 刷新解包目录再跑本脚本(原因见 docs/data.md)。
 """
 import json
 import os
@@ -22,16 +22,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import decode_bin  # vendored 解码器(scripts/decode_bin.py,纯标准库)
 import pbdesc      # 读 all.pb 描述符(依赖 protobuf,uv 管理)
 
-# 名称表:vendored 的游戏二进制配置(nrc/bin);opcode/枚举:游戏描述符 nrc/all.pb。
-BIN_DIR = os.environ.get("NRC_BIN_DIR", "nrc/bin")
-ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "nrc"), "all.pb")
+# 名称表:解包目录的游戏二进制配置(ScriptC/Data/Bin);opcode/枚举:游戏描述符 all.pb。
+PARSED = os.environ.get("ROCOM_PARSED", os.path.expanduser("~/Downloads/rocom/parsed"))
+BIN_DIR = os.path.join(PARSED, "NRC", "Content", "ScriptC", "Data", "Bin")
+ALL_PB = os.path.join(PARSED, "NRC", "Content", "ScriptC", "Data", "PB", "all.pb")
 OUT = "internal/gamedata/data"
 
 _FDS = pbdesc.load(ALL_PB)  # 描述符只读一次,enum_dim/opcodes 共用
 
 
 def rows(table):
-    """解码 nrc/bin 下一张表(.bytes + .non + dev_CN 本地化)为 {id字符串: 行}。"""
+    """解码 Bin 目录下一张表(.bytes + .non + dev_CN 本地化)为 {id字符串: 行}。"""
     base = table[:-5] if table.endswith(".json") else table
     loc = os.path.join(BIN_DIR, "BinLocalize", "dev_CN", base + ".bytes")
     return decode_bin.decode_file(
