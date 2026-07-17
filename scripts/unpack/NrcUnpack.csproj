@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- CUE4Parse 仓库位置:环境变量 CUE4PARSE_DIR 覆盖,默认 ~/Git/gh/CUE4Parse -->
+    <CUE4ParseDir Condition="'$(CUE4ParseDir)' == ''">$([System.Environment]::GetEnvironmentVariable('CUE4PARSE_DIR'))</CUE4ParseDir>
+    <CUE4ParseDir Condition="'$(CUE4ParseDir)' == ''">$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))/Git/gh/CUE4Parse</CUE4ParseDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(CUE4ParseDir)/CUE4Parse/CUE4Parse.csproj" />
+    <ProjectReference Include="$(CUE4ParseDir)/CUE4Parse-Conversion/CUE4Parse-Conversion.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CUE4Parse-Conversion 只带 SkiaSharp 托管层;Linux 原生 libSkiaSharp 要另配(版本随其 Directory.Packages.props) -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+    <!-- CUE4Parse 传递引用的 9.0.0 有已知漏洞通告(NU1903),顶层钉到修复版 -->
+    <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>

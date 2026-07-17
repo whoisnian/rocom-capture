@@ -10,8 +10,22 @@
   含字段号,可直接喂给 protoc 生成 Go,无需 .proto 文本。
 
 字段号/枚举是**追加式**的(新版本只加不改号),故几乎无需跟版本更新;名称表随游戏内容变动。
-要更新到新版本游戏:用 FModel 重新提取覆盖 `nrc/bin/` 与 `nrc/all.pb`,再跑两个生成脚本。
-行 id 同样跨版本稳定(实测大版本更新后星星刷新行 id 原样不动)。
+要更新到新版本游戏:用 `scripts/unpack.sh`(或 FModel 手动导出)重新提取覆盖 `nrc/bin/` 与
+`nrc/all.pb`,再跑两个生成脚本。行 id 同样跨版本稳定(实测大版本更新后星星刷新行 id 原样不动)。
+
+> **Linux 一键解包(`scripts/unpack.sh`)**:直接从游戏 pak(目录或安卓 .apk)产出与 FModel
+> 手动导出**完全一致**的 `~/Downloads/NRC/Content/` 布局——`bin`/`pb` 原始文件、`icons`/`bigmap`
+> Texture2D→PNG、`atlas` 五组图集的 Frames→Save Properties JSON + Textures→PNG(即下文各节的
+> 全部 FModel 前置操作),下游 gen_* 脚本零改动。`Parallel.ForEach` 并行解码,默认跳过已存在
+> 文件(增量),`--list` 预览、`--only` 选类别、`--pet1024` 追加全身大图、`--raw` 导任意前缀。
+> C# 实现在 `scripts/unpack/`,基于 CUE4Parse 内置的 `GAME_RocoKingdomWorld` 支持(自定义
+> AES 字节置换变体、Bin/luac 专属处理,无需 usmap)。依赖 dotnet-sdk 10+ 与 `~/Git/gh/CUE4Parse`
+> 克隆(`CUE4PARSE_DIR` 覆盖);首次运行自动下载 oodle/zlib-ng 到 `~/.cache/nrc-unpack`。
+> AES 主密钥与 Windows FModel `AppSettings.json → AesKeys` 同一把,默认值已内置在
+> `unpack.sh`(`DEFAULT_AES`,换密钥的版本用 `--aes <hex>`/`@文件` 覆盖);FModel 该游戏条目的 UeVersion=68812827 即
+> `GAME_RocoKingdomWorld`,usmap endpoint 未启用,与本工具口径一致。游戏 pak 在 Windows 客户端
+> `<安装目录>\Win64\NRC\Content\Paks`(拷到 Linux 或喂安卓 .apk 均可)。FModel 手动导出仍可用,
+> 两者互为校验。
 
 > **2026-07 大版本起,策划专用字段(editor_name、max_num、npc_pendant_id 等)从发布数据剥离**,
 > 解析只可依赖仍随包发布的字段与表:石像奖励行按刷新区域顶点数排除、带星石像按 NPC_PENDANT_CONF
@@ -130,8 +144,9 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `Zon
 `PetImage(confID, true)` 在「索引有该字段**且**对应 webp 确已 embed」时才用异色图,否则回退普通——
 故未导出异色 PNG 时异色宠仍显示普通美术,不会出现空图标。
 
-图片本体(webp)**embed 进二进制**:在 FModel 里把 `Common/Icon` 的 `HeadIcon`/`BigHeadIcon256`/
-`Pet256` 子目录以 **PNG** 导出(异色图 `*_1.png`/`JL_*_yise.png` 在同目录,一并导出即可),
+图片本体(webp)**embed 进二进制**:把 `Common/Icon` 的 `HeadIcon`/`BigHeadIcon256`/
+`Pet256` 子目录以 **PNG** 导出(`scripts/unpack.sh --only icons`,或 FModel 手动;异色图
+`*_1.png`/`JL_*_yise.png` 在同目录,一并导出即可),
 `uv run python scripts/gen_images.py <PNG源>` 转成 webp 落到 `internal/gamedata/data/img/`
 (`//go:embed all:data/img`),`internal/server` 经 `/img/` 提供。
 35MB 的 `Pet1024` 全身大图暂不 embed(体积考量),需要时把 `Pet1024` 加进 `gen_images.py` 的 `DIRS`。
@@ -177,7 +192,8 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `Zon
 只挑后者。其 `BakedSourceTexture.ObjectPath` 前缀为 `NRC/Content/...` 而非 `/Game/...`,`game_to_src`
 的正则两种都认,无需特殊处理。
 
-前置(FModel,导到下载根,默认 `~/Downloads/NRC`):对 `Common/Icon/Species/Frames`、
+前置(`scripts/unpack.sh --only atlas` 一步完成;FModel 手动则导到下载根,默认
+`~/Downloads/NRC`):对 `Common/Icon/Species/Frames`、
 `PetUI/Raw/Atlas/PetUI/Frames`、`Common/CommonStatic/Frames`、`Common/Icon/XueMai/Frames`、
 `System/BigMap/Raw/Atlas/WorldMapNpc/Frames` Save Properties(.json)并对各自 `Textures/` 图集
 Save Texture(PNG);对 `Common/Icon/BagItem` Save Texture(PNG)。webp 转码确定性,默认跳过已存在、

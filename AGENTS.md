@@ -28,12 +28,17 @@
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
   `-hex` 附原始字节);`-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。解码为 wire 级、
   不依赖 .proto(规避版本错位),自动跳过 c2s 子头并在 tsf4g 尾前停止。
-- 数据来源**全部随仓库提交、均为 FModel 自行提取**,不依赖外部仓库:中文名称表来自
+- 数据来源**全部随仓库提交、均为自行解包提取**,不依赖外部仓库:中文名称表来自
   `nrc/bin/`(游戏二进制配置,用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb`
   结构、opcode、枚举同出游戏描述符 `nrc/all.pb`(前者经 protoc `--descriptor_set_in` 生成 Go,
   后者经 `scripts/pbdesc.py` 读描述符);宠物图片索引(conf_id→头像/全身图)取自 `nrc/bin/`
-  的 `PETBASE_CONF`/`MODEL_CONF`,图片本体(webp)经 FModel PNG 导出 + `gen_images.py` 转码后
-  embed。更新游戏版本:FModel 重新提取覆盖 `nrc/bin/` 与 `nrc/all.pb` 再跑生成脚本(详见 docs/data.md)。
+  的 `PETBASE_CONF`/`MODEL_CONF`,图片本体(webp)经解包 PNG + `gen_images.py` 转码后
+  embed。更新游戏版本:重新解包覆盖 `nrc/bin/` 与 `nrc/all.pb` 再跑生成脚本(详见 docs/data.md)。
+- 解包:`scripts/unpack.sh --paks <游戏Paks目录|.apk> --aes <64位hex|@文件>` 在 Linux 直接从
+  游戏 pak 复刻 FModel 手动导出(输出 `~/Downloads/NRC/Content/` 同款布局,下游脚本零改动;
+  并行、增量,`--only bin,pb,icons,atlas,bigmap` 选类别)。C# 实现在 `scripts/unpack/`,依赖
+  dotnet-sdk 与 `~/Git/gh/CUE4Parse`(内置 `GAME_RocoKingdomWorld` 支持;`CUE4PARSE_DIR` 覆盖);
+  Windows 上用 FModel 手动导出亦可,布局等价(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
 - `internal/pb/*.pb.go` 与 `internal/gamedata/data/names.json` 为生成物，改动应改生成脚本而非手改。
@@ -41,7 +46,9 @@
 ## reference
 | source                                                       | directory                                   | description                                                           |
 | ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------- |
-| FModel 自行提取数据                                          | `~/Downloads/NRC` 挑选得到 `./nrc`          | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
+| 自行解包数据(scripts/unpack.sh 或 FModel)                    | `~/Downloads/NRC` 挑选得到 `./nrc`          | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
+| https://github.com/FabianFG/CUE4Parse                        | ~/Git/gh/CUE4Parse                          | `scripts/unpack` 的解析引擎(内置 `GAME_RocoKingdomWorld` 游戏支持)    |
+| https://github.com/4sval/FModel                              | ~/Git/gh/FModel                             | Windows GUI 解包器(手动导出备用路径;unpack.sh 复刻其输出布局)         |
 | https://github.com/MIXUULS/Roco-Kingdom-World-Data           | `./scripts/decode_bin.py`                   | 解 `nrc/bin/` 的 `.bytes`                                             |
 | https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | 已弃用(曾为名称表源,其 PET_CONF 本地化错位;仅留作对照)                |
 | https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 已弃用(曾为 `.proto` 源;其 Bin JSON 可作名称表三方对照)               |
