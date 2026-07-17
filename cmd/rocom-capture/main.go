@@ -173,18 +173,29 @@ func (ls *layerState) settle(l gamedata.LayerInfo, ok bool, now time.Time) (game
 // AOI 是**按格子**下发的(配置里有「跨aoi拆分」的区域),不是圆形半径:实测多次出现「更远的实体
 // 下发了、更近的没下发」。故不能拿单一半径当 AOI 边界,只能取一个**保守判定半径**——4 份 pcap 里
 // 凡距玩家轨迹 ≤100m 的固定 POI(必定存在那些)全部下发,无一例外,故 80m 留足余量。
+//
+// 但「进圈时刻」不能立即结账:实体按跨格触发下发,可以晚于进圈 4-31s、晚到时玩家已近至 21-59m
+// (12 份 pcap 共 5 例),圈边缘徘徊时延迟无上界——进圈即判会闪烁(先判已收集隐藏图标,实体
+// 随后到达又翻回)。空间邻近也推不出「该格已下发」(实测有星点 20m 内他者实体早到、星实体晚
+// 31s,格边界贴着点过)。故只在两种**实体必已下发**的时机结账:贴脸(≤starCommitNear,实测
+// 最早晚到距离 21m 的一半),或已过最近点回撤(≥minD+starCommitBack,即接近段结束——实体
+// 要来早来了)。回撤结账在圈外也生效(擦圈边而过的点,回撤 15m 时往往已出圈)。代价只是
+// 结账推迟到走过之后几秒,12 份 pcap 复演:零闪烁、无误判、无漏判(仅 pcap 截断处未及结账)。
 const (
-	starSweepRadius   = 8000  // 判定半径(厘米):玩家进到此距离内仍无实体 ⇒ 该点已收集
+	starSweepRadius   = 8000  // 判定半径(厘米):玩家进到此距离内仍无实体 ⇒ 该点已收集(结账另看时机)
+	starCommitNear    = 1000  // 贴脸结账距离:实体最早在 21m 处必已下发,10m 留足余量
+	starCommitBack    = 1500  // 回撤结账迟滞:距离回升超过最近点这么多 ⇒ 接近段结束
 	starCollectRadius = 3000  // 实体离开 AOI 时,玩家在此距离内 ⇒ 是被收走了(而非走远出 AOI)
 	starSettle        = 1500 * time.Millisecond // 进场景后等快照到齐再判定,免得把还没下发的当成已收集
 )
 
 // starTracker 是一个连接在**当前场景会话**内的星星观测态(换场景/传送即重置)。
 type starTracker struct {
-	seen   map[int32]bool   // 本场景收到过实体的刷新点 id ⇒ 未收集
-	actor  map[uint64]int32 // 实体 actor_id -> 刷新点 id(实体离开时只给 actor_id)
-	snapAt time.Time        // 周边实体快照(0x014a)到达时刻;零值 = 还没到,不做已收集判定
-	res    int32            // 当前场景 res(星点按场景取)
+	seen   map[int32]bool      // 本场景收到过实体的刷新点 id ⇒ 未收集
+	actor  map[uint64]int32    // 实体 actor_id -> 刷新点 id(实体离开时只给 actor_id)
+	minD   map[int32]float64   // 刷新点 id -> 本场景内玩家距它的最近距离(只记进过判定圈的,结账时机用)
+	snapAt time.Time           // 周边实体快照(0x014a)到达时刻;零值 = 还没到,不做已收集判定
+	res    int32               // 当前场景 res(星点按场景取)
 }
 
 // posXY 从位置推送里取玩家世界坐标。
@@ -339,6 +350,8 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	// acc -> camp -> 该区已收集数合计(服务器口径,各形态相加)。用作 starSweep 的守卫:
 	// 某区 got=0 ⇒ 该区**任何点都不可能已收集**,「走近无实体」只能是没刷出(2026-07-17 实测:
 	// 新区紫星配置/计数就位但实体未开放刷出,无此守卫会把玩家路过的点全误判成已收集)。
+	// key 的**存在性**也有语义:map 里有 camp = 服务器给过该区计数行;根本没行的区(月兔暗港)
+	// 不注册任何星,不参与守卫(见 starSweep)。
 	zoneGotByAcc := map[string]map[int32]int32{}
 	zoneGot := func(acc string) map[int32]int32 {
 		if g, ok := zoneGotByAcc[acc]; ok {
@@ -459,27 +472,43 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		}
 		states := map[int32]int{}
 		got := zoneGot(acc)
+		// 一条区域计数都没有(本会话与库里都没见过进场景包)⇒ 守卫无从工作,全部不判。
+		if len(got) == 0 {
+			return
+		}
 		for _, p := range db.POIs(uint32(res)) {
 			if !strings.HasPrefix(p.K, "star") {
 				continue
 			}
-			if !near(x, y, [2]int32{p.X, p.Y}, starSweepRadius) {
+			d := math.Hypot(float64(x-p.X), float64(y-p.Y))
+			md, entered := ts.minD[p.R]
+			// 没进过判定圈的点不关心;进过的出圈后仍要评估(回撤结账常发生在圈外)。
+			if d > starSweepRadius && !entered {
 				continue
 			}
 			if ts.seen[p.R] {
-				states[p.R] = store.StarUncollected
+				if d <= starSweepRadius {
+					states[p.R] = store.StarUncollected
+				}
 				continue
 			}
-			// 守卫:候选区域(见 POI.Z)只要有一个 got=0,「已收集」就不可能成立
+			if d <= starSweepRadius && (!entered || d < md) {
+				ts.minD[p.R], md, entered = d, d, true
+			}
+			// 守卫:候选区域(见 POI.Z)只要有一个**有计数行且 got=0**,「已收集」就不可能成立
 			//(真实归属区必在候选之中),多半是该点还没开放刷出——不判,保持显示。
+			// 服务器**根本没给计数行**的候选(如月兔暗港,该区不注册任何星)不可能是真归属区,
+			// 跳过不挡——否则重叠带上的点会被永远卡住(2026-07-17 pcap 实测:望风半岛 3 点
+			// 已收集却因候选含月兔暗港而永不隐藏)。
 			ok := true
 			for _, c := range p.Z {
-				if got[c] == 0 {
+				if g, tracked := got[c]; tracked && g == 0 {
 					ok = false
 					break
 				}
 			}
-			if ok {
+			// 结账时机:贴脸,或已过最近点回撤(实体若在早就该到了,见 starCommitNear/Back 注释)。
+			if ok && (d <= starCommitNear || (entered && d >= md+starCommitBack)) {
 				states[p.R] = store.StarCollected
 			}
 		}
@@ -593,7 +622,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				resetAreas(m.Session)
 				// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
 				starByConn[m.Session] = &starTracker{
-					seen: map[int32]bool{}, actor: map[uint64]int32{}, res: res,
+					seen: map[int32]bool{}, actor: map[uint64]int32{}, minD: map[int32]float64{}, res: res,
 				}
 			}
 			// 按区域的收集进度(服务器口径):前端按候选区域整片隐藏,starSweep 按 got=0 挡误判。
