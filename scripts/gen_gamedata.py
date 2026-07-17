@@ -447,11 +447,14 @@ world_map = rows("WORLD_MAP_CONF.json")
 # 已探索/未完成)。全空 = 纯触发体,游戏从不画它——如魔力之源的 5 行「空npc,用于分层地图切换」
 # (wmc 54001-54005,散落在真实魔力之源 65-260m 外,不加此过滤会在图上多出 5 个假图标)。
 # 不能只看大地图开关:有的元素按设计只上小地图/罗盘(如眠枭之星,大地图三个开关全空)。
+# 另尊重 is_disable:守护地搬家/换刷新行会留下停用的旧行(雪巨人 wmc 13260 在旧址 1.4km 外、
+# 不咕钟 wmc 13256 与现行行重叠),显示开关还开着,只有 is_disable 标记它已废弃。
 # 该过滤只影响 WORLD_MAP 匹配的图层;眠枭之星走 STAR_NPCS 白名单,不经此表。
 SHOW_FLAGS = [f"{s}_in_{m}" for m in ("map", "minimap", "compass")
               for s in ("unexplored", "explored", "unfinished")]
 world_map_all = world_map  # 区域行(1-35)没有显示标志,会被下面滤掉,故先留一份原表给 zones 用
-world_map = {k: w for k, w in world_map.items() if any(w.get(f) for f in SHOW_FLAGS)}
+world_map = {k: w for k, w in world_map.items()
+             if any(w.get(f) for f in SHOW_FLAGS) and not w.get("is_disable")}
 
 
 # ---- 区域(zone)与眠枭之星的归属 ----
@@ -505,9 +508,15 @@ def zones_of(x, y):
 
 
 def _poi_pos(refresh_id):
-    """刷新行 → (scene_res_id, x, y);禁用行(disable)与解不出坐标的返回 None。"""
+    """刷新行 → (scene_res_id, x, y);禁用/无刷新规则的行与解不出坐标的返回 None。"""
     r = npc_refresh.get(str(int(refresh_id)))
     if not r or r.get("disable"):  # 策划留的废弃/未启用点位
+        return None
+    # refresh_rule=0/缺失 ⇒ NPC_REFRESH_RULE_CONF 里无此行(规则表没有 id=0),刷新系统从不刷出,
+    # 与 disable 同义的另一种废弃写法:4 个炼金釜(700015-700018,游戏里实地无釜,2026-07-17 用户
+    # 实证圣所前哨东侧一例)与不咕钟守护地旧行 5502266 均属此类;已知不刷出的星星奖励预设落点
+    # 94 行也全是 rule=0(它们另有多顶点几何判别兜着)。真实点位全量核对无一 rule=0。
+    if not r.get("refresh_rule"):
         return None
     p = r.get("refresh_param")
     row = area_conf.get(str(int(p))) if p else None
