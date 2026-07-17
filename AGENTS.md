@@ -8,50 +8,48 @@
 不读内存、不注入进程，只解析网络流量。Go 后端 + React 前端，构建为单二进制(前端经 embed)。
 
 面向使用者的说明见 [README.md](README.md)；设计细节见 `docs/`：
-[协议](docs/protocol.md)、[数据来源与解析](docs/data.md)、[服务架构](docs/architecture.md)。
+[协议](docs/protocol.md)、[数据来源与解析](docs/data.md)、[服务架构](docs/architecture.md)、
+[参考资料](docs/reference.md)。
+
+## 解包数据流程
+
+原始解包数据**不进仓库**,仓库只提交精炼后的生成物(详见 docs/data.md):
+
+1. 从游戏目录原样复制 pak 到 `~/Downloads/rocom/Paks/`(或直接用安卓 .apk)。
+2. `scripts/unpack.sh` 用 CUE4Parse 全量解包到 `~/Downloads/rocom/parsed/`,按虚拟路径镜像
+   (顶层 `NRC/Content/...`):uasset/umap → 属性 json(纹理另出 png),其余(.bytes/.non/.pb/
+   .lua 等)原样字节。并行、增量,`--filter <前缀>` 选导、`--list` 预览;默认排除三维美术/
+   视频/音频等纯客户端运行时资源(`--exclude` 追加、`--no-exclude` 全量,清单见 --help)。C# 实现在
+   `scripts/unpack/`,依赖 dotnet-sdk 与 CUE4Parse 克隆(默认 `~/Git/gh/CUE4Parse`,
+   `CUE4PARSE_DIR` 覆盖;内置 `GAME_RocoKingdomWorld` 支持)。
+3. 生成脚本直接读 `parsed/`(解包根统一用环境变量 `ROCOM_PARSED` 覆盖,默认
+   `~/Downloads/rocom/parsed`),产出随仓库提交的生成物。
 
 ## 约定
 
-- Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(→ internal/pb)、
-  `uv run python scripts/gen_gamedata.py`(→ names.json)、`uv run python scripts/gen_images.py`
-  (FModel PNG → internal/gamedata/data/img 的 webp,需先在 FModel 里 PNG 导出 Icon 目录)、
+- Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(all.pb → internal/pb)、
+  `uv run python scripts/gen_gamedata.py`(Bin 配置 + all.pb → names.json)、
+  `uv run python scripts/gen_images.py`(解包 PNG → internal/gamedata/data/img 的宠物图 webp)、
   `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,worldmap,medal}:属性/
-  六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图;图集精灵从 FModel PaperSprite JSON + 图集 PNG 裁切,
+  六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图;图集精灵从解包属性 JSON + 图集 PNG 裁切,
   奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
   docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
   抓包脚本 `scripts/capture.sh`(bash)。查数据用 `uv run python scripts/dump_bin.py`:
-  把 `~/Downloads/NRC/.../Bin` 下全部 823 张表批量解码为 `<Bin>/Json/*.json`(增量,秒级),
+  把解包目录 Bin 下全部 823 张表批量解码为 `<Bin>/Json/*.json`(增量,秒级),
   之后直接 grep/jq,免每张表临时调 decode_bin。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
   `-hex` 附原始字节);`-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。解码为 wire 级、
   不依赖 .proto(规避版本错位),自动跳过 c2s 子头并在 tsf4g 尾前停止。
-- 数据来源**全部随仓库提交、均为自行解包提取**,不依赖外部仓库:中文名称表来自
-  `nrc/bin/`(游戏二进制配置,用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb`
-  结构、opcode、枚举同出游戏描述符 `nrc/all.pb`(前者经 protoc `--descriptor_set_in` 生成 Go,
-  后者经 `scripts/pbdesc.py` 读描述符);宠物图片索引(conf_id→头像/全身图)取自 `nrc/bin/`
-  的 `PETBASE_CONF`/`MODEL_CONF`,图片本体(webp)经解包 PNG + `gen_images.py` 转码后
-  embed。更新游戏版本:重新解包覆盖 `nrc/bin/` 与 `nrc/all.pb` 再跑生成脚本(详见 docs/data.md)。
-- 解包:`scripts/unpack.sh --paks <游戏Paks目录|.apk> --aes <64位hex|@文件>` 在 Linux 直接从
-  游戏 pak 复刻 FModel 手动导出(输出 `~/Downloads/NRC/Content/` 同款布局,下游脚本零改动;
-  并行、增量,`--only bin,pb,icons,atlas,bigmap` 选类别)。C# 实现在 `scripts/unpack/`,依赖
-  dotnet-sdk 与 `~/Git/gh/CUE4Parse`(内置 `GAME_RocoKingdomWorld` 支持;`CUE4PARSE_DIR` 覆盖);
-  Windows 上用 FModel 手动导出亦可,布局等价(详见 docs/data.md)。
+- 数据来源**均为自行解包提取**,不依赖外部数据仓库:中文名称表来自解包目录的 Bin 配置
+  (用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb` 结构、opcode、枚举同出
+  游戏描述符 all.pb(前者经 protoc `--descriptor_set_in` 生成 Go,后者经 `scripts/pbdesc.py`
+  读描述符);宠物图片索引(conf_id→头像/全身图)取自 `PETBASE_CONF`/`MODEL_CONF`,
+  图片本体(webp)经解包 PNG 转码后 embed。更新游戏版本:重新复制 pak、重跑 unpack.sh、
+  重跑生成脚本(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
 - `internal/pb/*.pb.go` 与 `internal/gamedata/data/names.json` 为生成物，改动应改生成脚本而非手改。
-
-## reference
-| source                                                       | directory                                   | description                                                           |
-| ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------- |
-| 自行解包数据(scripts/unpack.sh 或 FModel)                    | `~/Downloads/NRC` 挑选得到 `./nrc`          | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
-| https://github.com/FabianFG/CUE4Parse                        | ~/Git/gh/CUE4Parse                          | `scripts/unpack` 的解析引擎(内置 `GAME_RocoKingdomWorld` 游戏支持)    |
-| https://github.com/4sval/FModel                              | ~/Git/gh/FModel                             | Windows GUI 解包器(手动导出备用路径;unpack.sh 复刻其输出布局)         |
-| https://github.com/MIXUULS/Roco-Kingdom-World-Data           | `./scripts/decode_bin.py`                   | 解 `nrc/bin/` 的 `.bytes`                                             |
-| https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | 已弃用(曾为名称表源,其 PET_CONF 本地化错位;仅留作对照)                |
-| https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 已弃用(曾为 `.proto` 源;其 Bin JSON 可作名称表三方对照)               |
-| https://github.com/h3110w0r1d-y/rocom-helper                 | ~/Git/gh/rocom-helper                       | 闭源洛克王国世界助手，本项目受其启发                                  |
-| https://github.com/lsj9383/blog                              | ~/Git/gh/blog                               | tsf4g 通信协议说明                                                    |
-| https://github.com/yuzeis/Roco-Kingdom-Protocol-Parser       | ~/Git/gh/Roco-Kingdom-Protocol-Parser       | 开源洛克王国协议解析器，简称 RKPP                                     |
+- 相关工具与开源项目清单见 [docs/reference.md](docs/reference.md)。

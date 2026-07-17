@@ -31,7 +31,7 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 | --- | --- |
 | `internal/gcp` | GCP 分帧、密钥提取、AES 解密 |
 | `internal/capture` | afpacket 实时抓包 / pcap 离线回放 + TCP 重组 |
-| `internal/pb` | 由游戏描述符 `nrc/all.pb` 生成的宠物消息结构(`scripts/gen_proto.py`) |
+| `internal/pb` | 由游戏描述符 all.pb 生成的宠物消息结构(`scripts/gen_proto.py`) |
 | `internal/pet` | PetData 解析与业务模型 |
 | `internal/scene` | 移动/场景消息解析(自己实时位置,实时地图页;详见 docs/data.md 3.1/3.2) |
 | `internal/gamedata` | id→中文名 查找表 + 场景/大地图投影(`scripts/gen_gamedata.py` 生成，embed) |
@@ -43,18 +43,19 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 ## 文档
 
 - [协议说明](docs/protocol.md) — tsf4g/GCP 字节布局、分帧、密钥与解密、opcode
-- [数据来源与解析](docs/data.md) — nrc/all.pb + nrc/bin 自有数据源、proto 与名称表生成、宠物字段映射
+- [数据来源与解析](docs/data.md) — 解包数据源(all.pb + Bin 配置)、proto 与名称表生成、宠物字段映射
 - [服务架构](docs/architecture.md) — 数据流、模块、HTTP 接口、前端、部署
+- [参考资料](docs/reference.md) — 相关工具与开源项目
 
 ## 构建
 
 ```bash
 # 1. (可选)重新生成 proto / 名称表 / 图片,见「更新游戏数据」与 docs/data.md
-#    配置数据源(nrc/all.pb + nrc/bin)已随仓库提交;脚本依赖经 uv 管理
+#    生成物(internal/pb、names.json、img webp)已随仓库提交,不更新游戏数据可跳过;
+#    重新生成需先按「更新游戏数据」解包到 ~/Downloads/rocom/parsed;脚本依赖经 uv 管理
 uv sync
-uv run python scripts/gen_proto.py     # nrc/all.pb → internal/pb
-uv run python scripts/gen_gamedata.py  # nrc/bin + all.pb → names.json(含图标索引)
-# 图片(可选,需先按「更新游戏数据」用 FModel 导出到 ~/Downloads/NRC):
+uv run python scripts/gen_proto.py     # all.pb → internal/pb
+uv run python scripts/gen_gamedata.py  # Bin 配置 + all.pb → names.json(含图标索引)
 uv run python scripts/gen_images.py    # 宠物头像/全身图 → img/{HeadIcon,BigHeadIcon256,Pet256} webp
 uv run python scripts/gen_icons.py     # 属性/血脉/奖牌等 UI 图标 → img/{filter,blood,static,medal} webp
 uv run python scripts/gen_bigmap.py    # 大地图/分层切片 → img/bigmap{,/layer} webp(实时地图页)
@@ -82,49 +83,22 @@ make clean     # 清理 dist/
 
 ## 更新游戏数据
 
-游戏更新后,用 [FModel](https://fmodel.app) 从 Windows 客户端重新提取,按下列**目录 + 导出格式**
-导到一个下载根(默认 `~/Downloads/NRC`,可用环境变量 `IMG_SRC` 覆盖),再跑上面「构建」步骤 1 的
-生成脚本。FModel 里先把 **Texture Export Format 设为 PNG**。配置类随仓库提交进 `nrc/`,图片类转成
-webp 后 embed(详见 [docs/data.md](docs/data.md))。
+游戏更新后三步(详见 [docs/data.md](docs/data.md)):
 
-**Export Raw Data**(原样文件 → `nrc/`)
-```
-Content/ScriptC/Data/Bin/    # 配置表(.bytes 数据 + .non schema + BinLocalize/dev_CN 本地化):
-                             #   名称表(MONSTER/PET/MEDAL_CONF…)+ 场景/大地图
-                             #   (SCENE_CONF、SCENE_RES_CONF、WORLD_MAP_BLOCK_CONF、LAYERED_WORLD_MAP_CONF)
-Content/ScriptC/Data/PB/     # 描述符 all.pb(字段号 / opcode / 枚举)
-```
+```bash
+# 1. 从游戏目录原样复制 pak(Windows 客户端 <安装目录>\Win64\NRC\Content\Paks)
+cp -r <游戏Paks目录>/* ~/Downloads/rocom/Paks/
 
-**Save Texture**(整张贴图 → `gen_images.py` / `gen_icons.py` 的 medal 组)
-```
-Content/NewRoco/Modules/System/Common/Icon/BagItem/         # 奖牌小图
-Content/NewRoco/Modules/System/Common/Icon/HeadIcon/        # 宠物小头像
-Content/NewRoco/Modules/System/Common/Icon/BigHeadIcon256/  # 宠物大头像
-Content/NewRoco/Modules/System/Common/Icon/Pet256/          # 全身缩略
-Content/NewRoco/Modules/System/Common/Icon/Pet1024/         # 全身大图(暂不 embed)
+# 2. 解包到 ~/Downloads/rocom/parsed/(增量,已存在跳过;需 dotnet SDK 与 CUE4Parse 克隆;
+#    默认排除三维美术/视频/音频等与数据链无关的大目录,--no-exclude 可真·全量)
+./scripts/unpack.sh
+
+# 3. 重跑「构建」步骤 1 的生成脚本
 ```
 
-**Export Raw Data + Save Texture + Save Properties**(图集精灵 → `gen_icons.py` 按 UV 裁切)
-```
-Content/NewRoco/Modules/System/Common/CommonStatic/         # 搭档标记 + 杂项静态图标
-Content/NewRoco/Modules/System/Common/Icon/Species/         # 系别(属性)图标
-Content/NewRoco/Modules/System/Common/Icon/XueMai/          # 血脉主图标
-Content/NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI/       # 六维属性图标
-Content/NewRoco/Modules/System/BigMap/Raw/Atlas/WorldMapNpc/ # 大地图 POI 图标(炼金釜/矿石/植物/眠枭等)
-```
-
-**Save Texture**(大地图/分层切片 → `gen_bigmap.py`,实时地图页)
-```
-Content/NewRoco/Modules/System/BigMap/Raw/Texture/Maps/      # 大地图底图 4x4 瓦片(每场景 16 张,拼合)
-Content/NewRoco/Modules/System/BigMap/Raw/Texture/LayerMap/  # 洞穴/地下层切片(单张,含透明通道)
-```
-
-> 分层切片 PNG 带透明背景(洞穴轮廓),PNG 导出与 `gen_bigmap.py` 均保留 alpha(存 RGBA webp);
-> 底图瓦片不透明。投影参数取自上面的 `WORLD_MAP_BLOCK_CONF` / `LAYERED_WORLD_MAP_CONF`(见 docs/data.md 3.1/3.2)。
-
-> 图集精灵(Paper2D PaperSprite)不含像素,需 **Save Texture** 出图集 PNG + **Save Properties** 出精灵
-> UV(`.json`),脚本据此从图集裁出各图标。生成的 webp 保持原始解包文件名,语义键→原名映射写入
-> `names.json`(见 docs/data.md)。
+解包按虚拟路径镜像导出:`.uasset`/`.umap` → 属性 `.json`(纹理另出 `.png`),其余
+(`.bytes`/`.non`/`.pb`/`.lua` 等)原样字节。生成脚本直接读 `parsed/`(解包根可用环境变量
+`ROCOM_PARSED` 覆盖),仓库只提交精炼后的生成物(`internal/pb`、`names.json`、webp 图片)。
 
 ## 运行
 

@@ -3,7 +3,7 @@
 游戏客户端通过 TCP 连接远端服务器 **8195** 端口，使用腾讯 tsf4g 框架的 GCP 模式通信。
 本文记录经真实流量逐字节验证的线上格式，是 `internal/gcp` 与 `internal/capture` 的实现依据。
 
-> 概念性说明参见 tsf4g 文档(见 [AGENTS.md](../AGENTS.md) reference)。本文只记录**实测**结论。
+> 概念性说明参见 tsf4g 文档(见 [reference.md](reference.md))。本文只记录**实测**结论。
 
 ## 1. 分层结构
 
