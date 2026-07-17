@@ -13,7 +13,7 @@ import (
 // tsf4gMark 是应用层 protobuf body 之后的 tsf4g 尾标记;解码在其前停止(见 docs/protocol.md)。
 var tsf4gMark = []byte("tsf4g")
 
-// 场景相关 opcode(来自 ZoneSvrCmd,见 names.json opcodes,源自 nrc/all.pb)。
+// 场景相关 opcode(来自 ZoneSvrCmd,见 names.json opcodes,源自游戏描述符 all.pb)。
 const (
 	OpSceneMoveReq   = 0x0133 // ZONE_SCENE_MOVE_REQ(307), c2s,自己移动(to_pos/speed/scene_cfg_id)
 	OpEnterSceneRsp  = 0x0152 // ZONE_ENTER_SCENE_RSP(338), s2c,进入场景(scene_cfg_id/scene_res_cfg_id)
@@ -84,7 +84,7 @@ func ParseMoveReq(appBody []byte) (MoveReq, bool) {
 	return best, bestConsumed >= 0
 }
 
-// moveReqWire 是 ZoneSceneMoveReq 各字段的期望 wire type(据 nrc/all.pb 消息定义)。
+// moveReqWire 是 ZoneSceneMoveReq 各字段的期望 wire type(据 all.pb 消息定义)。
 // 用于锚定 protobuf 起点:错位起点几乎必然在某字段号上撞出不符的 wire type 而被否决。
 var moveReqWire = map[protowire.Number]protowire.Type{
 	1:  protowire.VarintType, // time_stamp

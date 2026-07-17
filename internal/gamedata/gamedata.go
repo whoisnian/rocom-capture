@@ -1,4 +1,4 @@
-// Package gamedata 提供从游戏解包数据(nrc/bin)提取的 id->中文名 查找表(编译期 embed)。
+// Package gamedata 提供从游戏解包数据(Bin 配置)提取的 id->中文名 查找表(编译期 embed)。
 package gamedata
 
 import (

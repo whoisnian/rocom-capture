@@ -8,7 +8,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/pb"
 )
 
-// 宠物相关 opcode(来自 ZoneSvrCmd enum,见 names.json opcodes,源自 nrc/all.pb)。
+// 宠物相关 opcode(来自 ZoneSvrCmd enum,见 names.json opcodes,源自游戏描述符 all.pb)。
 const (
 	OpGetPetInfoByPageRsp    = 0x1346 // ZONE_GET_PET_INFO_BY_PAGE_RSP(4934), 分页宠物列表
 	OpPetFreeRsp             = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
