@@ -39,6 +39,16 @@ CUE4PARSE_DIR="${CUE4PARSE_DIR:-$HOME/Git/gh/CUE4Parse}"
 }
 export CUE4PARSE_DIR
 
+# CUE4Parse 的 NRCLua 只解无头 luac,漏了带 {0xFA,0xE5,0xC0}+len 头的那批(约占 9 成,
+# 导致其 AES 对整段解密 padding 失败)。补丁剥掉该头再解密;幂等:已应用(git apply --check
+# 失败)则跳过。补丁随 fresh clone 自动应用,新版本上游修复后 --check 失败自然跳过。
+PATCH="$SCRIPT_DIR/unpack/patches/nrclua-luac-header.patch"
+if [[ -f "$PATCH" ]]; then
+    if git -C "$CUE4PARSE_DIR" apply --check "$PATCH" >/dev/null 2>&1; then
+        git -C "$CUE4PARSE_DIR" apply "$PATCH" && echo "已应用 NRCLua luac 头补丁到 $CUE4PARSE_DIR"
+    fi
+fi
+
 # 未显式传 --aes/--aes-file 时,用内置默认密钥(2026-07 版实测)
 DEFAULT_AES="0x34254D23E47299B3B7F6C4CFDE9BD0688703446D9D8F37B2EBDDDE5B06ED5ADF"
 has_aes=0

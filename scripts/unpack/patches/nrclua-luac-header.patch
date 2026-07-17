@@ -1,0 +1,21 @@
+diff --git a/CUE4Parse/GameTypes/RocoKingdomWorld/Lua/NRCLua.cs b/CUE4Parse/GameTypes/RocoKingdomWorld/Lua/NRCLua.cs
+index d1e0d99..37eddf3 100644
+--- a/CUE4Parse/GameTypes/RocoKingdomWorld/Lua/NRCLua.cs
++++ b/CUE4Parse/GameTypes/RocoKingdomWorld/Lua/NRCLua.cs
+@@ -40,6 +40,16 @@ public static byte[] Decrypt(this byte[] encrypted)
+ 
+     public static byte[] DecryptLuaBytecode(string name, byte[] encryptedData)
+     {
++        // Some luac are wrapped with a 7-byte header before the AES ciphertext:
++        // magic {0xFA, 0xE5, 0xC0} + uint32-LE ciphertext length. Strip it when present
++        // (headerless files start directly with the ciphertext and are decrypted as-is).
++        if (encryptedData.Length >= 7 && encryptedData[0] == 0xFA && encryptedData[1] == 0xE5 && encryptedData[2] == 0xC0)
++        {
++            var payloadLen = (int) BitConverter.ToUInt32(encryptedData, 3);
++            if (payloadLen >= 0 && 7 + payloadLen <= encryptedData.Length)
++                encryptedData = encryptedData[7..(7 + payloadLen)];
++        }
++
+         var decryptedData = encryptedData.Decrypt();
+ 
+         if (!FLuaReader.IsValidLuaMagic(decryptedData))

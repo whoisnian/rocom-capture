@@ -31,11 +31,13 @@
 > (增量),`--list` 预览、`--filter` 按前缀选导、`--force` 覆盖。**默认排除**纯客户端运行时
 > 资源(ArtRes 三维美术、Movies 视频、WwiseAudio 音频、AI 行为树、PVS/着色器/PSO 缓存、Engine;
 > 约占全量 74G/80G,下游脚本零引用,清单见 `--help`),`--exclude <前缀>` 追加排除、
-> `--no-exclude` 恢复真·全量。已知限制:约 6 千个 `.luac`
-> 解密失败(CUE4Parse 的 NRCLua 密钥/格式未跟上当前版本,仅约 400 个可解;lua 字节码无下游依赖,
-> 失败仅计数不中断);RenderTarget/视频纹理无像素数据,只出属性 json 不出 png。
+> `--no-exclude` 恢复真·全量。`.luac` 解出为标准 Lua 5.4 字节码(源码已编译,非明文);
+> RenderTarget/视频纹理无像素数据,只出属性 json 不出 png(降级为记录、json 照写)。
 > C# 实现在 `scripts/unpack/`,基于 CUE4Parse 内置的 `GAME_RocoKingdomWorld` 支持(自定义
-> AES 字节置换变体、Bin/luac 专属处理,无需 usmap)。依赖 dotnet-sdk 10+ 与 CUE4Parse 克隆
+> AES 字节置换变体、Bin/luac 专属处理,无需 usmap)。**CUE4Parse 的 NRCLua 只解无头 luac,
+> 漏了带 `{0xFA,0xE5,0xC0}+len` 头的那批(约占 9 成,其 AES 对整段解密 padding 失败),
+> `scripts/unpack/patches/nrclua-luac-header.patch` 剥头修复,由 unpack.sh 幂等应用到克隆**。
+> 依赖 dotnet-sdk 10+ 与 CUE4Parse 克隆
 > (默认 `~/Git/gh/CUE4Parse`,`CUE4PARSE_DIR` 覆盖);首次运行自动下载 oodle/zlib-ng 到
 > `~/.cache/nrc-unpack`。AES 主密钥默认值已内置在 `unpack.sh`(`DEFAULT_AES`,换密钥的版本用
 > `--aes <hex>`/`@文件` 覆盖;与 Windows FModel `AppSettings.json → AesKeys` 同一把,该游戏
