@@ -22,9 +22,9 @@
    视频/音频等纯客户端运行时资源(`--exclude` 追加、`--no-exclude` 全量,清单见 --help)。C# 实现在
    `scripts/unpack/`,依赖 dotnet-sdk 与 CUE4Parse 克隆(默认 `~/Git/gh/CUE4Parse`,
    `CUE4PARSE_DIR` 覆盖;内置 `GAME_RocoKingdomWorld` 支持)。
-   导出后自动跑两个后置步骤(增量,`--no-post` 跳过):Bin `.bytes` → `Json/*.json`
-   (`scripts/dump_bin.py`,需 uv)、`.luac` → `.lua` 反编译(`scripts/decompile_luac.sh`,
-   需 unluac,单文件超时兜住死循环、真失败打 `.lua.nodecomp` 标记免重试)。
+   导出后自动跑两个后置步骤(增量,`--no-post` 跳过):全树 RocoBinData `.bytes` → 紧邻 `.json`
+   (`scripts/bin2json.py`,需 uv;既供查数据也是 gen_* 输入)、`.luac` → `.lua` 反编译
+   (`scripts/decompile_luac.sh`,需 unluac,单文件超时兜住死循环、真失败打 `.lua.nodecomp` 标记免重试)。
 3. 生成脚本直接读 `parsed/`(解包根统一用环境变量 `ROCOM_PARSED` 覆盖,默认
    `~/Downloads/rocom/parsed`),产出随仓库提交的生成物。
 
@@ -38,16 +38,16 @@
   奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
   docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
-  抓包脚本 `scripts/capture.sh`(bash)。查数据用 `uv run python scripts/dump_bin.py`:
-  把解包目录 Bin 下全部 823 张表批量解码为 `<Bin>/Json/*.json`(增量,秒级),
-  之后直接 grep/jq,免每张表临时调 decode_bin。
+  抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
+  (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq
+  查数据、也是 gen_gamedata/gen_icons 的输入(它们直接读这些 JSON,不再自行解 .bytes)。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
   `-hex` 附原始字节);`-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。解码为 wire 级、
   不依赖 .proto(规避版本错位),自动跳过 c2s 子头并在 tsf4g 尾前停止。
 - 数据来源**均为自行解包提取**,不依赖外部数据仓库:中文名称表来自解包目录的 Bin 配置
-  (用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb` 结构、opcode、枚举同出
+  (由 `scripts/bin2json.py` 按 CUE4Parse 的 FRocoBinData 算法解为 JSON);`internal/pb` 结构、opcode、枚举同出
   游戏描述符 all.pb(前者经 protoc `--descriptor_set_in` 生成 Go,后者经 `scripts/pbdesc.py`
   读描述符);宠物图片索引(conf_id→头像/全身图)取自 `PETBASE_CONF`/`MODEL_CONF`,
   图片本体(webp)经解包 PNG 转码后 embed。更新游戏版本:重新复制 pak、重跑 unpack.sh、

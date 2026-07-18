@@ -7,9 +7,8 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| [CUE4Parse](https://github.com/FabianFG/CUE4Parse) | `scripts/unpack` 的解析引擎,内置 `GAME_RocoKingdomWorld` 游戏支持(自定义 AES 变体/Bin/luac,无需 usmap)。构建需本地克隆,位置用环境变量 `CUE4PARSE_DIR` 指定(默认 `~/Git/gh/CUE4Parse`) |
+| [CUE4Parse](https://github.com/FabianFG/CUE4Parse) | `scripts/unpack` 的解析引擎,内置 `GAME_RocoKingdomWorld` 游戏支持(自定义 AES 变体/Bin/luac,无需 usmap);其 `FRocoBinData.cs` 也是 `scripts/bin2json.py` 解 `.bytes` 配置的算法参照。构建需本地克隆,位置用环境变量 `CUE4PARSE_DIR` 指定(默认 `~/Git/gh/CUE4Parse`) |
 | [FModel](https://github.com/4sval/FModel) | Windows GUI 解包器,手动导出备用路径,可与 `scripts/unpack.sh` 互为校验(该游戏条目 UeVersion=68812827 即 `GAME_RocoKingdomWorld`) |
-| [MIXUULS/Roco-Kingdom-World-Data](https://github.com/MIXUULS/Roco-Kingdom-World-Data) | `scripts/decode_bin.py`(解 Bin 目录 `.bytes` 配置)的原始出处,已 vendored |
 
 ## 协议与同类项目
 

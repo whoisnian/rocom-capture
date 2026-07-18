@@ -91,7 +91,7 @@ cp -r <游戏Paks目录>/* ~/Downloads/rocom/Paks/
 
 # 2. 解包到 ~/Downloads/rocom/parsed/(增量,已存在跳过;需 dotnet SDK 与 CUE4Parse 克隆;
 #    默认排除三维美术/视频/音频等与数据链无关的大目录,--no-exclude 可真·全量;
-#    导出后自动 Bin→JSON、luac→lua 反编译(需 unluac,--no-post 跳过))
+#    导出后自动 .bytes→JSON、luac→lua 反编译(需 unluac,--no-post 跳过))
 ./scripts/unpack.sh
 
 # 3. 重跑「构建」步骤 1 的生成脚本

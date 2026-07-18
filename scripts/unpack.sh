@@ -5,13 +5,13 @@
 # 封装 scripts/unpack/(C#,基于 CUE4Parse 的 GAME_RocoKingdomWorld 支持):
 # 从 ~/Downloads/rocom/Paks/(游戏目录原样复制的 pak)全量导出到 ~/Downloads/rocom/parsed/,
 # 按虚拟路径镜像:uasset/umap → json(纹理另出 png),其余(.bytes/.non/.pb/.lua 等)原样字节。
-# 生成脚本(gen_proto/gen_gamedata/gen_images/gen_icons/gen_bigmap/dump_bin)直接读 parsed/。
+# 生成脚本(gen_proto/gen_gamedata/gen_images/gen_icons/gen_bigmap)直接读 parsed/。
 # 并行解码,默认跳过已存在文件(增量);默认排除纯客户端运行时资源(三维美术/视频/音频/着色器等,
 # 约占全量 74G/80G,清单见 --help),--exclude 追加、--no-exclude 恢复真·全量。
 #
 # 导出后自动跑两个后置步骤(增量,--no-post 跳过;缺依赖时提示后继续):
-#   1. Bin .bytes → Json/*.json(scripts/dump_bin.py,需 uv);2. .luac → .lua(反编译,
-#   scripts/decompile_luac.sh,需 unluac)。--list/--help 与导出失败(rc=1)时不跑。
+#   1. 全树 .bytes → 紧邻 .json(scripts/bin2json.py,需 uv;既供查数据也是 gen_* 输入);
+#   2. .luac → .lua 反编译(scripts/decompile_luac.sh,需 unluac)。--list/--help 与导出失败(rc=1)时不跑。
 #
 # 用法:
 #   ./scripts/unpack.sh                          # 默认 Paks → parsed 增量导出(含默认排除+后置步骤)
@@ -93,16 +93,13 @@ set -e
 
 # ── 后置步骤(增量,缺依赖时提示后继续)──────────────────────────────
 REPO="$(dirname "$SCRIPT_DIR")"
-BIN_DIR="$OUT_DIR/NRC/Content/ScriptC/Data/Bin"
 
-# 1. Bin .bytes → Json/*.json(供 grep/jq 查数据,增量秒级)
-if [[ -d "$BIN_DIR/BinConf" ]]; then
-    if command -v uv >/dev/null 2>&1; then
-        echo "==> 解码 Bin 配置为 JSON..."
-        uv run --project "$REPO" python "$SCRIPT_DIR/dump_bin.py" "$BIN_DIR" || echo "  (dump_bin 失败,跳过)"
-    else
-        echo "==> 跳过 Bin→JSON:未找到 uv" >&2
-    fi
+# 1. 全树 RocoBinData .bytes → 紧邻 .json(供 grep/jq 查数据,也是 gen_* 的输入,增量秒级)
+if command -v uv >/dev/null 2>&1; then
+    echo "==> 解码 .bytes 为 JSON..."
+    uv run --project "$REPO" python "$SCRIPT_DIR/bin2json.py" "$OUT_DIR" || echo "  (bin2json 失败,跳过)"
+else
+    echo "==> 跳过 .bytes→JSON:未找到 uv" >&2
 fi
 
 # 2. .luac → .lua 反编译(增量;缺 unluac 时脚本自行提示并退出 0)

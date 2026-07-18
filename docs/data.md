@@ -13,8 +13,8 @@
 生成脚本用到的两类源(均在解包目录内,`ROCOM_PARSED` 环境变量可覆盖解包根):
 
 - **游戏二进制配置 `NRC/Content/ScriptC/Data/Bin/`**:提供**中文名称表**。游戏自有的
-  `.bytes`(数据)+ `.non`(schema)+ `BinLocalize/dev_CN`(本地化),用 vendored 的
-  `scripts/decode_bin.py` 解码。
+  `.bytes`(数据)+ `.non`(schema)+ `BinLocalize/dev_CN`(本地化),由 `scripts/bin2json.py`
+  解为紧邻的 `.json`(unpack.sh 已自动解码),生成脚本读该 JSON。
 - **游戏描述符 `NRC/Content/ScriptC/Data/PB/all.pb`**:游戏自带的 protobuf 描述符
   (`FileDescriptorSet`,即运行时 `pb.loadufsfile` 加载的同一份),提供 `internal/pb` 的
   **字段号/类型**与 **opcode/枚举**。含字段号,可直接喂给 protoc 生成 Go,无需 .proto 文本。
@@ -35,7 +35,7 @@
 > (降级为记录、json 照写)。
 >
 > 导出后自动跑两个**后置步骤**(增量,`--no-post` 跳过;`--list`/`--help`/导出致命错时不跑):
-> ①`.bytes` → `Json/*.json`(`scripts/dump_bin.py`,需 uv);②`.luac` → `.lua` 反编译
+> ①全树 RocoBinData `.bytes` → 紧邻 `.json`(`scripts/bin2json.py`,需 uv);②`.luac` → `.lua` 反编译
 > (`scripts/decompile_luac.sh`,需 unluac)。`.luac` 本是标准 Lua 5.4 字节码(编译产物),
 > unluac 反编译回可读源码,6341 个里 6339 成功;单文件 `timeout`(默认 60s,`LUAC_TIMEOUT`
 > 覆盖)兜住 unluac 对个别字节码的死循环,真失败(1 报错 + 1 死循环)打 `.lua.nodecomp`
@@ -66,10 +66,12 @@ Bin 目录下:
 | `BinDataCompressed/*.bytes` | 表数据(游戏自有压缩二进制) |
 | `BinLocalize/dev_CN/*.bytes` | 本地化字符串(`ELocalizedString` 字段经此解析) |
 
-`scripts/gen_gamedata.py` 调 vendored 的 `scripts/decode_bin.py` 把上述解码成
-`{"RocoDataRows":{id:{...}}}`。opcode/枚举不在 Bin 里,取自 `all.pb`(见第 2、3 节)。
-调试查数据用 `scripts/dump_bin.py`:把全部 823 张表批量解码为 `<Bin>/Json/*.json`
-(增量,秒级),之后直接 grep/jq。
+`scripts/bin2json.py` 按 CUE4Parse 的 `FRocoBinData` 算法(自行实现,是全仓 `.bytes` 解码的
+唯一实现)把全树 RocoBinData `.bytes` 解为紧邻的 `.json`:压缩/定长表 `{"RocoDataRows":{id:{...}}}`、
+本地化 `{"LocalizationStrings":{...}}`(magic `0x53DF17BE` 识别,非此格式如 BigMap 的 `.bytes` 跳过)。
+`gen_gamedata.py`/`gen_icons.py` 直接读 `BinDataCompressed/<表>.json`,不再自行解 `.bytes`。
+opcode/枚举不在 Bin 里,取自 `all.pb`(见第 2、3 节)。unpack.sh 导出后自动解码,也可手动
+`uv run python scripts/bin2json.py` 重跑(增量,秒级);之后直接 grep/jq。
 
 关键表：
 
@@ -144,7 +146,7 @@ species  nature  nature_effect  skill_dam_type  talent_rate
 partner_mark  speciality  medal  images  image_base  opcodes
 ```
 
-名称表由 `decode_bin.py` 解 Bin 目录得到;系别/天分/标记的整数值通过解析 `all.pb`
+名称表由 `bin2json.py` 解出的 Bin JSON 得到;系别/天分/标记的整数值通过解析 `all.pb`
 枚举(名→整数)再 join `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+
 PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `all.pb` 的 `ZoneSvrCmd` 全集
 (枚举/opcode 均经 `scripts/pbdesc.py` 读描述符,与 `internal/pb` 同源),性别为硬编码。
@@ -561,7 +563,7 @@ s2c 0x1346 DATA 明文 body
 ## 5. 已修复 / 待校准
 
 已修复(实测对齐截图)：
-- **种类名**：合并 MONSTER_CONF+PET_CONF,自有解包提取 + `decode_bin.py` 解码,全量
+- **种类名**：合并 MONSTER_CONF+PET_CONF,自有解包提取 + `bin2json.py` 解码,全量
   543 只 0 空种类。**修正了 pak-public-kit 的 PET_CONF 名整体错位**:其 `ELocalizedString`
   本地化对彩蛋宠(PET_CONF)整体偏移一位(3011001 误为"恶魔叮",应为"恶魔狼"),
   累计 4787 个彩蛋宠名错误;经自有解包 + 两个独立 world-data 源三方比对确认后改用自有解码;

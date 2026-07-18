@@ -1,8 +1,8 @@
 """提取宠物展示需要的 id->中文名 精简表，输出到 internal/gamedata/data/names.json。
 
 数据全部来自本机解包目录(scripts/unpack.sh 从游戏 pak 导出,默认 ~/Downloads/rocom/parsed):
-- 名称表: ScriptC/Data/Bin 下游戏自有二进制配置(`.bytes` 数据 + `.non` schema + dev_CN 本地化),
-          用 vendored 的 scripts/decode_bin.py 解码(参考 CUE4Parse FRocoBinData.cs):
+- 名称表: ScriptC/Data/Bin 下游戏自有二进制配置,读 scripts/bin2json.py 解出的
+          BinDataCompressed/*.json(unpack.sh 已自动解码;`.bytes`+`.non`+dev_CN 本地化):
   - 种类:   MONSTER_CONF + PET_CONF      id -> name
   - 性格:   AUDIO_NATURE_CONF            nature_id -> name
   - 奖牌:   MEDAL_CONF                   id -> {name, desc}
@@ -19,7 +19,6 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import decode_bin  # vendored 解码器(scripts/decode_bin.py,纯标准库)
 import pbdesc      # 读 all.pb 描述符(依赖 protobuf,uv 管理)
 
 # 名称表:解包目录的游戏二进制配置(ScriptC/Data/Bin);opcode/枚举:游戏描述符 all.pb。
@@ -32,14 +31,13 @@ _FDS = pbdesc.load(ALL_PB)  # 描述符只读一次,enum_dim/opcodes 共用
 
 
 def rows(table):
-    """解码 Bin 目录下一张表(.bytes + .non + dev_CN 本地化)为 {id字符串: 行}。"""
+    """读一张表已解码的 JSON(scripts/bin2json.py 产出,紧邻 .bytes)为 {id字符串: 行}。"""
     base = table[:-5] if table.endswith(".json") else table
-    loc = os.path.join(BIN_DIR, "BinLocalize", "dev_CN", base + ".bytes")
-    return decode_bin.decode_file(
-        os.path.join(BIN_DIR, "BinDataCompressed", base + ".bytes"),
-        schema_path=os.path.join(BIN_DIR, "BinConf", base + ".non"),
-        loc_path=loc if os.path.exists(loc) else None,
-    )["RocoDataRows"]
+    path = os.path.join(BIN_DIR, "BinDataCompressed", base + ".json")
+    if not os.path.exists(path):
+        sys.exit(f"缺解码 JSON: {path}\n请先跑 scripts/unpack.sh(或 scripts/bin2json.py)解码 .bytes。")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)["RocoDataRows"]
 
 
 def texkey(ref):
@@ -335,7 +333,7 @@ for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
 # 只收录有 map_resource(即有切片图)的层;地表条目(无图,用底图)跳过。
 #
 # 层的 scene_res:LAYERED 表有就用(洞穴层=10003);家园层该列为空,只能从其区域行补(=30001)。
-# AREA_CONF/AREA_FUNC_CONF 已随仓库 vendored(为 POI 坐标一并入库,见下方「大地图 POI」)。
+# AREA_CONF/AREA_FUNC_CONF 在解包 Bin 目录(为 POI 坐标读取,见下方「大地图 POI」)。
 area_conf = rows("AREA_CONF.json")
 area_func = rows("AREA_FUNC_CONF.json")
 

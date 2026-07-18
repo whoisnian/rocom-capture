@@ -22,14 +22,12 @@ webp 转码确定性(同 libwebp 下同源字节一致),默认跳过已存在;--
 运行(需 uv 管理的 pillow):
     uv run python scripts/gen_icons.py [解包根目录(含 Content 的一级,默认 parsed/NRC)] [--force]
 """
+import json
 import os
 import re
 import sys
 
 from PIL import Image
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import decode_bin  # vendored 解码器(解 Bin 目录的 .bytes)
 
 FORCE = "--force" in sys.argv[1:]
 _pos = [a for a in sys.argv[1:] if not a.startswith("-")]
@@ -72,12 +70,11 @@ WORLDMAP = {
 # ── 基础设施 ──────────────────────────────────────────────
 
 def load_rows(table: str) -> dict:
-    loc = os.path.join(BIN_DIR, "BinLocalize", "dev_CN", table + ".bytes")
-    return decode_bin.decode_file(
-        os.path.join(BIN_DIR, "BinDataCompressed", table + ".bytes"),
-        schema_path=os.path.join(BIN_DIR, "BinConf", table + ".non"),
-        loc_path=loc if os.path.exists(loc) else None,
-    )["RocoDataRows"]
+    path = os.path.join(BIN_DIR, "BinDataCompressed", table + ".json")
+    if not os.path.exists(path):
+        sys.exit(f"缺解码 JSON: {path}\n请先跑 scripts/unpack.sh(或 scripts/bin2json.py)解码 .bytes。")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)["RocoDataRows"]
 
 
 def game_to_src(ref: str) -> str:
@@ -126,7 +123,6 @@ def find(ref: str, ext: str) -> str:
 
 def crop_sprite(ref: str, dst: str) -> str | None:
     """PaperSprite:读 Save Properties JSON 的 UV,从图集 PNG 裁切并写 webp。返回失败原因或 None。"""
-    import json
     jf = find(ref, ".json")
     if not jf:
         return "缺 JSON"
