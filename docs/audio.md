@@ -177,7 +177,77 @@ ffmpeg -i out.wav -ac 1 -ar 48000 -c:a aac -b:a 48k -movflags +faststart out.m4a
 批量转码时务必给 `subprocess.run` 加 `check=True`——wem 缺失会让 vgmstream 静默返回空,
 下游生成出**零长度音频**且无任何报错。
 
-## 9. 校验对应关系是否正确
+## 9. 嗓音音调:运行时变调,不在音频文件里
+
+导出的 wem 都是**中性音调**。游戏里每只宠物的叫声音高不同,是运行时由 Wwise RTPC 实时变调的,
+音频文件本身只有一份。
+
+链路起点是宠物的个体属性 `voice`,取值域写死在 `PET_GLOBAL_CONFIG`:
+
+```
+pet_voice_low  = -100
+pet_voice_high =  100
+```
+
+协议里同名字段,本项目已解出:`PetData.voice`(field 93, int32),另有
+`PetSpecialData`(23) / `SceneBasePetData`(20) / `MonsterDiffInfo`(8) / `BoxMonsterInfo`(16)。
+
+客户端三处把它原样喂给同一个 Game Parameter(Lua 路径相对 `NRC/Content/ScriptC/`):
+
+```lua
+-- NewRoco/Modules/Core/Scene/Component/Audio/AudioCustomSettingComponent.lua:100
+local voice = npc_base and npc_base.voice
+_G.NRCAudioManager:SetEmitterRTPC("Pet_Vo_Pitch", voice, ownerView)
+-- NewRoco/Modules/Core/Battle/Entity/BattlePet.lua:2405     战斗内
+-- NewRoco/Modules/System/PetUI/Res/UMG_PetImage3D_C.lua:1284 图鉴 3D 预览
+```
+
+`Init.bnk` 的 STMG 段登记了这个 Game Parameter(FNV-1 = `0xC339B8F5`,默认值 0)。
+
+### 曲线在哪、怎么读
+
+每只宠物的 `Pet_Vo_<拼音>.bnk` 都在 **ActorMixer(type=7)** 上挂了该参数的 RTPC 曲线。
+RTPC 条目自参数 id 起的布局(v135 实测):
+
+| 偏移 | 字段 |
+| --- | --- |
+| +0 | RTPC ID(= `fnv1_32("Pet_Vo_Pitch")`) |
+| +4 | rtpcType |
+| +5 | accum(1=Exclusive / 2=Additive) |
+| +6 | **ParameterID**(2 = Pitch、0 = Volume) |
+| +7 | curveID(4B) |
+| +11 | scaling |
+| +12 | 点数(**uint16**) |
+| +14 | 点数组,每点 `float x, float y, uint32 interp` |
+
+`interp=4` 为线性。三个点的 x 恒为 -100 / 0 / +100,与游戏内取值域一一对应,
+y 是**音分**(cent)。621 个 bnk 里 619 个有曲线,形态分布:
+
+| l / h(音分) | 数量 |
+| --- | --- |
+| -300 / +300 | 330 |
+| -300 / +500 | 275 |
+| 其它手调特例(如 -801/+1215、-400/+800) | 14 |
+
+同一参数还会命中 FX 插件对象(type=16/17,`0x00820003` / `0x00880003`),
+它们的 ParameterID 是**插件私有下标**、和上表的枚举不是一套(值形如 85→100→120 的百分比型),
+按语义归类前必须先用「宿主对象类型 ∈ 容器」把它们排除掉。
+
+### 复刻
+
+Wwise 的 pitch 是**重采样**实现(变调同时变速),所以浏览器侧
+
+```js
+audio.preservesPitch = false;           // 默认 true = 保音调时间伸缩,不是我们要的
+audio.playbackRate   = 2 ** (cents / 1200);
+```
+
+即等价实现,无需为每个音调预生成音频。上面那两个 FX 插件复刻不了(bnk 不存插件名字符串),
+两端听感会有音色差异。
+
+实际用法见 [rocom-petvo](https://github.com/whoisnian/rocom-petvo)——本文这条链路的落地站点。
+
+## 10. 校验对应关系是否正确
 
 比对「切出的音频」与「已知正确的单段」时,**不要用原始波形相关度**:几毫秒的相位差就会让
 高频波形相关度崩到 0.1 以下,看着像错的其实是对的。应改用 **10ms RMS 包络相关**:
@@ -187,7 +257,8 @@ ffmpeg -i out.wav -ac 1 -ar 48000 -c:a aac -b:a 48k -movflags +faststart out.m4a
 
 区分度足够清晰,且对小偏移不敏感。
 
-## 10. 相关文档
+## 11. 相关文档
 
 - 解包流程与其它数据源:[data.md](data.md)
+- 本文链路的落地站点:[rocom-petvo](https://github.com/whoisnian/rocom-petvo)
 - 工具与开源项目清单:[reference.md](reference.md)
