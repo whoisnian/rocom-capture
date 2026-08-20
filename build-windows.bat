@@ -1,0 +1,1 @@
+go build -o rocom-capture.exe ./cmd/rocom-capture
