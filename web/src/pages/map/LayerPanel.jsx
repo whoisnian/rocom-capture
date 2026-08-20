@@ -40,10 +40,11 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
         <div className="filter-group">
           <div className="map-wild-head">
             <label>野生宠物</label>
-            <div className="map-wild-mode" role="group" aria-label="野生宠物筛选条件">
+            <div className="map-wild-mode" role="tablist" aria-label="编辑野生宠物筛选条件">
               {['or', 'and'].map((mode) => (
                 <button key={mode} className={wilds.mode === mode ? 'on' : ''}
-                  onClick={() => wilds.setMode(mode)} aria-pressed={wilds.mode === mode}>
+                  onClick={() => wilds.setMode(mode)} role="tab" aria-selected={wilds.mode === mode}
+                  title={`编辑 ${mode.toUpperCase()} 条件；OR 与 AND 同时生效`}>
                   {mode.toUpperCase()}
                 </button>
               ))}

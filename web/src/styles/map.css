@@ -120,7 +120,7 @@
 }
 .map-layer-btn.map-wild-btn.on .map-wild-swatch { background: var(--wild-color); border-color: var(--wild-color); }
 
-/* 野生宠物多条件匹配模式:紧凑的分段控件,与下方图层开关分开。 */
+/* 野生宠物 OR/AND 条件页签:紧凑的分段控件,与下方图层开关分开。 */
 .map-wild-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .map-wild-head > label { font-size: 12px; color: var(--fg-dim); }
 .map-wild-mode {

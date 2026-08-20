@@ -1,31 +1,20 @@
 import { useState, useEffect } from 'react'
 import { getWildPets, subscribe } from '../../api'
+import { WILD_LAYERS, matchesWildPet } from './wildFilter'
+
+export { WILD_LAYERS } from './wildFilter'
 
 // —— 野生宠物图层(变异 · 污染 · 体重 · 嗓音)——
 // 与 POI 图层不同,这几类**不是固定点位**:野生宠会刷新、被别人抓走,只有走进 AOI 才知道它在。
 // 后端从周边实体快照与 AOI 通知里挑出这几类推过来(见 internal/pipeline/wildpets.go),
 // 前端只管开关与摆放。判定依据(捕捉前后一致的属性)见 docs/data.md 3.5。
 //
-// v3 把旧 voice(精确 +100)拆成奖牌窗口与 MAX;读 v2 时迁移到
-// voice-high-max,保持原有选择的实际语义不变。
-const LS_KEY = 'map.wildLayers.v3'
+// v4 分开记忆共享独立项、OR 条件与 AND 条件。迁移 v3 时按当时保存的模式放入对应条件集;
+// 更早的 v2 voice(精确 +100)先迁移为 voice-high-max。
+const LS_KEY = 'map.wildLayers.v4'
+const LEGACY_LS_KEY = 'map.wildLayers.v3'
 const OLD_LS_KEY = 'map.wildLayers.v2'
 const MODE_LS_KEY = 'map.wildMatchMode.v1'
-
-// 图层 = 一个开关,可覆盖后端 kinds 里的多个类别(异色与炫彩合成一个开关)。
-// priority 只决定多类别标记的描边优先级,UI 顺序按用户筛选习惯排列。
-export const WILD_LAYERS = [
-  { k: 'mutation', group: 'mutation', n: '异色/炫彩', kinds: ['shiny', 'colorful'], color: '#7ad3ff', priority: 100, on: true },
-  { k: 'pollution', group: 'pollution', n: '污染', kinds: ['pollution'], color: '#c792ea', priority: 90 },
-  { k: 'weight-big', group: 'weight', n: '大块头', kinds: ['weight-big'], color: '#f5b942', priority: 40 },
-  { k: 'weight-small', group: 'weight', n: '小不点', kinds: ['weight-small'], color: '#4c8dff', priority: 40 },
-  { k: 'weight-big-max', group: 'weight', n: '大块头MAX', kinds: ['weight-big-max'], color: '#ff6b57', priority: 80 },
-  { k: 'weight-small-max', group: 'weight', n: '小不点MAX', kinds: ['weight-small-max'], color: '#2dd4bf', priority: 80 },
-  { k: 'voice-high', group: 'voice', n: '婉转声', kinds: ['voice-high'], color: '#e6d05f', priority: 30 },
-  { k: 'voice-low', group: 'voice', n: '粗嗓门', kinds: ['voice-low'], color: '#8b9cff', priority: 30 },
-  { k: 'voice-high-max', group: 'voice', n: '婉转声MAX', kinds: ['voice-high-max'], color: '#ff7eb6', priority: 70 },
-  { k: 'voice-low-max', group: 'voice', n: '粗嗓门MAX', kinds: ['voice-low-max'], color: '#55d6e8', priority: 70 },
-]
 
 // wildTags 把一只宠物命中的类别翻成悬浮提示上的标签(比图层名更细:图层把异色/炫彩合成
 // 一个开关,提示里仍分开说)。异色 + 炫彩兼具时游戏自己有个合称「异色炫彩」
@@ -75,23 +64,43 @@ export function wildRing(kinds = [], enabled = null) {
   }
 }
 
-// null = 用户从没手动选过,按各图层的 on 默认;数组 = 用户的选择(可以是空数组 = 全关)。
-const loadKeys = () => {
+const loadMode = () => localStorage.getItem(MODE_LS_KEY) === 'and' ? 'and' : 'or'
+const saveFilters = (filters) => localStorage.setItem(LS_KEY, JSON.stringify({
+  standalone: [...filters.standalone], or: [...filters.or], and: [...filters.and],
+}))
+
+const loadFilters = () => {
   try {
     const v = JSON.parse(localStorage.getItem(LS_KEY))
-    if (Array.isArray(v)) return v
-    const old = JSON.parse(localStorage.getItem(OLD_LS_KEY))
-    if (!Array.isArray(old)) return null
-    return old.map((k) => k === 'voice' ? 'voice-high-max' : k)
-  } catch { return null }
+    if (v && Array.isArray(v.standalone) && Array.isArray(v.or) && Array.isArray(v.and)) {
+      return { standalone: new Set(v.standalone), or: new Set(v.or), and: new Set(v.and) }
+    }
+    let old = JSON.parse(localStorage.getItem(LEGACY_LS_KEY))
+    if (!Array.isArray(old)) {
+      old = JSON.parse(localStorage.getItem(OLD_LS_KEY))
+      if (Array.isArray(old)) old = old.map((k) => k === 'voice' ? 'voice-high-max' : k)
+    }
+    if (Array.isArray(old)) {
+      const standalone = new Set(WILD_LAYERS.filter((l) => l.standalone && old.includes(l.k)).map((l) => l.k))
+      const conditional = new Set(WILD_LAYERS.filter((l) => !l.standalone && old.includes(l.k)).map((l) => l.k))
+      return {
+        standalone,
+        or: loadMode() === 'or' ? conditional : new Set(),
+        and: loadMode() === 'and' ? conditional : new Set(),
+      }
+    }
+  } catch { /* 使用默认值 */ }
+  return {
+    standalone: new Set(WILD_LAYERS.filter((l) => l.standalone && l.on).map((l) => l.k)),
+    or: new Set(),
+    and: new Set(),
+  }
 }
-const defaultKeys = () => WILD_LAYERS.filter((l) => l.on).map((l) => l.k)
-const loadMode = () => localStorage.getItem(MODE_LS_KEY) === 'and' ? 'and' : 'or'
 
 // useWildPets 管理野生宠物图层:订阅后端推送、按当前场景与开关筛出可绘制的标记。
 export function useWildPets(account, sceneResId) {
   const [snapshot, setSnapshot] = useState({ sceneResId: null, pets: [] })
-  const [on, setOn] = useState(() => new Set(loadKeys() || defaultKeys()))
+  const [filters, setFilters] = useState(loadFilters)
   const [mode, setModeState] = useState(loadMode)
 
   useEffect(() => {
@@ -115,10 +124,15 @@ export function useWildPets(account, sceneResId) {
   const pets = sceneResId != null && snapshot.sceneResId === sceneResId ? snapshot.pets : []
 
   const toggle = (k) => {
-    setOn((prev) => {
-      const next = new Set(prev)
-      next.has(k) ? next.delete(k) : next.add(k)
-      localStorage.setItem(LS_KEY, JSON.stringify([...next]))
+    const layer = WILD_LAYERS.find((l) => l.k === k)
+    if (!layer) return
+    setFilters((prev) => {
+      const next = {
+        standalone: new Set(prev.standalone), or: new Set(prev.or), and: new Set(prev.and),
+      }
+      const bucket = layer.standalone ? next.standalone : next[mode]
+      bucket.has(k) ? bucket.delete(k) : bucket.add(k)
+      saveFilters(next)
       return next
     })
   }
@@ -129,23 +143,22 @@ export function useWildPets(account, sceneResId) {
     setModeState(mode)
   }
 
-  // OR: 命中任一已开图层。AND:同属性组内 OR、不同属性组间 AND。例如同时选择
-  // 大/小块头 MAX 与高/低嗓音 MAX,即要求「任一体重 MAX 且任一嗓音 MAX」。
-  // 复合的「异色/炫彩」本身也只需命中 shiny/colorful 任一。全关时不显示标记。
-  const active = WILD_LAYERS.filter((l) => on.has(l.k))
-  const hits = (p, l) => l.kinds.some((k) => (p.kinds || []).includes(k))
-  const grouped = new Map()
-  active.forEach((l) => grouped.set(l.group, [...(grouped.get(l.group) || []), l]))
-  const groups = [...grouped.values()]
-  const marks = active.length === 0 ? [] : pets.filter((p) =>
-    mode === 'and' ? groups.every((group) => group.some((l) => hits(p, l))) : active.some((l) => hits(p, l)))
-  // 图层行计数是该单项条件的命中数;AND 模式下不等于最终交集数。灰点
+  // OR 与 AND 两套条件同时生效并取并集;mode 只表示侧栏当前正在编辑哪一套。
+  // 异色/炫彩、污染是跨页签共享的独立附加项;MAX 与普通条件都可进入 OR 或 AND。
+  const layersIn = (keys) => WILD_LAYERS.filter((l) => keys.has(l.k))
+  const standalone = layersIn(filters.standalone)
+  const orLayers = layersIn(filters.or)
+  const andLayers = layersIn(filters.and)
+  const marks = pets.filter((p) => matchesWildPet(p, standalone, orLayers, andLayers))
+  // 图层行计数是该单项条件的命中数;AND 条件集下不等于最终交集数。灰点
   // (已离开视野的最后所见)也计入,另单算灰点数供侧栏悬浮拆开说明。
   const count = (l, pick) => pets.filter(
     (p) => pick(p) && (p.kinds || []).some((k) => l.kinds.includes(k))).length
   const num = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, () => true)]))
   const numStale = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, (p) => p.stale)]))
 
-  const ring = (kinds) => wildRing(kinds, on)
+  const on = new Set([...filters.standalone, ...filters[mode]])
+  const enabled = new Set([...filters.standalone, ...filters.or, ...filters.and])
+  const ring = (kinds) => wildRing(kinds, enabled)
   return { marks, num, numStale, on, toggle, mode, setMode, ring }
 }
