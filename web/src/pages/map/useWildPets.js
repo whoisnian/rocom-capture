@@ -88,23 +88,31 @@ const loadKeys = () => {
 const defaultKeys = () => WILD_LAYERS.filter((l) => l.on).map((l) => l.k)
 const loadMode = () => localStorage.getItem(MODE_LS_KEY) === 'and' ? 'and' : 'or'
 
-// useWildPets 管理野生宠物图层:订阅后端推送、按开关筛出可绘制的标记。
-export function useWildPets(account) {
-  const [pets, setPets] = useState([])
+// useWildPets 管理野生宠物图层:订阅后端推送、按当前场景与开关筛出可绘制的标记。
+export function useWildPets(account, sceneResId) {
+  const [snapshot, setSnapshot] = useState({ sceneResId: null, pets: [] })
   const [on, setOn] = useState(() => new Set(loadKeys() || defaultKeys()))
   const [mode, setModeState] = useState(loadMode)
 
   useEffect(() => {
     let alive = true
-    setPets([])
-    getWildPets().then((d) => { if (alive && d) setPets(d.pets || []) }).catch(() => {})
+    setSnapshot({ sceneResId: null, pets: [] })
+    getWildPets().then((d) => {
+      if (alive && d) setSnapshot({ sceneResId: d.sceneResId, pets: d.pets || [] })
+    }).catch(() => {})
     return () => { alive = false }
   }, [account])
 
   // 后端每次成员/状态变化都推全量列表(实体进出 AOI 是低频事件),直接替换即可。
   useEffect(() => subscribe((m) => {
-    if (m.type === 'wildpets') setPets(m.data.pets || [])
+    if (m.type === 'wildpets') {
+      setSnapshot({ sceneResId: m.data.sceneResId, pets: m.data.pets || [] })
+    }
   }), [account])
+
+  // 位置与野生宠物是两条独立 SSE。切场景时任一条都可能先到,只绘制场景号一致的快照,
+  // 避免把上一张地图或下一张地图的投影坐标短暂画到当前底图上。
+  const pets = sceneResId != null && snapshot.sceneResId === sceneResId ? snapshot.pets : []
 
   const toggle = (k) => {
     setOn((prev) => {

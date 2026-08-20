@@ -43,11 +43,11 @@ const (
 	wildVoiceMax        = 100  // PET_GLOBAL_CONFIG.pet_voice_high
 	// 出 AOI 后「最后所见」的灰点还留多久(超时由 pushWilds 顺手丢弃)。取 4 小时是为了
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
-	// 多半还在。灰点不会无限堆积——换场景/传送即清空,自己捉走的当场撤。
+	// 多半还在。灰点按场景保留并定期过期,自己捉走的当场撤;服务重启后清空。
 	wildStaleTTL = 4 * time.Hour
 )
 
-// wildPet 是一只被跟踪的野生宠物(当前场景会话内)。
+// wildPet 是一只被跟踪的野生宠物(当前连接、对应场景内)。
 type wildPet struct {
 	actorID    uint64
 	cfgID      int32
@@ -63,7 +63,7 @@ type wildPet struct {
 	left       bool      // 已离开 AOI:标记转为「最后所见」,置灰显示,wildStaleTTL 后丢弃
 }
 
-// wildTracker 是一个连接在当前场景会话内的野生宠物观测态(换场景/传送即重置)。
+// wildTracker 是一个连接在某个场景内的野生宠物观测态。
 type wildTracker struct {
 	pets map[uint64]*wildPet
 	res  int32
@@ -141,9 +141,42 @@ func wildKinds(a scene.NpcActor, info *gamedata.PetBaseInfo) []string {
 	return out
 }
 
-// resetWilds 换场景/传送时重置野生宠物观测态并推空列表(前端随即清掉上个场景的标记)。
-func (p *Pipeline) resetWilds(conn, acc string, res int32, now time.Time) {
-	p.conn(conn).wilds = newWildTracker(res)
+// switchWildTracker 把当前场景内仍活跃的目标转为「最后所见」,再切到目标场景的缓存。
+// 同场景传送也会走这里:AOI 会整体重建,旧目标应保留但不能继续显示为视野内。
+func switchWildTracker(cs *connState, res int32, now time.Time) {
+	if cs.wildByRes == nil {
+		cs.wildByRes = map[int32]*wildTracker{}
+	}
+	if cs.wilds != nil {
+		for _, w := range cs.wilds.pets {
+			if !w.left {
+				w.left = true
+				w.seenAt = now
+			}
+		}
+		cs.wildByRes[cs.wilds.res] = cs.wilds
+	}
+
+	// 每次切换顺手清理所有场景的过期灰点,避免长期跑服务时缓存只增不减。
+	for _, ts := range cs.wildByRes {
+		for id, w := range ts.pets {
+			if w.left && now.Sub(w.seenAt) > wildStaleTTL {
+				delete(ts.pets, id)
+			}
+		}
+	}
+
+	ts := cs.wildByRes[res]
+	if ts == nil {
+		ts = newWildTracker(res)
+		cs.wildByRes[res] = ts
+	}
+	cs.wilds = ts
+}
+
+// switchWilds 在换场景/传送时切换野生宠物观测态,并推送目标场景的保留列表。
+func (p *Pipeline) switchWilds(conn, acc string, res int32, now time.Time) {
+	switchWildTracker(p.conn(conn), res, now)
 	p.pushWilds(conn, acc, now)
 }
 

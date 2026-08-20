@@ -3,6 +3,7 @@ package pipeline
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/scene"
@@ -60,5 +61,67 @@ func TestWildKindsWeightDoesNotUseRoundedPercentile(t *testing.T) {
 	got := wildKinds(scene.NpcActor{Weight: 97999}, &info) // 97.999%,展示值会舍入为 98.00%
 	if slices.Contains(got, "weight-big") {
 		t.Fatalf("wildKinds() = %v, raw 97.999%% must not match weight-big", got)
+	}
+}
+
+func TestSwitchWildTrackerRetainsTargetsByScene(t *testing.T) {
+	seen := time.Date(2026, 8, 20, 8, 0, 0, 0, time.UTC)
+	left := seen.Add(10 * time.Minute)
+	pet := &wildPet{actorID: 1, seenAt: seen}
+	first := newWildTracker(101)
+	first.pets[pet.actorID] = pet
+	cs := &connState{wilds: first}
+
+	switchWildTracker(cs, 202, left)
+	if cs.wilds.res != 202 || len(cs.wilds.pets) != 0 {
+		t.Fatalf("destination tracker = %#v, want empty scene 202", cs.wilds)
+	}
+	if !pet.left || !pet.seenAt.Equal(left) {
+		t.Fatalf("departed pet left=%v seenAt=%v, want stale at %v", pet.left, pet.seenAt, left)
+	}
+
+	switchWildTracker(cs, 101, left.Add(time.Minute))
+	if cs.wilds != first || cs.wilds.pets[pet.actorID] != pet {
+		t.Fatal("returning to scene did not restore its tracker")
+	}
+}
+
+func TestSwitchWildTrackerSameSceneTeleportMarksActiveStale(t *testing.T) {
+	seen := time.Date(2026, 8, 20, 8, 0, 0, 0, time.UTC)
+	teleported := seen.Add(time.Minute)
+	ts := newWildTracker(101)
+	ts.pets[1] = &wildPet{actorID: 1, seenAt: seen}
+	cs := &connState{wilds: ts}
+
+	switchWildTracker(cs, 101, teleported)
+	pet := cs.wilds.pets[1]
+	if cs.wilds != ts || pet == nil || !pet.left || !pet.seenAt.Equal(teleported) {
+		t.Fatalf("same-scene tracker/pet not retained as stale: tracker=%p pet=%#v", cs.wilds, pet)
+	}
+
+	// 传送通知后还可能紧跟同场景进入回包,不能让第二次切换延后灰点过期时间。
+	switchWildTracker(cs, 101, teleported.Add(time.Second))
+	if !pet.seenAt.Equal(teleported) {
+		t.Fatalf("already stale target seenAt = %v, want original departure %v", pet.seenAt, teleported)
+	}
+}
+
+func TestSwitchWildTrackerPrunesExpiredScenes(t *testing.T) {
+	now := time.Date(2026, 8, 20, 8, 0, 0, 0, time.UTC)
+	old := newWildTracker(101)
+	old.pets[1] = &wildPet{actorID: 1, left: true, seenAt: now.Add(-wildStaleTTL - time.Second)}
+	recent := newWildTracker(202)
+	recent.pets[2] = &wildPet{actorID: 2, left: true, seenAt: now.Add(-wildStaleTTL)}
+	cs := &connState{
+		wilds:     recent,
+		wildByRes: map[int32]*wildTracker{101: old, 202: recent},
+	}
+
+	switchWildTracker(cs, 303, now)
+	if len(old.pets) != 0 {
+		t.Fatalf("expired stale targets were not pruned: %#v", old.pets)
+	}
+	if recent.pets[2] == nil {
+		t.Fatal("target exactly at stale TTL must still be retained")
 	}
 }

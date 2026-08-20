@@ -53,7 +53,8 @@ type connState struct {
 	areas      map[uint32]map[uint32]bool
 	layer      *layerState               // 分层地图去抖状态(见 layerDebounce)
 	stars      *starTracker              // 眠枭之星观测态(换场景/传送即重置)
-	wilds      *wildTracker              // 野生宠物图层观测态(同上,见 wildpets.go)
+	wilds      *wildTracker              // 当前场景的野生宠物图层观测态(见 wildpets.go)
+	wildByRes  map[int32]*wildTracker    // 按 scene_res_id 保留的观测态,返回场景时恢复
 	pos        scene.Position            // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
 	wildSeen   map[uint64]scene.Position // 当前 AOI 里**全部**野生宠实体的位置(涂地用,不只稀有那几只)
 	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认

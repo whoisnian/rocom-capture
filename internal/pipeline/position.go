@@ -55,8 +55,8 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		p.resetAreas(m.Session)
 		// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
 		cs.stars = newStarTracker(res)
-		cs.wildSeen = nil                         // 涂地跟踪的实体同样按场景清零(见 paintSeen)
-		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(并推空列表,前端立刻清屏)
+		cs.wildSeen = nil                          // 涂地跟踪的实体同样按场景清零(见 paintSeen)
+		p.switchWilds(m.Session, acc, res, m.Time) // 野生宠按场景保留;当前 AOI 目标先转为最后所见
 	}
 	p.applyZoneProgress(m, acc)
 }
@@ -74,9 +74,9 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
 	p.resetAreas(m.Session)
-	cs.wildSeen = nil                              // 同上:涂地跟踪的实体也作废
-	cs.pos = tp.Pos                                // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
-	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
+	cs.wildSeen = nil                               // 同上:涂地跟踪的实体也作废
+	cs.pos = tp.Pos                                 // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
+	p.switchWilds(m.Session, acc, tp.ResID, m.Time) // AOI 全换;旧目标置灰,跨场景目标返回时恢复
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)

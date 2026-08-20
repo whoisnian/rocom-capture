@@ -61,7 +61,7 @@ export default function MapPage() {
   const view = usePanZoom(hasMap, onTap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
-  const wilds = useWildPets(account)
+  const wilds = useWildPets(account, pos && pos.sceneResId)
   const home = useHomeNests(account)
   // 涂地:把「见到过野生宠物」的方向涂上色(玩家 ↔ 宠物之间那条带子),遍历找稀有个体时
   // 看哪片还没扫。分层地图与地表各涂各的,故要把当前层 id 一并给它。
