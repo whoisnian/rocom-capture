@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    name: Build for Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+            zig_target: x86_64-linux-musl
+          - arch: arm64
+            goarch: arm64
+            zig_target: aarch64-linux-musl
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. 安装 Go 环境 (建议使用 stable 自动获取最新稳定版，避免手动猜版本号导致 404)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      # 2. 安装 Node.js 环境 (构建前端)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      # 3. 安装 Zig
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.13.0'
+
+      # 4. 构建前端
+      - name: Build Web Frontend
+        run: |
+          cd web
+          npm ci
+          npm run build
+          cd ..
+
+      # 5. 编译 Go 二进制 (配合 Zig 交叉编译与静态链接)
+      - name: Build Go Binary
+        env:
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CC: zig cc -target ${{ matrix.zig_target }}
+          CXX: zig c++ -target ${{ matrix.zig_target }}
+        run: |
+          mkdir -p dist
+          go mod tidy
+          go build -ldflags="-s -w" -o dist/rocom-capture-linux-${{ matrix.goarch }} ./cmd/rocom-capture
+
+      # 6. 上传构建产物
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rocom-capture-linux-${{ matrix.arch }}
+          path: dist/rocom-capture-linux-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    permissions:
+      contents: write 
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifact-dir
+
+      - name: Display structure of downloaded files
+        run: ls -R artifact-dir
+
+      - name: Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifact-dir/rocom-capture-linux-amd64/rocom-capture-linux-amd64
+            artifact-dir/rocom-capture-linux-arm64/rocom-capture-linux-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

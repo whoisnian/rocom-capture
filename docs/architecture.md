@@ -1,13 +1,14 @@
 # 服务架构
 
-单进程 Go 服务：一边被动抓包解析，一边对外提供 Web 界面。前端构建产物经 `embed`
-打包进同一个二进制，部署时无外部文件依赖。
+单进程 Go 服务：一边被动抓包解析，一边对外提供 Web 界面，并可同时运行
+内置无认证 SOCKS5 转发服务。前端构建产物经 `embed` 打包进同一个二进制，
+部署时无前端静态文件依赖。SQLite 数据库与可选的 TLS 证书/私钥仍是运行时外部文件。
 
 ## 1. 数据流
 
 ```
                          ┌─────────────── capture.Engine ───────────────┐
- 网卡(afpacket)/pcap ──→ │ 读包 → TCP重组 → GCP分帧 → 取密钥 → AES解密     │
+ 网卡(含SOCKS5出站)/pcap → │ 读包 → TCP重组 → GCP分帧 → 取密钥 → AES解密     │
                          │        → opcode 路由                          │
                          └───────────────────┬──────────────────────────┘
                                              │ chan Message{dir,opcode,appBody}
@@ -44,7 +45,14 @@
 | `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/data.md 3.8) |
 
-`cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
+`cmd/rocom-capture/main.go` 组装上述模块并启动抓包、HTTP/HTTPS 与可选 SOCKS5。
+启动顺序与生命周期:
+
+1. 加载 embed 游戏数据,打开 `-db` SQLite,组装 `capture`/`pipeline`/`server`;
+2. `-socks5` 非空时,用已创建的 `capture.Engine` 在独立 goroutine 启动无认证 SOCKS5(默认 `:4948`);
+3. 在独立 goroutine 运行 `pipeline` 并监听 Web(默认 `:4949`),主 goroutine 运行数据源;
+4. `-pcap` 优先于 `-iface`;回放完成后强制落盘涂地批次,然后保持 Web/SOCKS5 运行;
+5. 两种数据源都未给出时只记录用法并退出,因此 SOCKS5 本身不是抓包数据源。
 
 ## 3. 抓包与重组要点
 
@@ -67,6 +75,12 @@
   缓存密钥,故解密后用 `gcp.ValidPlain` 校验 s2c 明文固定标记 `0x55aa`,不符即丢弃(新连接
   的 ACK 会重下发正确密钥覆盖);缓存另设 `store.SessionTTL`(24h)兜底过期。
 - **实时 vs 离线**：二者共用 `process()`；`afpacket` 无需 libpcap(纯 AF_PACKET)。
+- **SOCKS5 出站例外**：代理只允许 `CONNECT` 到 `-port`(默认 TCP 8195)。拨号成功后将该连接的
+  本地 `IP:临时端口` 登记到 `Engine.allowedSelf`,连接关闭时撤销；实时抓包的本机 IP 去重仅对
+  这个精确端点放行,其余本机流量仍被过滤,用户通过 `-ignore-ip` 忽略的另一端也不会被例外覆盖。
+  因此手机可把 SOCKS5 当作流量入口,但服务仍须传 `-iface`,且代理出站路由必须经过所抓网卡。
+  规则拒绝属于正常流量筛选,自定义 logger 会丢弃其 `blocked by rules` 输出,避免刷入 stderr/journald;
+  其他协议或网络错误仍照常记录。
 
 ## 4. 事件判定
 
@@ -112,7 +126,7 @@
 | `GET /api/stats` | 统计(当前账号宠物总数,`?account=`) |
 | `GET /api/position` | 当前账号最近一次位置(地图页初始回显);超过 4s 未更新则抹掉速度(不给前端外推) |
 | `GET /api/pois` | 某场景(`?res=<scene_res_cfg_id>`)的大地图 POI:图层清单 + 已投影为底图归一化 u/v 的标记点;眠枭之星另带收集状态与按区域进度(见 docs/data.md 3.3/3.4) |
-| `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、满声音,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
+| `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、体重/嗓音奖牌窗口及 MAX,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
 | `GET /api/paint` | 涂地覆盖位图(`?res=<scene_res>&layer=<分层 id,0=地表>`):`{w,h,cell,corridor,safe,cells}`,`cells` 是 w*h 位的位图 base64(1=已扫过);无大地图底图的场景回 `w=0`(见 docs/data.md 3.8) |
 | `DELETE /api/paint` | 重置该场景该层的涂地(同时广播 `paint:{reset:true}`,同账号其它页面一起清屏) |
 | `GET /api/home` | 家园的精灵小窝图层:每个窝的位置(已投影 u/v)、入住宠物简要信息与配对、窝上还没收的蛋;不在家园时 `nests` 为空(见 docs/data.md 3.6) |
@@ -186,7 +200,10 @@
 ## 8. 部署形态
 
 单二进制 `rocom-capture`：
-- 实时：`sudo ./rocom-capture -iface <网卡> -addr :4939`(需 root，网卡须为客户端设备流量必经)
-- 离线：`./rocom-capture -pcap <文件> -addr :4939`
+- 实时：`sudo ./rocom-capture -iface <网卡>`(需 root，网卡须为客户端设备流量必经)
+- 离线：`./rocom-capture -pcap <文件>`
+- Web：默认 `:4949`,HTTPS 由 `-tls` 开启
+- SOCKS5：默认 `:4948`,**无认证**,仅允许连接 `-port`(默认 8195);不需要时必须传
+  `-socks5 ''` 关闭,对外开放时应用防火墙限制来源
 
-数据库默认 `rocom.db`(SQLite 文件)。详见 [README](../README.md)。
+数据库默认 `rocom.db`(SQLite 文件)。完整参数表见 [README](../README.md)。

@@ -80,7 +80,8 @@ export const getAccounts = () => getJSON('/api/accounts')
 // 场景无底图时两者皆空。
 export const getPois = (res) => getJSON('/api/pois?res=' + res, { kinds: [], pois: [] })
 
-// getWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音):
+// getWildPets 返回当前账号最近一次野生宠物标记
+// (异色/炫彩、污染、体重/嗓音奖牌窗口及 MAX):
 //   {sceneResId, pets:[{id,n,img,kinds,u,v,lv,voice,height,weight,weightPct,mutation,glass,stale}]}
 // 之后由 SSE wildpets 增量覆盖;从未收到过任何 AOI 通知时返回 null。
 export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)

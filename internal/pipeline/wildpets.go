@@ -25,7 +25,8 @@ import (
 //   - 炫彩(glass_info.glass_type != GT_NULL,等价于 mutation_type 的 MDT_GLASS 位);
 //   - 异色(mutation_type 的 MDT_SHINING 位);
 //   - 污染(mutation_type 的 MDT_CHAOS 家族);这类丢球即进战斗,打完才解除污染。
-//   - 嗓音拉满(voice == wildVoiceMax):对应「婉转声」奖牌的百分位上限。
+//   - 体重奖牌窗口(大块头 >=98% / 小不点 <=2%)及精确上下限(MAX);
+//   - 嗓音奖牌窗口(婉转声 >=96 / 粗嗓门 <=-96)及精确±100(MAX)。
 //
 // 炫彩不另按 mutation 位判:两者严格等价(全部 pcap 363 只变异宠物零反例),
 // 用 glass_info 还能顺带说出是哪一种炫彩。MDT_VACANT(空缺态)客户端自己都不出变异标,忽略。
@@ -34,7 +35,12 @@ import (
 // 为假),它在刷新点附近的溜达根本不过网——16 份 pcap 里 server_move 只出现 1 次、client_move
 // 全是玩家 avatar,没有一条属于野生宠。故位置≈刷新点,误差是它自己绕的那几米。
 const (
-	wildVoiceMax = 100 // 嗓音上限(PET_GLOBAL_CONFIG.pet_voice_high)
+	wildWeightMedalLow  = 2
+	wildWeightMedalHigh = 98
+	wildVoiceMedalLow   = -96
+	wildVoiceMedalHigh  = 96
+	wildVoiceMin        = -100 // PET_GLOBAL_CONFIG.pet_voice_low
+	wildVoiceMax        = 100  // PET_GLOBAL_CONFIG.pet_voice_high
 	// 出 AOI 后「最后所见」的灰点还留多久(超时由 pushWilds 顺手丢弃)。取 4 小时是为了
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
 	// 多半还在。灰点不会无限堆积——换场景/传送即清空,自己捉走的当场撤。
@@ -73,16 +79,24 @@ func newWildTracker(res int32) *wildTracker {
 //     (实测家园场景的宠物 NPC——幽星光 710346、鸭吉吉 710012 等——同样带身高体重叫声,
 //     只靠第一道闸会把它们也标出来;它们的 NPC_CONF 没有 throwing_interact_type)。
 func (p *Pipeline) wildMatch(a scene.NpcActor) bool {
-	if !a.IsWildPet() || len(wildKinds(a)) == 0 {
+	if !a.IsWildPet() {
 		return false
 	}
-	_, catchable := p.db.NpcPetBase(uint32(a.CfgID))
-	return catchable
+	base, catchable := p.db.NpcPetBase(uint32(a.CfgID))
+	if !catchable {
+		return false
+	}
+	info, ok := p.db.PetBase(base)
+	if !ok {
+		return len(wildKinds(a, nil)) > 0
+	}
+	return len(wildKinds(a, &info)) > 0
 }
 
 // wildKinds 返回该实体命中的类别键;一只可同时命中多类。前端 WILD_LAYERS 的每个开关
 // 覆盖其中一个或多个(异色/炫彩合成一个开关),悬浮提示则仍按这里的细粒度分开说。
-func wildKinds(a scene.NpcActor) []string {
+// 普通奖牌类别包含 MAX;前端把体重、嗓音各自分组,同组按钮按 OR 匹配。
+func wildKinds(a scene.NpcActor, info *gamedata.PetBaseInfo) []string {
 	var out []string
 	if a.GlassType != gamedata.GlassNull {
 		out = append(out, "colorful")
@@ -93,8 +107,36 @@ func wildKinds(a scene.NpcActor) []string {
 	if a.IsPolluted() {
 		out = append(out, "pollution")
 	}
+	if info != nil {
+		low, high, weight := int64(info.WeightLow), int64(info.WeightHigh), int64(a.Weight)
+		if high > low {
+			// 直接用协议原始整数交叉相乘,不经过展示百分位的两位小数舍入。
+			offset, span := weight-low, high-low
+			if offset*100 >= span*wildWeightMedalHigh {
+				out = append(out, "weight-big")
+			}
+			if offset*100 <= span*wildWeightMedalLow {
+				out = append(out, "weight-small")
+			}
+		}
+		if weight == high {
+			out = append(out, "weight-big-max")
+		}
+		if weight == low {
+			out = append(out, "weight-small-max")
+		}
+	}
+	if a.Voice >= wildVoiceMedalHigh {
+		out = append(out, "voice-high")
+	}
+	if a.Voice <= wildVoiceMedalLow {
+		out = append(out, "voice-low")
+	}
 	if a.Voice == wildVoiceMax {
-		out = append(out, "voice")
+		out = append(out, "voice-high-max")
+	}
+	if a.Voice == wildVoiceMin {
+		out = append(out, "voice-low-max")
 	}
 	return out
 }
@@ -205,7 +247,7 @@ type wildMark struct {
 	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
 	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
 	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voice
+	Kinds  []string `json:"kinds"`         // 命中的类别:变异/污染/体重奖牌/嗓音奖牌及 MAX
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`
@@ -247,7 +289,6 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			X: w.pos.X, Y: w.pos.Y, Z: w.pos.Z,
 			Lv: w.lv, Voice: w.voice, Height: w.height, Weight: w.weight,
 			Mutation: w.mutation, Stale: w.left,
-			Kinds: wildKinds(scene.NpcActor{Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType}),
 		}
 		if w.glassType != gamedata.GlassNull {
 			m.Glass = p.db.GlassDesc(w.glassType, w.glassValue)
@@ -255,16 +296,21 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 				m.Glass = "炫彩"
 			}
 		}
+		var info *gamedata.PetBaseInfo
 		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
-			if info, ok := p.db.PetBase(base); ok {
-				m.Name = info.Name
+			if baseInfo, ok := p.db.PetBase(base); ok {
+				m.Name = baseInfo.Name
 				// 体重单位与 PetData 一致(÷1000 千克),百分位口径同宠物列表。
 				m.WeightPct = pet.SizePercentile(float64(w.weight)/1000,
-					float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000)
+					float64(baseInfo.WeightLow)/1000, float64(baseInfo.WeightHigh)/1000)
+				info = &baseInfo
 			}
 			// 异色个体有专属头像的就用异色版(无则 PetImageByBase 自动回退普通)。
 			m.Img = p.db.PetImageByBase(base, w.mutation&scene.MutationShiny != 0).Head
 		}
+		m.Kinds = wildKinds(scene.NpcActor{
+			Weight: w.weight, Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType,
+		}, info)
 		marks = append(marks, m)
 	}
 	// 顺序稳定(前端按 id 作 key,免得每次推送都重排 DOM)。

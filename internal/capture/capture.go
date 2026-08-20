@@ -83,24 +83,75 @@ type Engine struct {
 	noKey    int
 	badKey   int
 
-	// skipIPs:凡 src 或 dst 命中即整包丢弃。用于单臂网关去重——网关对转发流量做
+	// skipIPs:凡 src 或 dst 命中即整包丢弃(SOCKS5 登记的精确本机端点除外)。用于单臂网关去重——网关对转发流量做
 	// SNAT 后从同一网卡再发一次,该副本的客户端侧地址是网关本机 IP;忽略本机 IP 即只
 	// 保留 NAT 前的真实客户端会话,避免同一游戏流被解析两次(见 RunLive 自动填充)。
 	skipIPs map[netip.Addr]bool
+	// allowedSelf 是少量需例外保留的本机 TCP 端点(当前只有内置 SOCKS5
+	// 拨出的游戏连接)。按 IP:临时端口精确放行,不全局关闭单臂 NAT 去重。
+	selfMu      sync.RWMutex
+	allowedSelf map[netip.AddrPort]int
 }
 
 // NewEngine 创建引擎，port 为游戏服务器端口(8195)。
 func NewEngine(port int) *Engine {
 	return &Engine{
-		Port:     port,
-		Out:      make(chan Message, 4096),
-		sessions: make(map[string]*session),
-		skipIPs:  make(map[netip.Addr]bool),
+		Port:        port,
+		Out:         make(chan Message, 4096),
+		sessions:    make(map[string]*session),
+		skipIPs:     make(map[netip.Addr]bool),
+		allowedSelf: make(map[netip.AddrPort]int),
 	}
 }
 
 // AddSkipIP 登记一个需忽略的 IP(见 skipIPs)。非并发安全,须在 Run* 前调用。
 func (e *Engine) AddSkipIP(ip netip.Addr) { e.skipIPs[ip.Unmap()] = true }
+
+// AllowSelfEndpoint 临时放行一个本机 TCP 端点,并返回幂等的撤销函数。
+// SOCKS5 在拨号成功、向客户端回复成功前登记,故游戏应用数据从第一包起即可被抓取。
+// 允许运行期并发调用。
+func (e *Engine) AllowSelfEndpoint(ep netip.AddrPort) func() {
+	if !ep.IsValid() {
+		return func() {}
+	}
+	ep = netip.AddrPortFrom(ep.Addr().Unmap(), ep.Port())
+	e.selfMu.Lock()
+	e.allowedSelf[ep]++
+	e.selfMu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			e.selfMu.Lock()
+			if e.allowedSelf[ep] <= 1 {
+				delete(e.allowedSelf, ep)
+			} else {
+				e.allowedSelf[ep]--
+			}
+			e.selfMu.Unlock()
+		})
+	}
+}
+
+func (e *Engine) isAllowedSelfEndpoint(ep netip.AddrPort) bool {
+	if !ep.IsValid() {
+		return false
+	}
+	ep = netip.AddrPortFrom(ep.Addr().Unmap(), ep.Port())
+	e.selfMu.RLock()
+	ok := e.allowedSelf[ep] > 0
+	e.selfMu.RUnlock()
+	return ok
+}
+
+func (e *Engine) shouldSkipEndpoints(src, dst netip.AddrPort) bool {
+	for _, ep := range [...]netip.AddrPort{src, dst} {
+		if ep.IsValid() && e.skipIPs[ep.Addr().Unmap()] && !e.isAllowedSelfEndpoint(ep) {
+			return true
+		}
+	}
+	return false
+}
 
 // NoKeyDropped 返回因尚无会话密钥而丢弃的 DATA 包数。
 func (e *Engine) NoKeyDropped() int { e.mu.Lock(); defer e.mu.Unlock(); return e.noKey }
@@ -174,10 +225,25 @@ func (e *Engine) process(src *gopacket.PacketSource) {
 		}
 		if len(e.skipIPs) > 0 {
 			nf := netLayer.NetworkFlow()
-			if ip, ok := netip.AddrFromSlice(nf.Src().Raw()); ok && e.skipIPs[ip.Unmap()] {
-				continue // SNAT 后的重复副本(源为本机/网关 IP)
+			srcIP, srcOK := netip.AddrFromSlice(nf.Src().Raw())
+			dstIP, dstOK := netip.AddrFromSlice(nf.Dst().Raw())
+			if srcOK {
+				srcIP = srcIP.Unmap()
 			}
-			if ip, ok := netip.AddrFromSlice(nf.Dst().Raw()); ok && e.skipIPs[ip.Unmap()] {
+			if dstOK {
+				dstIP = dstIP.Unmap()
+			}
+			srcEndpoint := netip.AddrPort{}
+			dstEndpoint := netip.AddrPort{}
+			if srcOK {
+				srcEndpoint = netip.AddrPortFrom(srcIP, uint16(tcp.SrcPort))
+			}
+			if dstOK {
+				dstEndpoint = netip.AddrPortFrom(dstIP, uint16(tcp.DstPort))
+			}
+			// 例外只覆盖命中忽略 IP 的那个端点。这样代理的本机端点可被抓取，
+			// 但另一端若被 -ignore-ip 明确忽略，整包仍会丢弃。
+			if e.shouldSkipEndpoints(srcEndpoint, dstEndpoint) {
 				continue
 			}
 		}

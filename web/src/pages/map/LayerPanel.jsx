@@ -38,15 +38,26 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
           ))}
         </div>
         <div className="filter-group">
-          <label>野生宠物</label>
+          <div className="map-wild-head">
+            <label>野生宠物</label>
+            <div className="map-wild-mode" role="group" aria-label="野生宠物筛选条件">
+              {['or', 'and'].map((mode) => (
+                <button key={mode} className={wilds.mode === mode ? 'on' : ''}
+                  onClick={() => wilds.setMode(mode)} aria-pressed={wilds.mode === mode}>
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
           {WILD_LAYERS.map(({ k, n, color }) => {
-            // 计数含灰点(与图上标记一致),悬浮再拆开说明其中多少已离开视野。
+            // 计数是该单项条件的命中数(含灰点),悬浮再拆开视野内/已离开。
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
             return (
               <div className="map-layer-row" key={k}>
                 <button className={'map-layer-btn map-wild-btn' + (wilds.on.has(k) ? ' on' : '')}
                   onClick={() => wilds.toggle(k)}
+                  style={{ '--wild-color': color }}
                   title={gone ? `视野内 ${num - gone} · 已离开视野 ${gone}` : undefined}>
                   <span className="map-wild-swatch" style={{ borderColor: color }} />
                   <span className="map-layer-name">{n}</span>

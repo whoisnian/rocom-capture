@@ -52,7 +52,8 @@ func (s *Server) SetLastWildPets(account string, payload any) {
 	s.posMu.Unlock()
 }
 
-// handleWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音);无记录返回 null。
+// handleWildPets 返回当前账号最近一次野生宠物标记
+// (异色/炫彩、污染、体重/嗓音奖牌窗口及 MAX);无记录返回 null。
 // 与位置不同,这里不做过期抹除:标记本身已带 stale 标志(实体离开 AOI 后由管线置位并限时保留)。
 func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {
 	s.posMu.Lock()

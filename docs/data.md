@@ -703,29 +703,54 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 只出现 1 次、`client_move`(11)3387 次全属玩家 avatar,没有一条属于野生宠;`set_npc_pos`(222)与
 `npc_mutation_info_change`(515)一次都没出现过。故标记位置≈刷新点,误差是它自己绕的那几米。
 
-**前端**:图层栏「野生宠物」一组三个开关(`WILD_LAYERS`),选择记忆于 localStorage:
+**体重/嗓音稀有条件**:体重使用协议原始 `weight` 与当前形态
+`PETBASE_CONF.weight_low/high` 做交叉相乘比较;普通条件沿用奖牌百分位窗口,
+MAX 精确比较上下限,两者都不使用界面展示值的两位小数舍入:
+
+| 后端 `kind` | 条件 |
+| --- | --- |
+| `weight-big` | 体重百分位 `>= 98%`(大块头,包含 MAX) |
+| `weight-small` | 体重百分位 `<= 2%`(小不点,包含 MAX) |
+| `weight-big-max` | 协议原始 `weight == weight_high`(精确 100%) |
+| `weight-small-max` | 协议原始 `weight == weight_low`(精确 0%) |
+| `voice-high` | 协议原始 `voice >= 96`(婉转声,包含 MAX) |
+| `voice-low` | 协议原始 `voice <= -96`(粗嗓门,包含 MAX) |
+| `voice-high-max` | 协议原始 `voice == 100`(婉转声MAX,声音 100%) |
+| `voice-low-max` | 协议原始 `voice == -100`(粗嗓门MAX,声音 0%) |
+
+**前端**:图层栏「野生宠物」的开关由 `WILD_LAYERS` 定义,选择记忆于 localStorage:
 
 | 开关 | 覆盖的后端 `wildKinds` | 默认 |
 | --- | --- | --- |
 | 异色/炫彩 | `shiny` + `colorful` | **开** |
 | 污染 | `pollution` | 关 |
-| 满声音 | `voice` | 关 |
+| 大块头 / 小不点 | `weight-big` / `weight-small` | 关 |
+| 大块头MAX / 小不点MAX | `weight-big-max` / `weight-small-max` | 关 |
+| 婉转声 / 粗嗓门 | `voice-high` / `voice-low` | 关 |
+| 婉转声MAX / 粗嗓门MAX | `voice-high-max` / `voice-low-max` | 关 |
 
-一个开关可覆盖多个后端类别(异色与炫彩合成一个),故后端仍分开推 4 个 kind——悬浮提示要按
-细粒度说(两者兼具时用游戏自己的合称「异色炫彩」)。存储键带 `.v2`:图层键整体改过,
-沿用旧键会让存着旧选择的人一个图层都不开,与「默认勾选」相悖。
+匹配模式默认 `OR`(命中任一已开开关),可切换为分组 `AND`:同属性组内取 OR、不同属性组间
+取 AND。体重四项为一组、嗓音四项为一组,「异色/炫彩」与「污染」各自独立成组。例如同时
+勾选大块头MAX、小不点MAX、婉转声MAX、粗嗓门MAX,实际条件是
+`(大块头MAX OR 小不点MAX) AND (婉转声MAX OR 粗嗓门MAX)`,会得到四种体重/嗓音组合。
+「异色/炫彩」本身仍是复合按钮,两种 kind 任一命中即可。普通奖牌条件包含 MAX,因此同组同时
+勾选某普通条件与它的 MAX 时按 OR 处理,MAX 是冗余子集而不会进一步收窄。图层存储键为 `.v3`;
+旧 `.v2` 的 `voice`(原本就是精确 +100)迁移为 `voice-high-max`,模式另存于 `map.wildMatchMode.v1`。
 
-标记是圆形头像(异色个体用异色头像)+ 类别描边:描边色由 JS 按命中**图层**算(`wildRing`,
-主描边取最稀有的那层,次一层再加一圈外环),不走 CSS 类组合——组合数太多。标记不可点击,
+标记是圆形头像(异色个体用异色头像)+ 类别描边:每个开关有独立颜色,复合命中时
+`wildRing` 将当前开启且命中的条件色做等权 RGB 混合。MAX 会取代同方向的普通条件色,
+避免同一维度重复加权。标记不可点击,
 只有悬浮说明,故用 `cursor: help`(别用 `pointer` 骗点击),悬停另放大 1.15× 便于确认指到了哪只。
 提示格式与事件页那行对齐,一眼能对上:
 
 ```
-{种类} Lv.44 异色炫彩 W 19% V -55
+{种类} Lv.44 异色炫彩 W 19.00% V -55
 ```
 
 `W` 是体重在本形态取值范围内的百分位(后端用 `pet.SizePercentile` 算好放进 `weightPct`,
-与宠物列表/事件页的「W xx%」同一口径,勿各算各的),`V` 是嗓音原值。
+与宠物列表/事件页的「W xx%」同一口径,勿各算各的),固定显示两位小数。只有协议原始体重
+精确等于 `weight_low`/`weight_high` 时才显示 `0.00%`/`100.00%`,避免舍入产生假性边界；
+`V` 是嗓音原值。
 数据经 SSE(`wildpets`,成员或状态变化时推全量,实体进出 AOI 是低频事件故不节流)+ 加载时
 `GET /api/wildpets` 回显;换场景/传送即清空重来。
 

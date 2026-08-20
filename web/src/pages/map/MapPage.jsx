@@ -5,21 +5,32 @@ import { imgURL } from '../../components/icons'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
-import { useWildPets, wildTags, wildRing } from './useWildPets'
+import { useWildPets, wildTags } from './useWildPets'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import LayerPanel from './LayerPanel'
 
 // wildTitle 组一条野生宠物标记的悬停说明,格式:
-//   {种类} Lv.44 异色炫彩 W 19% V -55
+//   {种类} Lv.44 异色炫彩 W 19.00% V -55
 // W 是体重在本形态取值范围内的百分位(后端算好,与宠物列表/事件页的「W xx%」同一口径),
 // V 是嗓音原值——与事件页那行保持一致,一眼能对上。
+function wildWeightText(p) {
+  if (p.weightPct == null) return '-'
+  let pct = Number(p.weightPct)
+  const kinds = p.kinds || []
+  // MAX 按协议原始 weight == low/high 判定。非边界值即使两位小数舍入到端点，
+  // 也不能显示成假性 0.00%/100.00%。
+  if (pct <= 0 && !kinds.includes('weight-small-max')) pct = 0.01
+  if (pct >= 100 && !kinds.includes('weight-big-max')) pct = 99.99
+  return `${pct.toFixed(2)}%`
+}
+
 function wildTitle(p) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(...wildTags(p.kinds))
-  const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
+  const w = wildWeightText(p)
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
   return s
@@ -209,13 +220,13 @@ export default function MapPage() {
                 {n.egg && <img className="map-nest-egg" src={imgURL(n.egg.icon)} alt="" draggable={false} />}
               </div>
             ))}
-            {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、满声音),同属 .map-world 一起
+            {/* 野生宠物标记:圆头像 + 当前命中条件的混合色描边,同属 .map-world 一起
                 平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
                 描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。 */}
             {wilds.marks.map((p) => (
               <div key={p.id} title={wildTitle(p)}
                 className={'map-wild' + (p.stale ? ' stale' : '')}
-                style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
+                style={{ left: p.u * mapPx, top: p.v * mapPx, ...wilds.ring(p.kinds) }}>
                 {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
               </div>
             ))}

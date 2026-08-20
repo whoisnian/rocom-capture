@@ -89,8 +89,8 @@
 }
 /* 收集模式下「已确认还在」的可收集点(星星/零件):描一圈金色,与尚未走到过的候选点区分开。 */
 .map-poi.sure { filter: drop-shadow(0 0 3px #ffd54a) drop-shadow(0 0 6px #ffd54a); }
-/* 野生宠物标记:圆形头像 + 类别描边。描边色由 JS 按命中图层算(见 useWildPets 的 wildRing):
-   主描边 = 最稀有的那层,次一层再加一圈 box-shadow 外环——组合数太多,不走 CSS 类。 */
+/* 野生宠物标记:圆形头像 + 类别描边。描边色由 wildRing 将当前开启且
+   命中的条件色混合得到;复合命中再加同色半透明外环。 */
 .map-wild {
   position: absolute; width: 30px; height: 30px;
   transform: translate(-50%, -50%);
@@ -114,6 +114,25 @@
   border: 2px solid var(--line); background: var(--bg-1);
 }
 .map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
+.map-layer-btn.map-wild-btn.on {
+  border-color: var(--wild-color); color: var(--wild-color);
+  background: color-mix(in srgb, var(--wild-color) 16%, var(--bg-2));
+}
+.map-layer-btn.map-wild-btn.on .map-wild-swatch { background: var(--wild-color); border-color: var(--wild-color); }
+
+/* 野生宠物多条件匹配模式:紧凑的分段控件,与下方图层开关分开。 */
+.map-wild-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.map-wild-head > label { font-size: 12px; color: var(--fg-dim); }
+.map-wild-mode {
+  display: grid; grid-template-columns: repeat(2, 1fr); width: 96px;
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+}
+.map-wild-mode button {
+  min-width: 0; padding: 4px 7px; border: 0; border-right: 1px solid var(--line);
+  background: var(--bg-2); color: var(--fg-dim); cursor: pointer; font-size: 11px;
+}
+.map-wild-mode button:last-child { border-right: 0; }
+.map-wild-mode button.on { background: var(--accent); color: #fff; }
 
 /* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
    图标同样只定高不定宽(见上)。 */
