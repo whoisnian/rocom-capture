@@ -25,7 +25,8 @@ import (
 //   - 炫彩(glass_info.glass_type != GT_NULL,等价于 mutation_type 的 MDT_GLASS 位);
 //   - 异色(mutation_type 的 MDT_SHINING 位);
 //   - 污染(mutation_type 的 MDT_CHAOS 家族);这类丢球即进战斗,打完才解除污染。
-//   - 嗓音拉满(voice == wildVoiceMax):对应「婉转声」奖牌的百分位上限。
+//   - 嗓音取到极值(voice == pet.VoiceHigh / pet.VoiceLow):两端各对应「婉转声」/「粗嗓门」奖牌
+//     的百分位边界,且都是随机不出第二次的顶格值,故两端各给一个图层。
 //
 // 炫彩不另按 mutation 位判:两者严格等价(全部 pcap 363 只变异宠物零反例),
 // 用 glass_info 还能顺带说出是哪一种炫彩。MDT_VACANT(空缺态)客户端自己都不出变异标,忽略。
@@ -34,10 +35,9 @@ import (
 // 为假),它在刷新点附近的溜达根本不过网——16 份 pcap 里 server_move 只出现 1 次、client_move
 // 全是玩家 avatar,没有一条属于野生宠。故位置≈刷新点,误差是它自己绕的那几米。
 const (
-	wildVoiceMax = 100 // 嗓音上限(PET_GLOBAL_CONFIG.pet_voice_high)
 	// 出 AOI 后「最后所见」的灰点还留多久(超时由 pushWilds 顺手丢弃)。取 4 小时是为了
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
-	// 多半还在。灰点不会无限堆积——换场景/传送即清空,自己捉走的当场撤。
+	// 多半还在。灰点不会无限堆积——换场景即清空,自己捉走的当场撤。
 	wildStaleTTL = 4 * time.Hour
 )
 
@@ -57,7 +57,8 @@ type wildPet struct {
 	left       bool      // 已离开 AOI:标记转为「最后所见」,置灰显示,wildStaleTTL 后丢弃
 }
 
-// wildTracker 是一个连接在当前场景会话内的野生宠物观测态(换场景/传送即重置)。
+// wildTracker 是一个连接在当前场景会话内的野生宠物观测态(换场景即重置;同场景内传送只置灰,
+// 见 resetWilds)。
 type wildTracker struct {
 	pets map[uint64]*wildPet
 	res  int32
@@ -93,15 +94,33 @@ func wildKinds(a scene.NpcActor) []string {
 	if a.IsPolluted() {
 		out = append(out, "pollution")
 	}
-	if a.Voice == wildVoiceMax {
-		out = append(out, "voice")
+	// 嗓音顶格(±100,PET_GLOBAL_CONFIG.pet_voice_high/low);两端分别是「婉转声」/「粗嗓门」
+	// 那两枚奖牌的极限值,故分成两个类别,前端两个开关各管一端。
+	if a.Voice == pet.VoiceHigh {
+		out = append(out, "voiceMax")
+	}
+	if a.Voice == pet.VoiceLow {
+		out = append(out, "voiceMin")
 	}
 	return out
 }
 
-// resetWilds 换场景/传送时重置野生宠物观测态并推空列表(前端随即清掉上个场景的标记)。
+// resetWilds 换场景时重置野生宠物观测态并推空列表(前端随即清掉上个场景的标记)。
+//
+// **同一场景内的传送不算换场景**(res 不变:大地图传送点、营地魔力之源之间跳来跳去,实测
+// 2026-08-20 那份 pcap 的 0x015c 是 res 10003 → 10003):旧标记的世界坐标仍属这张底图,
+// 玩家走回去还能再遇上,只是此刻不在 AOI 里了——这与「走远了出 AOI」是同一回事,
+// 故一律转成「最后所见」置灰保留(seenAt 不动,TTL 仍从最后一次确认它在算起),而不是抹掉。
+// 服务器传送时不为旧实体补发 actor_leave(客户端自己清空 AOI),故只能在这里代劳。
 func (p *Pipeline) resetWilds(conn, acc string, res int32, now time.Time) {
-	p.conn(conn).wilds = newWildTracker(res)
+	cs := p.conn(conn)
+	if ts := cs.wilds; ts != nil && ts.res == res {
+		for _, w := range ts.pets {
+			w.left = true
+		}
+	} else { // 真换了场景(或首次进场景):上个场景的实体与坐标一律作废
+		cs.wilds = newWildTracker(res)
+	}
 	p.pushWilds(conn, acc, now)
 }
 
@@ -205,7 +224,7 @@ type wildMark struct {
 	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
 	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
 	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voice
+	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voiceMax / voiceMin
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`

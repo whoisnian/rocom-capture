@@ -74,9 +74,10 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
 	p.resetAreas(m.Session)
-	cs.wildSeen = nil                              // 同上:涂地跟踪的实体也作废
-	cs.pos = tp.Pos                                // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
-	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
+	cs.wildSeen = nil // 同上:涂地跟踪的实体也作废
+	cs.pos = tp.Pos   // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
+	// 传送落地后 AOI 全换:跨场景的旧标记作废,同场景内(大地图传送点之间)的只置灰留着。
+	p.resetWilds(m.Session, acc, tp.ResID, m.Time)
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)

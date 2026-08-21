@@ -1,22 +1,23 @@
 import { useState, useEffect } from 'react'
 import { getWildPets, subscribe } from '../../api'
 
-// —— 野生宠物图层(异色/炫彩 · 污染 · 满声音)——
+// —— 野生宠物图层(异色/炫彩 · 污染 · 最大声音 · 最小声音)——
 // 与 POI 图层不同,这几类**不是固定点位**:野生宠会刷新、被别人抓走,只有走进 AOI 才知道它在。
 // 后端从周边实体快照与 AOI 通知里挑出这几类推过来(见 internal/pipeline/wildpets.go),
 // 前端只管开关与摆放。判定依据(捕捉前后一致的属性)见 docs/data.md 3.5。
 //
-// 存储键带版本号:图层键在这一版整体改过(glass/colorful/shiny/nightmare →
-// mutation/pollution/voice),沿用旧键会让浏览器里存着旧选择的人一个图层都不开,
-// 与「异色/炫彩默认勾选」相悖。
-const LS_KEY = 'map.wildLayers.v2'
+// 存储键带版本号:图层键改过就进一版,沿用旧键会让浏览器里存着旧选择的人一个图层都不开,
+// 与「异色/炫彩默认勾选」相悖。v2:glass/colorful/shiny/nightmare → mutation/pollution/voice;
+// v3:满声音一分为二(voice → voiceMax + voiceMin)。
+const LS_KEY = 'map.wildLayers.v3'
 
 // 图层 = 一个开关,可覆盖后端 kinds 里的**多个**类别(异色与炫彩合成一个开关);
 // 按稀有度从高到低排,color 同时用作侧栏色点与地图标记描边(见 wildRing)。
 export const WILD_LAYERS = [
   { k: 'mutation', n: '异色/炫彩', kinds: ['shiny', 'colorful'], color: '#7ad3ff', on: true },
   { k: 'pollution', n: '污染', kinds: ['pollution'], color: '#c792ea' },
-  { k: 'voice', n: '满声音', kinds: ['voice'], color: '#ffd54a' },
+  { k: 'voiceMax', n: '最大声音', kinds: ['voiceMax'], color: '#ffd54a' },
+  { k: 'voiceMin', n: '最小声音', kinds: ['voiceMin'], color: '#7ee0a0' },
 ]
 
 // wildTags 把一只宠物命中的类别翻成悬浮提示上的标签(比图层名更细:图层把异色/炫彩合成
@@ -29,12 +30,13 @@ export function wildTags(kinds = []) {
   else if (has('shiny')) out.push('异色')
   else if (has('colorful')) out.push('炫彩')
   if (has('pollution')) out.push('污染')
-  if (has('voice')) out.push('满声音')
+  if (has('voiceMax')) out.push('最大声音')
+  if (has('voiceMin')) out.push('最小声音')
   return out
 }
 
 // wildRing 把一只宠物命中的类别翻成描边样式:最稀有的那层上主描边,次一层再加一圈外环。
-// (一只可以同时是炫彩 + 满声音,靠 CSS 类组合会指数爆炸,故按数据算。)
+// (一只可以同时是炫彩 + 最大声音,靠 CSS 类组合会指数爆炸,故按数据算。)
 export function wildRing(kinds = []) {
   const hit = WILD_LAYERS.filter((l) => l.kinds.some((k) => kinds.includes(k)))
   if (hit.length === 0) return {}

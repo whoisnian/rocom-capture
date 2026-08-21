@@ -112,7 +112,7 @@
 | `GET /api/stats` | 统计(当前账号宠物总数,`?account=`) |
 | `GET /api/position` | 当前账号最近一次位置(地图页初始回显);超过 4s 未更新则抹掉速度(不给前端外推) |
 | `GET /api/pois` | 某场景(`?res=<scene_res_cfg_id>`)的大地图 POI:图层清单 + 已投影为底图归一化 u/v 的标记点;眠枭之星另带收集状态与按区域进度(见 docs/data.md 3.3/3.4) |
-| `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、满声音,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
+| `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、最大/最小声音,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
 | `GET /api/paint` | 涂地覆盖位图(`?res=<scene_res>&layer=<分层 id,0=地表>`):`{w,h,cell,corridor,safe,cells}`,`cells` 是 w*h 位的位图 base64(1=已扫过);无大地图底图的场景回 `w=0`(见 docs/data.md 3.8) |
 | `DELETE /api/paint` | 重置该场景该层的涂地(同时广播 `paint:{reset:true}`,同账号其它页面一起清屏) |
 | `GET /api/home` | 家园的精灵小窝图层:每个窝的位置(已投影 u/v)、入住宠物简要信息与配对、窝上还没收的蛋;不在家园时 `nests` 为空(见 docs/data.md 3.6) |
