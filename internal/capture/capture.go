@@ -18,14 +18,29 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gcp"
 )
 
+// headBlock 取密文 body 的头块,取不出就留空(调用方按可选字段处理)。
+func headBlock(key, body []byte) []byte {
+	h, err := gcp.DecryptHeadBlock(key, body)
+	if err != nil {
+		return nil
+	}
+	return h
+}
+
 // Message 是一条解密后的应用层消息。
 type Message struct {
 	Time      time.Time
 	Direction gcp.Direction
 	Opcode    uint16
 	Session   string // GCP 连接标识 "server:port|client:port"(client 侧为游戏客户端设备,供按设备/账号归属)
-	Plain     []byte // 解密后完整明文(含 internal header)
-	AppBody   []byte // 剥离 internal header 后的 protobuf body
+	// Sequence 与 Header 只有主动造包那条链路用得上(见 docs/inject.md),被动解析不看:
+	// Sequence 是该包的 GCP 包序号(HEAD.base [9:13]),Header 是密文 body 最前面那 16 字节
+	// 解出来的头块 —— c2s 的头块里带着这一包的序号与长度,填错服务端收到即断开。
+	// boxarrange -selftest 靠这两者在任意一份抓包上复核头块规则。
+	Sequence uint32
+	Header   []byte
+	Plain    []byte // 解密后完整明文(含 internal header)
+	AppBody  []byte // 剥离 internal header 后的 protobuf body
 }
 
 // session 对应一个 GCP 连接，持有会话 AES 密钥(双向共享)。
@@ -345,6 +360,8 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 				Direction: dir,
 				Opcode:    op,
 				Session:   s.connID,
+				Sequence:  p.Sequence,
+				Header:    headBlock(key, p.Body),
 				Plain:     plain,
 				AppBody:   gcp.AppBody(dir, plain),
 			})

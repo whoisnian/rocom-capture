@@ -171,6 +171,27 @@ func DecryptData(key, body []byte) ([]byte, error) {
 	return nil, errShort
 }
 
+// DecryptHeadBlock 取出 DATA body 最前面那 16 字节的头块。
+//
+// 那 16 字节常被当成 CBC 的 IV(DecryptData 的 embedded_iv 分支就是这么读的),数学上与
+// 「零 IV 解整段、丢掉第一块」完全等价 —— 所以被动解析怎么读都对。但它其实是个有结构的
+// 头块:c2s 里带着这一包的 GCP 包序号与长度,自己造包时必须填对,否则服务端收到即断开。
+// 结构见 docs/inject.md,构造与校验在 internal/petbox。
+//
+// 零 IV 下第一块的明文就是它的 ECB 解密结果(CBC 首块与全零 IV 异或等于自身)。
+func DecryptHeadBlock(key, body []byte) ([]byte, error) {
+	if len(body) < 16 {
+		return nil, errShort
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]byte, 16)
+	block.Decrypt(out, body[:16])
+	return out, nil
+}
+
 // AppOpcode 从解密明文中提取应用层 opcode。
 func AppOpcode(dir Direction, plain []byte) (uint16, bool) {
 	off := c2sOpcodeOffset

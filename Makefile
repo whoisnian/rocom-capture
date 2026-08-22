@@ -8,7 +8,8 @@
 # 前端产物已提交到 internal/server/web,无需在此 npm build。
 
 # 二进制清单:与 ./cmd/ 下的目录同名,加一个新的只要往这里添个名字
-BINS    := rocom-capture
+# (boxarrange 的 -selftest -iface 也要 afpacket,同样得交叉编译)
+BINS    := rocom-capture boxarrange
 DIST    := dist
 # -extldflags=-Wl,-s 让 zig 外部链接器真正 strip(仅 -s -w 对 zig 不完全生效)
 LDFLAGS := -s -w -extldflags=-Wl,-s
