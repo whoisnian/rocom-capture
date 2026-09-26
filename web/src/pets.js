@@ -1,7 +1,8 @@
 // 本机桌宠:姊妹项目 rocom-pets 的桌面客户端开着「本地监听」时,色卡直接唤起它的预览窗口,
 // 不再跳 rkpet 网页。接口是它那边 src/control/http.rs 定的:
 //   GET  /          探活,回 {ok, app: "rocom-pets", version}
-//   POST /preview   JSON {pet: base_conf_id, shiny, glass_type, glass_value},开一个不带列表的预览窗口
+//   POST /preview   JSON {pet: base_conf_id, shiny, glass_type, glass_value},开一个不带列表的预览窗口;
+//                   污染不在协议字段里,改送它认的外观写法 mutation(「异色+炫彩:污染」)
 // 地址来自启动参数 -pets-url(经 GET /api/config 下发);没设就整个不探,色卡只跳 rkpet。
 //
 // 探测**整页只做一次**(页面打开时),结论存在模块里;之后点色卡按它选路,不再重探。
@@ -52,7 +53,10 @@ export async function openPetsPreview(p) {
     const r = await fetch(petsURL + '/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(p.glass && p.glass.pollution ? {
+        pet: p.baseConfId,
+        mutation: (p.shiny ? '异色+' : '') + '炫彩:污染',
+      } : {
         pet: p.baseConfId,
         shiny: !!p.shiny,
         glass_type: p.glassType,

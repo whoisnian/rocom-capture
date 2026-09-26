@@ -61,8 +61,9 @@
   炫彩宠物在昵称/天分两行右侧多一张**色卡**(复刻游戏内点开炫彩标记弹出的那张)，悬浮看外观名：
   隐藏炫彩给赛季归属与外观名(暗夜拾光/狂欢怪谈/铅字幻梦/黑白)，普通炫彩给粒子与配色；
   名称行的炫彩标记也换成这一款自己的图标(素材来源见 rocom-parse docs/data.md 的炫彩色卡段)。
+  污染血脉的宠物同样有一张污染色卡(游戏图鉴里与炫彩卡摆在一排,拼法相同)。
   **点色卡**可跳到姊妹项目 [rkpet.whoisnian.com](https://rkpet.whoisnian.com) 看这只这个形态、
-  这套炫彩的 3D 效果(走它的 `GET /api/link?petbase=<形态编号>&shiny=1&glass=<type>:<value>`,
+  这套炫彩的 3D 效果(走它的 `GET /api/link?petbase=<形态编号>&shiny=1&glass=<type>:<value>`,污染卡送 `pollution=1`,
   送的全是游戏自己的编号,换算由那边负责;只是个链接,不点不发任何外部请求)。
   启动时加 `-pets-url http://127.0.0.1:47831` 后,本机开着 [rocom-pets](https://github.com/whoisnian/rocom-pets)
   桌宠客户端时点色卡改为直接唤起它的预览窗口:桌宠隐藏设置里「本地监听」填同一地址、「允许跨域」填本页地址

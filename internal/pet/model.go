@@ -83,7 +83,8 @@ type Pet struct {
 	GlassType  int32 `json:"glassType,omitempty"`  // glass_type:1 普通 / 2 隐藏
 	GlassValue int32 `json:"glassValue,omitempty"` // glass_value:隐藏款 id / 打包色号
 	// 色卡(外观名与绘制素材,见 gamedata.GlassCard):由上面两个编号在**读取时**现算
-	// (FillDerived),这样改了图标/名称重跑生成脚本即刻生效,老库不必重抓;非炫彩为 nil。
+	// (FillDerived),这样改了图标/名称重跑生成脚本即刻生效,老库不必重抓;非炫彩为 nil
+	// (污染血脉给污染卡,见 gamedata.PollutionCard)。
 	Glass *gamedata.GlassCard `json:"glass,omitempty"`
 
 	Image gamedata.PetImage `json:"image"` // 各尺寸图片相对路径(由前端拼到 /img/ 下)
@@ -243,11 +244,13 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 // 裁剪到 0-100。
 //
 // 色卡只在**查得出**时覆盖:行里 glass_info 编号缺失(GlassType 为 0)时留着 data 里那份,
-// 等下次登录全量快照重写这一行就补齐了。
+// 等下次登录全量快照重写这一行就补齐了。非炫彩的污染血脉宠物给污染卡(炫彩的仍画炫彩卡)。
 func FillDerived(db *gamedata.DB, pets ...*Pet) {
 	for _, p := range pets {
 		if g := db.Glass(p.GlassType, p.GlassValue, p.Shiny); g != nil {
 			p.Glass = g
+		} else if !p.Colorful && p.BloodID == gamedata.BloodPollution {
+			p.Glass = db.PollutionCard()
 		}
 		info, ok := db.PetBase(p.BaseConfID)
 		if !ok {

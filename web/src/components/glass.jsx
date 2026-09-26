@@ -7,6 +7,7 @@ import { openPetsPreview, petsAvailable, subscribePets } from '../pets'
 //   隐藏炫彩(赛季款/常驻款)→ card 就是整张烤好的图,配色已画进去,原样贴上;
 //   普通炫彩 → 三层叠:base(圆角矩形)着 color2 打底 → wave(上半波浪)着 color1
 //              → card(粒子层)原色压最上。base/wave 是纯白+alpha 的遮罩,用 CSS mask 上色。
+// 污染血脉的宠物也有一张(g.pollution,不是炫彩):游戏图鉴里与炫彩卡摆在一排,拼法同普通炫彩。
 
 // rkpet 是姊妹项目 rocom-pets 的站点,能把这只的**模型**按同一套炫彩渲出来。
 // `/api/link` 是它给外部工具开的接口:送游戏侧编号(形态 + 异色/炫彩),302 到对应的展示页。
@@ -21,14 +22,16 @@ function maskStyle(src, color) {
   return { background: color, maskImage: url, WebkitMaskImage: url }
 }
 
-// rkpetURL 拼这只在 rkpet 的展示链接。缺形态编号或缺 glass_info 原始编号时不给链接 ——
+// rkpetURL 拼这只在 rkpet 的展示链接。缺形态编号或(炫彩卡)缺 glass_info 原始编号时不给链接 ——
 // 后者是**老库**才会缺(glassType/glassValue 是后加的字段,早先入库的行里没有),
-// 下次登录全量快照重写那一行就补齐了;这期间卡照画,只是点不动。
+// 下次登录全量快照重写那一行就补齐了;这期间卡照画,只是点不动。污染卡不看 glass_info,送 pollution=1。
 function rkpetURL(p) {
-  if (!p.baseConfId || !p.glassType) return null
+  const pollution = p.glass && p.glass.pollution
+  if (!p.baseConfId || (!pollution && !p.glassType)) return null
   const q = new URLSearchParams({ petbase: String(p.baseConfId) })
   if (p.shiny) q.set('shiny', '1')
-  q.set('glass', `${p.glassType}:${p.glassValue}`)
+  if (pollution) q.set('pollution', '1')
+  else q.set('glass', `${p.glassType}:${p.glassValue}`)
   return `${RKPET_LINK}?${q}`
 }
 
@@ -39,6 +42,7 @@ function rkpetURL(p) {
 //   本机桌宠在监听 → 拦下链接,叫桌宠开预览窗口;叫不动就当场退回 rkpet 链接;
 //   否则 → 就是个跳 rkpet 的普通链接,不点不会有任何外部请求(这是个局域网工具,没网也照常用)。
 // 链接给不出时(老库缺 glass_info 编号)两条路都不走,连提示也不给。缺素材时不渲染。
+// 污染卡同一套:图层同普通炫彩,点了看的是污染外观。
 export function GlassCard({ p }) {
   const local = useSyncExternalStore(subscribePets, petsAvailable)
   const g = p && p.glass

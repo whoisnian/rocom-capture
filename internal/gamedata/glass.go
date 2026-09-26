@@ -36,6 +36,11 @@ type glassData struct {
 		N    string `json:"n"`    // 粒子名(四角星/爱心…)
 		Card string `json:"card"` // 色卡的粒子层
 	} `json:"particles"`
+	Pollution *struct {
+		C1   string `json:"c1"`   // PET_GLOBAL_CONFIG.hb_record_nightmare_color 前一色(着波浪)
+		C2   string `json:"c2"`   // 同上后一色(着底)
+		Card string `json:"card"` // hb_record_nightmare_icon 圆点层
+	} `json:"pollution"`
 }
 
 // GlassCard 是一只炫彩宠物的色卡。两种画法二选一(见 UMG_Pet_DazzlingTips_C:ShowInfo):
@@ -44,8 +49,10 @@ type glassData struct {
 //	普通炫彩 → 三层叠:Base 着 Color2 打底 → Wave(上半波浪)着 Color1 → Card(粒子层)原色压最上。
 //
 // Base/Wave 是纯白 + alpha 的遮罩,前端用 CSS mask 上色。
+// 污染血脉的宠物也借这张卡(Pollution,见 PollutionCard):游戏图鉴里它的卡与炫彩摆在一排,拼法同普通炫彩。
 type GlassCard struct {
 	Hidden    bool   `json:"hidden,omitempty"`    // 隐藏炫彩(赛季款/常驻款);否则普通炫彩
+	Pollution bool   `json:"pollution,omitempty"` // 污染卡(不是炫彩,是污染血脉)
 	Name      string `json:"name"`                // 暗夜拾光 / 亮X亮 - 绿红(普通炫彩即配色名)
 	NameColor string `json:"nameColor,omitempty"` // 隐藏炫彩名的游戏内显示色
 	Season    string `json:"season,omitempty"`    // 隐藏炫彩的归属:常驻隐藏 / 第2赛季限定
@@ -97,6 +104,25 @@ func (db *DB) Glass(glassType, glassValue int32, shiny bool) *GlassCard {
 		}
 	}
 	return nil
+}
+
+// BloodPollution 是污染血脉的 PET_BLOOD_CONF 行 id(PetData.blood_id)。
+const BloodPollution = 23
+
+// PollutionCard 是污染血脉宠物的色卡:拼法同普通炫彩,两色与圆点层来自 PET_GLOBAL_CONFIG 的
+// hb_record_nightmare_color / hb_record_nightmare_icon(rocom-parse docs/data.md 的炫彩段)。
+// 该版本配置里没有这两行时返回 nil。
+func (db *DB) PollutionCard() *GlassCard {
+	p := db.glass.Pollution
+	if p == nil {
+		return nil
+	}
+	return &GlassCard{
+		Pollution: true, Name: "污染", Color1: p.C1, Color2: p.C2,
+		Card: db.iconPath("glass", p.Card),
+		Base: db.iconPath("glass", db.glass.Base),
+		Wave: db.iconPath("glass", db.glass.Wave),
+	}
 }
 
 // GlassDesc 返回炫彩外观的一行中文描述(见 docs/map.md 5):
