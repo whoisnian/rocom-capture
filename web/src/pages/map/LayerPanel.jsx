@@ -4,7 +4,8 @@ import { WILD_LAYERS } from './useWildPets'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
-// 而是附近实时刷出的稀有个体(见 useWildPets.js)。「稀兽花种」并入「地图图标」一组:它同样是
+// 而是附近实时刷出的稀有个体(见 useWildPets.js);其中最大/最小声音两行也有收集模式开关
+// (开 = 已收集的标记划斜线,不隐藏)。「稀兽花种」并入「地图图标」一组:它同样是
 // 地图图标,只是点位每天/每两周重投、由流量攒出而非后端 POI 清单(见 useFlowers.js)。
 // 家园小窝不在此列:那层始终开着,不给开关也不占图例(见 useHomeNests.js)。
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
@@ -70,7 +71,7 @@ export default function LayerPanel({ pois, wilds, flowers, paint, collapsed, onC
         </div>
         <div className="filter-group">
           <label>野生宠物</label>
-          {WILD_LAYERS.map(({ k, n, color }) => {
+          {WILD_LAYERS.map(({ k, n, color, collect }) => {
             // 计数含灰点(与图上标记一致),悬浮再拆开说明其中多少已离开视野。
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
@@ -83,6 +84,13 @@ export default function LayerPanel({ pois, wilds, flowers, paint, collapsed, onC
                   <span className="map-layer-name">{n}</span>
                   <span className="muted">{num}</span>
                 </button>
+                {/* 收集模式:同眠枭之星那颗小开关,但不隐藏,而是在已收集的标记上划一道斜线 */}
+                {collect && (
+                  <button className={'map-collect-btn' + (wilds.collectOn.has(k) ? ' on' : '')}
+                    onClick={() => wilds.toggleCollect(k)} disabled={!wilds.on.has(k)}
+                    title="收集模式:盒子里已有同进化链的雌性同端满声音个体时,标记上划斜线(需先开启图层)"
+                    aria-label={`${n}收集模式`} aria-pressed={wilds.collectOn.has(k)}>✓</button>
+                )}
               </div>
             )
           })}

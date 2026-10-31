@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 )
 
@@ -308,6 +309,31 @@ func (sc *Scoped) OwnedMedalIDs() []uint32 {
 		}
 	}
 	return out
+}
+
+// FullVoiceFemaleBases 返回本账号**雌性且嗓音顶格**的宠物所在形态(base_conf_id),
+// 两端分开:hi = 嗓音 pet.VoiceHigh(婉转声那端)、lo = pet.VoiceLow(粗嗓门那端)。
+// 供实时地图野生宠物图层的收集模式判「这条进化链的满声音母本已经有了」(见 pipeline/wildpets.go)。
+func (sc *Scoped) FullVoiceFemaleBases() (hi, lo []uint32) {
+	rows, err := sc.rdb.Query(`SELECT DISTINCT base_conf_id, voice FROM pets
+WHERE account=? AND gender=? AND voice IN (?,?)`, sc.account, gamedata.GenderName(2), pet.VoiceHigh, pet.VoiceLow)
+	if err != nil {
+		return nil, nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var base uint32
+		var voice int32
+		if rows.Scan(&base, &voice) != nil {
+			continue
+		}
+		if voice == pet.VoiceHigh {
+			hi = append(hi, base)
+		} else {
+			lo = append(lo, base)
+		}
+	}
+	return hi, lo
 }
 
 // filterCols 是筛选下拉的各维度:前端键 → pets 列名。顺序即 SELECT 的列顺序。

@@ -84,7 +84,8 @@ export const getAccounts = () => getJSON('/api/accounts')
 export const getPois = (res) => getJSON('/api/pois?res=' + res, { kinds: [], pois: [] })
 
 // getWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音):
-//   {sceneResId, pets:[{id,n,img,kinds,u,v,lv,voice,height,weight,weightPct,mutation,glass,stale}]}
+//   {sceneResId, pets:[{id,n,img,kinds,u,v,lv,voice,height,weight,weightPct,mutation,glass,stale,owned}]}
+//   owned 是 kinds 里已收集的满声音类别(盒子里有同进化链的雌性同端满声音个体),收集模式用。
 // 之后由 SSE wildpets 增量覆盖;从未收到过任何 AOI 通知时返回 null。
 export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)
 

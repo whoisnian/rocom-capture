@@ -31,6 +31,9 @@ func (p *Pipeline) handlePet(m capture.Message, acc string) {
 		p.applyLayouts(m, sc, acc)
 	}
 
+	// petsTouched:本条消息可能改了宠物的增减/形态/嗓音,事后让野生宠物图层核对一遍
+	// 「已收集的满声音进化链」(见 refreshWildOwned)。
+	petsTouched := true
 	switch {
 	// 携带更新后完整 PetData 的回包(换牌:佩戴奖牌已变;进化:base_conf_id 换形态、
 	// 等级/属性/技能刷新),就地更新宠物(同一 gid)但不产生获得事件。
@@ -45,6 +48,7 @@ func (p *Pipeline) handlePet(m capture.Message, acc string) {
 	// 标记值就地改库里那一只。
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpUpdatePetCollectTagRsp:
 		p.applyPartnerMark(m, sc, acc)
+		petsTouched = false
 
 	// 获得新宠物:孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)、
 	// 传说精灵战后捕捉(catch_way=5,仅经战斗结束通知下发)都把新宠物嵌在子消息里。同一宠物可能
@@ -78,6 +82,12 @@ func (p *Pipeline) handlePet(m capture.Message, acc string) {
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetPetInfoByPageRsp:
 		p.applyPetPage(m, sc, acc)
+
+	default:
+		petsTouched = false
+	}
+	if petsTouched {
+		p.refreshWildOwned(m.Session, acc, m.Time)
 	}
 }
 

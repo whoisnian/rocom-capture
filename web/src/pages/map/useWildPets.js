@@ -10,14 +10,18 @@ import { getWildPets, subscribe } from '../../api'
 // 与「异色/炫彩默认勾选」相悖。v2:glass/colorful/shiny/nightmare → mutation/pollution/voice;
 // v3:满声音一分为二(voice → voiceMax + voiceMin)。
 const LS_KEY = 'map.wildLayers.v3'
+// 收集模式开关(按图层各自开,同眠枭之星;只有带 collect 的图层有)。
+const COLLECT_LS_KEY = 'map.wildCollect.v1'
 
 // 图层 = 一个开关,可覆盖后端 kinds 里的**多个**类别(异色与炫彩合成一个开关);
 // 按稀有度从高到低排,color 同时用作侧栏色点与地图标记描边(见 wildRing)。
+// collect = 该图层有收集模式:后端在标记的 owned 里列出已收集的类别(盒子里已有同进化链、
+// 雌性、同端满声音的个体,见 internal/pipeline/wildpets.go 的 voiceOwned)。
 export const WILD_LAYERS = [
   { k: 'mutation', n: '异色/炫彩', kinds: ['shiny', 'colorful'], color: '#7ad3ff', on: true },
   { k: 'pollution', n: '污染', kinds: ['pollution'], color: '#c792ea' },
-  { k: 'voiceMax', n: '最大声音', kinds: ['voiceMax'], color: '#ffd54a' },
-  { k: 'voiceMin', n: '最小声音', kinds: ['voiceMin'], color: '#7ee0a0' },
+  { k: 'voiceMax', n: '最大声音', kinds: ['voiceMax'], color: '#ffd54a', collect: true },
+  { k: 'voiceMin', n: '最小声音', kinds: ['voiceMin'], color: '#7ee0a0', collect: true },
 ]
 
 // wildTags 把一只宠物命中的类别翻成悬浮提示上的标签(比图层名更细:图层把异色/炫彩合成
@@ -46,11 +50,14 @@ export function wildRing(kinds = []) {
 }
 
 // null = 用户从没手动选过,按各图层的 on 默认;数组 = 用户的选择(可以是空数组 = 全关)。
-const loadKeys = () => {
+const loadKeys = (key = LS_KEY) => {
   try {
-    const v = JSON.parse(localStorage.getItem(LS_KEY))
+    const v = JSON.parse(localStorage.getItem(key))
     return Array.isArray(v) ? v : null
   } catch { return null }
+}
+const saveKeys = (key, set) => {
+  try { localStorage.setItem(key, JSON.stringify([...set])) } catch { /* 存不了就只在本页生效 */ }
 }
 const defaultKeys = () => WILD_LAYERS.filter((l) => l.on).map((l) => l.k)
 
@@ -58,6 +65,7 @@ const defaultKeys = () => WILD_LAYERS.filter((l) => l.on).map((l) => l.k)
 export function useWildPets(account) {
   const [pets, setPets] = useState([])
   const [on, setOn] = useState(() => new Set(loadKeys() || defaultKeys()))
+  const [collectOn, setCollectOn] = useState(() => new Set(loadKeys(COLLECT_LS_KEY) || []))
 
   useEffect(() => {
     let alive = true
@@ -71,14 +79,16 @@ export function useWildPets(account) {
     if (m.type === 'wildpets') setPets(m.data.pets || [])
   }), [account])
 
-  const toggle = (k) => {
-    setOn((prev) => {
+  const flip = (setter, key) => (k) => {
+    setter((prev) => {
       const next = new Set(prev)
       next.has(k) ? next.delete(k) : next.add(k)
-      localStorage.setItem(LS_KEY, JSON.stringify([...next]))
+      saveKeys(key, next)
       return next
     })
   }
+  const toggle = flip(setOn, LS_KEY)
+  const toggleCollect = flip(setCollectOn, COLLECT_LS_KEY)
 
   // 开着的图层覆盖哪些后端类别;一只宠物命中任一即画(可同时命中多层)。
   const shown = new Set(WILD_LAYERS.filter((l) => on.has(l.k)).flatMap((l) => l.kinds))
@@ -91,5 +101,13 @@ export function useWildPets(account) {
   const num = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, () => true)]))
   const numStale = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, (p) => p.stale)]))
 
-  return { marks, num, numStale, on, toggle }
+  // 收集模式下的「已收集」(地图上划一道斜线):这只命中的**每个**开着的图层都开了收集模式且
+  // 已收集才算。一只既是异色又是满声音的,哪怕满声音那条链收过了,异色本身仍值得跑一趟,不划。
+  const collected = (p) => {
+    const hit = WILD_LAYERS.filter((l) => on.has(l.k) && l.kinds.some((k) => (p.kinds || []).includes(k)))
+    return hit.length > 0 && hit.every((l) => l.collect && collectOn.has(l.k) &&
+      l.kinds.some((k) => (p.owned || []).includes(k)))
+  }
+
+  return { marks, num, numStale, on, toggle, collectOn, toggleCollect, collected }
 }

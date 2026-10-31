@@ -114,6 +114,17 @@
 .map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
+/* 收集模式下已收集(盒子里有同进化链的雌性满声音个体):头像淡一些,再从左上到右下划一道红斜线,
+   同 🚫 的意思。斜线是 ::after,被圆形 overflow:hidden 裁在描边以内,描边色(类别)照旧看得清;
+   斜线带一圈暗边,压在浅色头像上也分得出来。 */
+.map-wild.collected img { opacity: .55; filter: grayscale(.4); }
+.map-wild.collected::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 150%; height: 3px; background: var(--red);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+}
 
 /* 图层侧栏里野生宠物那几行:没有图标,用一个同色小圆点代表标记描边色(色值同样来自 JS)。 */
 .map-wild-swatch {

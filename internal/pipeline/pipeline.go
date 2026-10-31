@@ -72,8 +72,11 @@ type acctState struct {
 	zoneGot map[int32]int32
 	// starKnown: 已确认的星星状态(库内快照,只写增量);nil=尚未从库预热。
 	starKnown map[int32]int
-	eggSweep  *eggSweep      // 正在累积的分页背包快照(末页对账,见 eggs.go)
-	lastPos   map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
+	eggSweep  *eggSweep // 正在累积的分页背包快照(末页对账,见 eggs.go)
+	// wildOwnedSig: 上次推送野生宠物标记时「已收集的满声音进化链」摘要(见 voiceOwned),
+	// 宠物增减后对比它决定要不要重推。
+	wildOwnedSig string
+	lastPos      map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
 }
 
 // New 创建消费管线并从库中预热连接归属/场景状态(抓包服务重启后无缝续接)。

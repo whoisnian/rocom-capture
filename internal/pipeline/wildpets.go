@@ -3,6 +3,7 @@ package pipeline
 import (
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
@@ -240,6 +241,56 @@ type wildMark struct {
 	Glass     string   `json:"glass,omitempty"`    // 炫彩外观描述(暗夜拾光 / 亮X暗 - 浅紫橙·四角星);空=非炫彩
 	Mutation  int32    `json:"mutation,omitempty"` // 原始 mutation_type 位标志(排查用)
 	Stale     bool     `json:"stale,omitempty"`    // 已离开 AOI:位置是最后所见,前端置灰
+	// Owned 是 Kinds 里**已收集**的满声音类别(voiceMax / voiceMin):盒子里已有同一进化链、
+	// 雌性、嗓音同端顶格的个体(见 voiceOwned)。前端收集模式据此在标记上画斜线。
+	Owned []string `json:"owned,omitempty"`
+}
+
+// voiceOwned 返回本账号已收集的满声音进化链:类别(voiceMax / voiceMin)→ 链上全部 petbase。
+//
+// 「收集」指留种:蛋的种族随母本、嗓音取双亲均值(见 docs/eggs.md),同一进化链里有一只雌性
+// 满声音的就能孵出该链任一形态的满声音后代,同链再抓一只满声音的意义就不大了。故以雌性个体为准,
+// 并把它所在的整条进化链(含分支进化)都算作已收集——野外刷的形态未必与盒子里那只同阶段。
+// sig 是集合内容的稳定摘要,宠物增减后据此判断标记要不要重推(见 refreshWildOwned)。
+func (p *Pipeline) voiceOwned(acc string) (owned map[string]map[uint32]bool, sig string) {
+	hi, lo := p.st.For(acc).FullVoiceFemaleBases()
+	owned = map[string]map[uint32]bool{}
+	var b strings.Builder
+	for _, side := range []struct {
+		kind  string
+		bases []uint32
+	}{{"voiceMax", hi}, {"voiceMin", lo}} {
+		set := map[uint32]bool{}
+		for _, base := range side.bases {
+			for _, st := range p.db.EvolutionChain(base) {
+				set[st.Petbase] = true
+			}
+		}
+		owned[side.kind] = set
+		ids := make([]int, 0, len(set))
+		for id := range set {
+			ids = append(ids, int(id))
+		}
+		sort.Ints(ids)
+		b.WriteString(side.kind)
+		for _, id := range ids {
+			b.WriteString("," + strconv.Itoa(id))
+		}
+		b.WriteString(";")
+	}
+	return owned, b.String()
+}
+
+// refreshWildOwned 在宠物增减/变化后调用:已收集的满声音进化链变了才重推标记
+// (抓到一只雌性满声音的,同链其它还挂在图上的标记要当场划掉)。
+func (p *Pipeline) refreshWildOwned(conn, acc string, now time.Time) {
+	cs := p.conns[conn]
+	if cs == nil || cs.wilds == nil {
+		return
+	}
+	if _, sig := p.voiceOwned(acc); sig != p.acct(acc).wildOwnedSig {
+		p.pushWilds(conn, acc, now)
+	}
 }
 
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
@@ -251,6 +302,8 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 		return
 	}
 	ts := cs.wilds
+	owned, sig := p.voiceOwned(acc)
+	p.acct(acc).wildOwnedSig = sig
 	marks := []wildMark{}
 	for id, w := range ts.pets {
 		if w.left && now.Sub(w.seenAt) > wildStaleTTL {
@@ -283,6 +336,11 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			}
 			// 异色个体有专属头像的就用异色版(无则 PetImageByBase 自动回退普通)。
 			m.Img = p.db.PetImageByBase(base, w.mutation&scene.MutationShiny != 0).Head
+			for _, k := range m.Kinds {
+				if owned[k][base] {
+					m.Owned = append(m.Owned, k)
+				}
+			}
 		}
 		marks = append(marks, m)
 	}

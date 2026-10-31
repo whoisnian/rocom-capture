@@ -15,14 +15,15 @@ import LayerPanel from './LayerPanel'
 // wildTitle 组一条野生宠物标记的悬停说明,格式:
 //   {种类} Lv.44 异色炫彩 W 19% V -55
 // W 是体重在本形态取值范围内的百分位(后端算好,与宠物列表/事件页的「W xx%」同一口径),
-// V 是嗓音原值——与事件页那行保持一致,一眼能对上。
-function wildTitle(p) {
+// V 是嗓音原值——与事件页那行保持一致,一眼能对上。收集模式下已收集的再注明一句。
+function wildTitle(p, collected) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(...wildTags(p.kinds))
   const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
+  if (collected) s += ' · 已收集(盒子里有同进化链的雌性满声音个体)'
   return s
 }
 
@@ -224,14 +225,18 @@ export default function MapPage() {
             ))}
             {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、最大/最小声音),同属 .map-world 一起
                 平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
-                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。 */}
-            {wilds.marks.map((p) => (
-              <div key={p.id} title={wildTitle(p)}
-                className={'map-wild' + (p.stale ? ' stale' : '')}
-                style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
-                {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
-              </div>
-            ))}
+                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。
+                收集模式下已收集的加 .collected(头像上一道斜线,见 useWildPets 的 collected)。 */}
+            {wilds.marks.map((p) => {
+              const got = wilds.collected(p)
+              return (
+                <div key={p.id} title={wildTitle(p, got)}
+                  className={'map-wild' + (p.stale ? ' stale' : '') + (got ? ' collected' : '')}
+                  style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
+                  {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+                </div>
+              )
+            })}
           </div>
           <div className="map-arrow" ref={arrowRef}>
             <svg viewBox="0 0 24 24" width="30" height="30">
