@@ -103,19 +103,15 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 ### 物种名怎么来
 
 `PET_EGG_CONF` 的 `name`/`form`/`voice_percent`/`pet_bond_name` 四个字段是策划专用、不随包发布
-(schema `.non` 里没有),`egg_conf.n` 只能用仍发布的字段重建:`pet_id` → `MONSTER_CONF`/`PET_CONF` 的种类名,再按
-`PET_INFO_CONF[pet_info_id].blood_id` 补血脉后缀(取 `PET_BLOOD_CONF.name` 全名,
-如「迪莫（光系血脉）」;`blood_id==1` 普通系人人都有,不加)。
+(schema `.non` 里没有),`egg_conf.n` 只能用仍发布的字段重建:`pet_id` → `MONSTER_CONF`/`PET_CONF`
+的种类名(即 `EggConf.Name` → API 的 `species`,页面上的「孵出 X」)。「异色」由
+`precious_egg_type`/`egg_types` 角标单独表达,不进名字。
 
-916 行里 758 行与被删的旧 `name` 逐字相同,其余差异都是旧 `name` 自己的策划自由文本毛病,
-重建值更准:①「异色」前缀——该信息由 `precious_egg_type`/`egg_types` 角标单独表达,不再进
-名字;②12 处多写的「的蛋」后缀(拼进模板会出「鸭吉吉的蛋的蛋」);③「碎晶蝎」这种与种类表
-对不上的过时名(实际叫晶尾蝎)。
+**孵出的血脉无从得知**:`PET_INFO_CONF` 不发布 `blood_id`,背包里蛋的 `PetEggBrief` 也不带血脉
+(只有孵化用的 `PetEggCore` 有),客户端的蛋界面同样不显示血脉。
 
-**`egg_items` 的模板填的是不带血脉后缀的种类名**,与客户端一致——`HandbookModuleData`
-用 `GetPetConf(petId).name` 填 `known_name`,不掺血脉/异色。血脉只留在 `egg_conf.n`
-(即 `EggConf.Name` → API 的 `species`,页面上的「孵出 X」)里。旧版这里填的是
-`PET_EGG_CONF.name`,反倒和客户端对不上。
+`egg_items` 的模板同样填种类名,与客户端一致——`HandbookModuleData` 用 `GetPetConf(petId).name`
+填 `known_name`。
 
 ### 随机蛋(神奇的蛋)的区间藏在哪
 
@@ -128,7 +124,7 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 - `height`/`weight` 也就是按那个隐藏物种的蛋区间滚出来的。
 
 于是可以**反推候选物种**:`hatch_data == max_hatched_secs` 且 `height`/`weight` 落在
-该行区间内的所有 `PET_EGG_CONF` 行。1016 行的表能收得很窄 —— 实测 14 个随机蛋里最窄的只剩
+该行区间内的所有 `PET_EGG_CONF` 行。1119 行的表能收得很窄 —— 实测 14 个随机蛋里最窄的只剩
 1 个候选(菇菇丁),中位数十来个。候选集假设随机蛋的池子是全表,若实际池子更小
 (商人/活动限定)还能再收窄。
 
