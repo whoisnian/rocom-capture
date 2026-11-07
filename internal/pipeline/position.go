@@ -38,6 +38,9 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 		// 花种战斗打完(捕捉/击败)那朵花还在原地,但里面的精灵重投了:打回未检测。
 		// 与野生宠撤标记同一份解析。
 		p.onFlowerHarvested(m.Session, acc, scene.ParseBattleGoneNpcs(m.AppBody), m.Time)
+		// 0x132c 同时是获得宠物的通道(传说精灵战后捕捉只在这里下发,见 pets.go),
+		// 不能当作已消费,要放行给 handlePet。
+		return false
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
 		p.onMove(m, acc)
 	// 稀兽花种图层(见 flowers.go):列表给全集(含异色/炫彩),通知给增量,单朵详情兜底

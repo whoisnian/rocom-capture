@@ -61,16 +61,21 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 
 ## 2. 获得与减少
 
-五个获得 opcode 统一走 `FindNewPet`(递归找 body 里带中文名且 `conf_id>1000` 的 `PetData`,防误报),
-按 `catch_way` 区分子类型(1/4/5=捕捉、3=孵蛋),`isNew` 去重(同宠物可能多 opcode 下发):
+五个获得 opcode 统一走 `FindNewPet`(递归找 body 里 `gid>0`、`conf_id>1000` 且 `add_time` 是合理
+秒级时间戳的 `PetData`,防误报),按 `catch_way` 区分子类型(1/4/5=捕捉、3=孵蛋),
+`isNew` 去重(同宠物可能多 opcode 下发):
 
 | 途径 | opcode | 说明 |
 | --- | --- | --- |
 | 孵蛋 | `ZONE_CRACK_EGG_RSP(780)` | 奖励 `ret_info.goods_reward.rewards[].pet` |
-| 战斗外捕捉 | `0x1983` | 赛季球/高级球,大 body 含新宠物 |
+| 战斗外捕捉 | `0x1983` + `0x0243` | 投球结果 `0x1983` 只回球道具变更,新宠物经 `0x0243` 下发 |
 | 普通战斗内捕捉 | `ZONE_GOODS_REWARD_NOTIFY(0x0243)` | |
 | 花种(稀兽)战斗内捕捉 | `ZONE_PLAYER_SYNC_NOTIFY(0x0160)` | `catch_way=4`;通用同步通道,额外加 `add_time` 时近性守卫(相对本包时间 120s 内)防 PvP 对手/旧快照污染 |
-| 传说精灵战后捕捉 | `ZONE_BATTLE_FINISH_NOTIFY(0x132c)` | `catch_way=5`;同为通用通道,同样加时近性守卫;普通/花种捕捉的战斗也带它(与 GOODS_REWARD 重复,靠 `isNew` 去重) |
+| 传说精灵战后捕捉 | `ZONE_BATTLE_FINISH_NOTIFY(0x132c)` | `catch_way=5`;同为通用通道,同样加时近性守卫;普通/花种捕捉的战斗也带它(与 GOODS_REWARD 重复,靠 `isNew` 去重);该消息还要撤野生宠标记,分发时两处都要过 |
+
+> **新获得宠物的 `PetData` 不带 `name`**(客户端按配置显示种类名),各通道一样,分页全量(`0x1346`)
+> 里也是空的,只有早先创建的老宠物还保留 `name`;故 `FindNewPet` 不拿 `name` 作判据,改认每只宠物
+> 都带的 `add_time`(创建时间)。
 
 减少只记库、不记事件(捕获事件页只统计获得):
 - **放生** `ZONE_PET_FREE_RSP(0x01c5)`:`pet_gid`(field2)→ 从库中移除;
@@ -82,7 +87,7 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 世界主人与到访好友「一起捕捉」再转赠(4 小时窗口),`PetData.together_catch_info`(#90)记录双方:
 `related_uin`=接收方、`catched_uin`=捕捉方。捕捉与赠送是相互独立的事件:
 
-- **送出方**:捕捉回包 `0x1983` 照常记「捕捉」;之后开盒子赠送,经 `0x1808` 确认 →
+- **送出方**:捕捉照常记「捕捉」(新宠物随 `0x0243` 下发);之后开盒子赠送,经 `0x1808` 确认 →
   `ParseTogetherCatchGiftRsp` 取顶层 field3 的 `pet_gid` 移除。该 opcode 有两种回包:内嵌完整 PetData
   的预览与紧凑 ack(仅 `ret_info`+gid),**只认后者**,避免预览误删。
 - **接收方**:受赠宠物经 `0x0243` 下发(走 `FindNewPet`),`catch_way` 仍为 1,靠

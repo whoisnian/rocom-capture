@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 // 2026-09-13 pcap 里连续三次改同一只宠物(gid 34052)伙伴标记的 0x0403 回包原始 AppBody:
@@ -42,5 +44,42 @@ func TestParseCollectTagRspIgnoresOthers(t *testing.T) {
 	}
 	if _, _, ok := ParseCollectTagRsp(nil); ok {
 		t.Error("空 body 不应解出标记变更")
+	}
+}
+
+// 新获得宠物的 PetData 不带 name——2026-11-07 五份抓包实测获得通道(0x0243/0x030c/0x132c/0x0160)
+// 与分页全量 0x1346 里都是 0 字节,只有老宠物保留 name,故靠 gid/conf_id/add_time 认宠物;
+// 只有 gid/conf_id(或带名字却没有 add_time)的普通子消息不得误报,否则会往宠物库里塞假数据。
+func TestFindNewPet(t *testing.T) {
+	petData := func(gid, conf uint32, name string, addTime uint32) []byte {
+		var b []byte
+		b = protowire.AppendTag(b, 1, protowire.VarintType) // gid
+		b = protowire.AppendVarint(b, uint64(gid))
+		b = protowire.AppendTag(b, 2, protowire.VarintType) // conf_id
+		b = protowire.AppendVarint(b, uint64(conf))
+		b = protowire.AppendTag(b, 3, protowire.BytesType) // name
+		b = protowire.AppendBytes(b, []byte(name))
+		if addTime != 0 {
+			b = protowire.AppendTag(b, 32, protowire.VarintType) // add_time
+			b = protowire.AppendVarint(b, uint64(addTime))
+		}
+		// 包一层,让 Walk 把整段 PetData 当作一个 LEN 子字段访问(与实际嵌套一致)。
+		out := protowire.AppendTag(nil, 1, protowire.BytesType)
+		return protowire.AppendBytes(out, b)
+	}
+
+	if pd := FindNewPet(petData(52889, 410066, "", 1794031042)); pd == nil {
+		t.Fatal("空 name + add_time 的新宠未识别(获得通知就是这种形态)")
+	} else if pd.GetGid() != 52889 || pd.GetConfId() != 410066 {
+		t.Errorf("解出 gid=%d conf_id=%d, 期望 52889/410066", pd.GetGid(), pd.GetConfId())
+	}
+	if pd := FindNewPet(petData(231, 1007, "罗隐", 1775238967)); pd == nil {
+		t.Error("带 name 与 add_time 的老宠物未识别")
+	}
+	if pd := FindNewPet(petData(52889, 410066, "护主犬", 0)); pd != nil {
+		t.Errorf("无 add_time 的子消息被误认成宠物: gid=%d", pd.GetGid())
+	}
+	if pd := FindNewPet(petData(52889, 410066, "", 0)); pd != nil {
+		t.Errorf("只有 gid/conf_id 的子消息被误认成宠物: gid=%d", pd.GetGid())
 	}
 }

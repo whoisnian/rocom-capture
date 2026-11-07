@@ -8,19 +8,17 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/wire"
 )
 
-// hasCJK 判断字节串是否含中日韩统一表意文字(宠物名为中文)。
-func hasCJK(b []byte) bool {
-	for _, r := range string(b) {
-		if r >= 0x4E00 && r <= 0x9FFF {
-			return true
-		}
-	}
-	return false
-}
+// petDataAddTimeFloor 是 PetData.add_time 的合理下界(2020-09,早于游戏上线)。
+// 每只宠物都带创建时间(秒级 unix 时间),而恰好凑出 gid/conf_id 的普通子消息给出这么大的
+// field 32 varint 的概率足够低,故以它证明这段字节确实是宠物。
+const petDataAddTimeFloor = 1_600_000_000
 
 // FindNewPet 在响应 body 中递归查找新宠物 PetData。
 // 孵蛋/捕捉获得的宠物作为奖励嵌套在 ret_info.goods_reward.rewards[].pet 里,逐层路径随消息
-// 而异,故递归尝试把每个 LEN 子字段反序列化为 PetData,以 gid/conf_id/name 均有效作为命中判据。
+// 而异,故递归尝试把每个 LEN 子字段反序列化为 PetData,以 gid/conf_id/add_time 均有效作为命中判据。
+//
+// 不能拿 name 作判据:新获得的宠物 name 为空(客户端按配置显示种类名),各通道一样,分页全量
+// 0x1346 里也是空的;只有早先创建的老宠物还保留 name。
 func FindNewPet(body []byte) *pb.PetData {
 	var found *pb.PetData
 	wire.Walk(body, func(v []byte) bool {
@@ -29,7 +27,7 @@ func FindNewPet(body []byte) *pb.PetData {
 		}
 		var pd pb.PetData
 		if proto.Unmarshal(v, &pd) == nil &&
-			pd.GetGid() > 0 && pd.GetConfId() > 1000 && hasCJK(pd.GetName()) {
+			pd.GetGid() > 0 && pd.GetConfId() > 1000 && pd.GetAddTime() >= petDataAddTimeFloor {
 			found = &pd
 			return false
 		}
