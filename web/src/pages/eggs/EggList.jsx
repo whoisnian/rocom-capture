@@ -7,17 +7,17 @@ import { fmtTime, pctHot, voiceHot } from '../../utils/format'
 import { Marks, Gender } from '../../components/badges'
 import { hatchProgress } from './hatch'
 
-// 精灵蛋页面:左栏孵蛋器(在孵的那几颗)、右栏背包(其余的,每行六个,同游戏内布局)。
-// 不分标签页——在孵的蛋本来就不出现在背包格子里(客户端 BagModuleData.IsRemoveEggItem),
-// 两栏一摆就把「在孵 / 在包」说清楚了,不必再给个过滤器。
+// 精灵蛋页面:左栏孵蛋器(3x3 九宫格,点中一颗在下方看卡片)、右栏背包(其余的,每行六个,
+// 同游戏内布局)。不分标签页——在孵的蛋本来就不出现在背包格子里
+// (客户端 BagModuleData.IsRemoveEggItem),两栏一摆就把「在孵 / 在包」说清楚了,不必再给个过滤器。
 // 排序复刻游戏内背包的两种(见 docs/eggs.md 与 internal/pet.SortEggs)。
 const SORTS = [
   { k: 'quality', label: '品质' },
   { k: 'obtained', label: '获取时间' },
 ]
 
-// 孵蛋器格子数:实测 3 个(玩家上限可能随等级/道具变,故按实际在孵数取大)。
-const HATCH_SLOTS = 3
+// 孵蛋器格子数:9 格,固定按 3x3 九宫格展示(玩家若再扩容则跟着在孵数加行)。
+const HATCH_SLOTS = 9
 
 export default function EggList() {
   const account = useContext(AccountContext)
@@ -26,6 +26,7 @@ export default function EggList() {
   const [search, setSearch] = useState('')
   const [data, setData] = useState({ eggs: [] })
   const [detailGid, setDetailGid] = useState(null)
+  const [selGid, setSelGid] = useState(null) // 九宫格里选中的那颗蛋(见下方 sel)
   const [now, setNow] = useState(() => Date.now())
 
   const load = () => getEggs({ search, sort, order })
@@ -43,6 +44,8 @@ export default function EggList() {
   const hatching = data.eggs.filter((e) => e.hatching)
   const bag = data.eggs.filter((e) => !e.hatching)
   const slots = Math.max(HATCH_SLOTS, hatching.length)
+  // 九宫格里点中的那颗:按 gid 记(gid 唯一,重拉列表后仍能对上;它破壳了就回落到第一颗)
+  const sel = hatching.find((e) => e.gid === selGid) || hatching[0] || null
 
   return (
     <div className="eggs-page">
@@ -64,12 +67,27 @@ export default function EggList() {
             onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
+        {/* 孵蛋器九宫格:每格只放蛋图,点中后在下方看整张卡片;可破壳的蛋右上角点红点。
+            九格固定画满(空着也画),与游戏内的孵蛋器布局一致。 */}
         <aside className="eggs-incu">
-          {Array.from({ length: slots }, (_, i) => hatching[i]).map((e, i) => (
-            e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
-              : <div key={'s' + i} className="egg-slot-empty">空格子</div>
-          ))}
+          <div className="egg-slots">
+            {Array.from({ length: slots }, (_, i) => hatching[i]).map((e, i) => {
+              if (!e) return <div key={'s' + i} className="egg-slot egg-slot-empty">空格子</div>
+              const p = hatchProgress(e, now)
+              const ready = !!p && p.pct >= 100
+              return (
+                <button key={e.gid} className={'egg-slot' + (e === sel ? ' on' : '')}
+                  onClick={() => setSelGid(e.gid)} aria-pressed={e === sel}
+                  title={`${e.name} · ${ready ? '可破壳' : p ? p.pct + '%' : '进度未知'}`}>
+                  <img src={imgURL(e.icon)} alt="" draggable={false} />
+                  {ready && <span className="egg-slot-dot" title="可破壳" />}
+                </button>
+              )
+            })}
+          </div>
+          {sel
+            ? <EggCard key={sel.gid} egg={sel} now={now} onPet={setDetailGid} />
+            : <div className="empty">孵蛋器里还没有蛋</div>}
         </aside>
 
         <section className="eggs-bag">

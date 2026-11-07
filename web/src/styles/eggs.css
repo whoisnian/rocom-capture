@@ -1,4 +1,5 @@
-/* 精灵蛋页面:左栏孵蛋器 + 右栏背包(每行六个)。卡片布局固定,缺信息留占位,保证等高。 */
+/* 精灵蛋页面:左栏孵蛋器(3x3 九宫格 + 选中那颗的卡片) + 右栏背包(每行六个)。
+   卡片布局固定,缺信息留占位,保证等高。 */
 
 /* 两栏各自的标题(左「孵蛋器」、右「背包」+排序+搜索)是同一网格行的两个单元格,行高取两者
    较高的那个(右栏被输入框/按钮撑高),故两栏的卡片必从同一条基线开始;左标题 stretch 满行高、
@@ -15,10 +16,29 @@
 .eggs-col-t { font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .eggs-col-t .muted { font-weight: 400; font-size: 13px; }
 
-/* 孵蛋器空格子:虚线框,与卡片同宽,占位说明「这一格还能放一颗」 */
+/* 孵蛋器九宫格:同宠物盒的位置示意图——固定小格子、水平居中,面板两侧自然留出间距。
+   每格是方形蛋图,选中后在下方展示整张卡片(见 EggList);可破壳的蛋右上角点一颗红点。 */
+.egg-slots {
+  display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; justify-content: center;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+}
+.egg-slot {
+  position: relative; height: 56px; padding: 5px; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.egg-slot img { width: 100%; height: 100%; object-fit: contain; }
+.egg-slot:hover { border-color: var(--fg-dim); }
+.egg-slot.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* 空格子:虚线框,说明「这一格还能放一颗」;不可点 */
 .egg-slot-empty {
-  border: 1px dashed var(--line); border-radius: 12px; color: var(--fg-dim);
-  min-height: 96px; display: flex; align-items: center; justify-content: center; font-size: 13px;
+  border-style: dashed; color: var(--fg-dim); font-size: 11px; cursor: default;
+}
+.egg-slot-empty:hover { border-color: var(--line); }
+.egg-slot-dot {
+  position: absolute; top: 4px; right: 4px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--red); box-shadow: 0 0 0 2px var(--bg-1);
 }
 
 .eggs-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -33,12 +53,7 @@
 @media (max-width: 900px) {
   /* 单栏:各标题回到自己那一段前面(否则两个标题会叠在最上方) */
   .eggs-cols { grid-template-columns: 1fr; grid-template-areas: "ht" "incu" "hb" "bag"; }
-  .eggs-cols > .eggs-bar { margin-top: 6px; } /* 与上面的孵蛋器卡片拉开,免得两段黏在一起 */
-  .eggs-incu { flex-direction: row; flex-wrap: wrap; }
-  .eggs-incu .egg-card { flex: 1 1 240px; }
-  /* 空格子在手机上一个就占一行,却只是说「这一格还能放一颗」——标题的 n/3 已经说清了,
-     故窄屏一律收起(空着几格、还是一颗都没在孵,都不占高度)。 */
-  .egg-slot-empty { display: none; }
+  .eggs-cols > .eggs-bar { margin-top: 6px; } /* 与上面的孵蛋器拉开,免得两段黏在一起 */
   .egg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* 手机上背包**仍是双列**(同游戏内孵蛋页选蛋的那个两列格子)。卡片只剩 ~155px 宽,

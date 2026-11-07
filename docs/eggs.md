@@ -72,8 +72,8 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 **蛋从孵蛋器里取出后 `start_hatch_time` 不清零**,服务器只把进度清掉
 (`hatched_secs` 与 `last_hatch_update_sec` 一起归 0,与 `PET_GLOBAL_CONFIG.hatch_interrupt_text`
 「精灵蛋被取出后,孵化进度将不会保留」对得上)。只看这个字段,曾经放进去过的蛋会一直算在
-孵蛋器里 —— 2026-08-26 那份 pcap 就是:背包 63 颗蛋里 5 颗带 `start_hatch_time`,页面显示
-「孵蛋器 5/5」,游戏内只有 3 格。那 5 颗分两拨,一眼可辨:
+孵蛋器里 —— 2026-08-26 那份 pcap 就是:背包 63 颗蛋里 5 颗带 `start_hatch_time`,照此算会得出
+5 颗都在孵,而当次游戏内只有 3 颗真正在孵(另外 2 颗早换出来了)。那 5 颗分两拨,一眼可辨:
 
 | gid | start_hatch_time | hatched_secs | last_hatch_update_sec | 实际 |
 | --- | --- | --- | --- | --- |
@@ -244,15 +244,15 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
 
 - **放入孵蛋器**走通用的用道具:`0x0163 ZoneUseBagItemReq{gid, num:1, item_conf_id}`,
   RSP 回来的 `bag_item.egg_data` 就带上了 `start_hatch_time`;下一次 `0x0312` 里
-  该 `egg_gid` 才出现(`hatched_secs: 0`)。孵蛋器 3 格,`egg_gid[]` 就是当前占用的格子。
+  该 `egg_gid` 才出现(`hatched_secs: 0`)。孵蛋器 9 格(3x3 九宫格),`egg_gid[]` 就是当前占用的格子。
 - **取出**是 `0x02ff ZoneStopHatchReq{egg_gid}` → `0x0300 RSP`(回包只有 `ret_info`,
   更新后的 `bag_item` 搭 `goods_change_info` 的便车)。取出**不清** `start_hatch_time`,
   只清进度,故「在孵与否」得另有口径,见 1 的「谁在孵蛋器里」。
 - **孵满**后 `hatched_secs` 停在上限(`28800/28800`;实测有一例 `57620/57600` 溢出 20 秒)。
-- **三个槽位按入孵时刻升序**,与背包次序无关。客户端
+- **槽位按入孵时刻升序**,与背包次序无关。客户端
   `UMG_PetHatching_C:UpdatePanel` 取 `PlayerDataModel:GetPlayerBackpackEggInfo()`
   (即 `PetBackpackInfo.egg_gid` 那串)后先 `table.sort(…, a.start_hatch_time < b.start_hatch_time)`,
-  再依次填 1..3 号槽。实测本机三颗在孵的蛋(3104/3109/3110)背包次序恰是入孵次序的**倒序**,
+  再依次填 1..9 号槽。实测本机三颗在孵的蛋(3104/3109/3110)背包次序恰是入孵次序的**倒序**,
   页面早先照背包顺序摆,看上去就与游戏内整个反了;后端 `pet.SortHatchingEggs` 照客户端重排。
 - **破壳**:`0x030b ZoneCrackEggReq{egg_gid, select_ball_gid}`(要选一个精灵球道具的 gid)
   → `0x030c RSP` 里 `ret_info.goods_reward.rewards{type: GT_PET, first_get, pet_data{…}}`
@@ -382,7 +382,7 @@ gid 单独返回,交给 `pipeline.removeEggs` 当场删行。三个条件一起�
 - 列表 = 背包里能看见的那些,**在孵的蛋不算**(客户端先 `IsRemoveEggItem` 摘掉再排),
   故 `handleEggs` 只对非孵化那部分调 `SortEggs`(`can_see` 那道过滤对蛋恒为真,1051 件全是 1)。
 **在孵的蛋不出现在背包格子里**:客户端 `IsRemoveEggItem` 把孵蛋器里的蛋从背包列表里摘掉,
-本页照此分两栏(左孵蛋器、右背包),因而不需要「背包中/孵化中」这类过滤。
+本页照此分两栏(左孵蛋器九宫格、右背包),因而不需要「背包中/孵化中」这类过滤。
 分栏依据是 `eggs.hatching` 那一列(权威列表订正过它,见 1 的「谁在孵蛋器里」),
 `ListEggs` 单取该列覆盖 `data` 里写入当时的判断,`RefreshEggView` 也不再照 `start_hatch_time` 重推。
 破壳后的蛋也不留:`0x030b` 记下 egg_gid、`0x030c` 一到就删行(库里只有背包现状)。
