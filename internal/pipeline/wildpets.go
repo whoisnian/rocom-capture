@@ -230,6 +230,8 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 // onBattleFinish 处理战斗结算(0x132c):被污染的野生宠丢球只是开战,结果要等这里
 // (见 docs/map.md 5)。捉走与打死对标记是一回事——那儿已经没这只了,当场撤掉;
 // 战斗期间它早已离开 AOI 被置灰,这一步把灰点也抹掉。打输/它逃跑则不在此列,灰点照旧。
+// 大龙棋士同理:结算里的 npc_obj_id 就是那只棋子,CATCHED/DEFEATED 表示这场战斗把它消耗掉了
+// (服务器随后会补一条 actor_leave),当场撤标记,不等那条 leave 把它置灰。
 func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) {
 	cs := p.conns[conn]
 	if cs == nil || cs.wilds == nil {
@@ -237,9 +239,7 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 	}
 	changed := false
 	for _, id := range scene.ParseBattleGoneNpcs(body) {
-		// 大龙棋士战斗的结算也带它自己的 npc_obj_id(状态同样是 CATCHED,但那是战斗里的棋子,
-		// 被捉的是它身后的宠物),而它可以反复对战、不会因一场战斗从世界上消失,故不能撤。
-		if w, ok := cs.wilds.pets[id]; ok && !w.chess {
+		if _, ok := cs.wilds.pets[id]; ok {
 			delete(cs.wilds.pets, id)
 			changed = true
 		}

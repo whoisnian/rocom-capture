@@ -472,8 +472,9 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 `img/worldmap/`),没有圆环、高度与其它地图图标一致。与野生宠一样在进场景快照/`actor_enter`
 时加入、`actor_leave` 时置灰。它的存活期是**出生时刻(`base.born_time`)+ 4 小时**,到点后端
 在下次推送时清掉(服务器撤走时也会补 `actor_leave`,那一推就删);出生时刻缺失时退回首见
-+4 小时。这颗棋子可以反复对战:战斗结算里的 `CATCHED` 指的是战斗里的棋子、被捉的是它身后的
-宠物,故 `onBattleFinish` 不据此撤标记(与污染野生宠不同)。
++4 小时。战斗里捉走(或打死)它身后的宠物后这颗棋子即被消耗:结算的 `monster_info.npc_obj_id`
+就是它,`CATCHED`/`DEFEATED` 与污染野生宠一样由 `onBattleFinish` 当场撤标记,不等随后那条
+`actor_leave` 把它置灰。没捉到(逃跑/打输,`ALIVE`)则棋子还在,继续按「离开 AOI」处理。
 
 **满声音的收集模式**:最大/最小声音两行右侧各有一颗收集模式小开关(同眠枭之星那颗,开关各自
 记忆于 localStorage),开着时**已收集**的标记头像压淡、划一道红斜线(🚫 的意思),不隐藏——
@@ -518,7 +519,7 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
   | 路径 | 消息 | 字段 |
   | --- | --- | --- |
   | 战斗外直接丢球 | `0x0414`/`0x0413` 的 `acts.throw_catch_notify`(173,`SpaceAct_DeleteThrowNotify`) | `npc_id(3)` + `is_catch_success(4)`,及 `npc_catch_infos(11){npc_id(1), is_catch_success(2)}` |
-  | 污染个体(要打一场) | `0x132c` `ZoneBattleFinishNotify` | `settle_info(1).monster_info(8){state(2), npc_obj_id(16)}`,`state ∈ {CATCHED(1), DEFEATED(0)}` |
+  | 战斗(污染个体/大龙棋士) | `0x132c` `ZoneBattleFinishNotify` | `settle_info(1).monster_info(8){state(2), npc_obj_id(16)}`,`state ∈ {CATCHED(1), DEFEATED(0)}` |
 
   战斗那条**捉走与打死一视同仁**——对地图标记是一回事,那儿已经没这只了
   (2026-08-02 两份 pcap:污染爬爬 `WIN_CATCH`、污染矿晶虫 `WIN_DEFEAT`)。

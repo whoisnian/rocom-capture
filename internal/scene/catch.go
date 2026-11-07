@@ -9,7 +9,8 @@ import (
 // 两条路各有各的结果通知,都直接带**实体 actor_id**,不必靠位置猜:
 //
 //	战斗外直接丢球:0x0414/0x0413 的 acts.throw_catch_notify(173,SpaceAct_DeleteThrowNotify)
-//	被污染的个体  :丢球只是开战,结果在 0x132c 战斗结算的 monster_info 里(捉走或打死)
+//	要打一场的    :结果在 0x132c 战斗结算的 monster_info 里(捉走或打死);污染个体丢球即开战,
+//	                大龙棋士则是捉走它身后的宠物后棋子被消耗
 //
 // 挑 throw_catch_notify 而不挑 0x0203 END_THROW_RSP 的 `catch_results`:后者是较新的字段,
 // 16 份 pcap 里只有最近两份填了,而前者从最早的包一路都在,且 `is_catch_success` 是显式布尔
@@ -81,7 +82,9 @@ func ParseCaughtByThrow(body []byte) []uint64 {
 // 野生实体 id(被捉走或被打死):settle_info(1) → monster_info(8,重复 BattleMonsterInfo)
 // = {state(2), npc_obj_id(16)}。
 //
-// 被污染的野生宠丢球不会直接捉住而是开战(见 docs/map.md 5),故它的标记只能等这里撤:
+// 被污染的野生宠丢球不会直接捉住而是开战(见 docs/map.md 5),故它的标记只能等这里撤;
+// 大龙棋士的结算里 npc_obj_id 也是它自己(宠物藏在棋子身后),捉走/打死同样表示这只棋子
+// 已被这场战斗消耗,服务器随后会补 actor_leave。
 // 捉走(TRUE_BATTLE_RESULT_WIN_CATCH)与打死(..._WIN_DEFEAT)对地图标记是一回事——那儿
 // 已经没这只了。结算里同时含我方队伍的宠物(side=0),它们的 npc_obj_id 为 0,自然被过滤掉。
 //
