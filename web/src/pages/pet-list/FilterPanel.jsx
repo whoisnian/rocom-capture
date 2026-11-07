@@ -6,6 +6,19 @@ import { Gender } from '../../components/badges'
 import { Dropdown, MultiDropdown } from '../../components/dropdown'
 import { CATCH_RANGES, asList } from './filters'
 
+// FilterLabel 筛选组的标签行:标签与 ↺ 合成一个按钮,点标签本身就能重置这一项(符号只有
+// 十几像素,单独当按钮太难点)。该项没有筛选条件时整颗按钮灰掉,既看得见每项都有重置入口,
+// 又不会让一列按钮都像在生效。
+function FilterLabel({ text, note, active, onReset }) {
+  return (
+    <button type="button" className="filter-label" disabled={!active}
+      onClick={onReset} title={`重置${text}`} aria-label={`重置${text}`}>
+      {text}{note && <span className="muted">{note}</span>}
+      <span className="filter-reset-ic" aria-hidden="true">↺</span>
+    </button>
+  )
+}
+
 // FilterPanel 筛选侧栏:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
 // children 为顶部的位置示意图(BoxMap)插槽;筛选状态由父级持有,经 set 增量更新。
 export default function FilterPanel({ filter, options, total, collapsed, onClose, set, toggleType, reset, children }) {
@@ -25,7 +38,7 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
           <button className="btn" onClick={reset}>重置筛选</button>
         </div>
         <div className="filter-group">
-          <label>系别</label>
+          <FilterLabel text="系别" active={(filter.types || []).length > 0} onReset={() => set({ types: [] })} />
           <div className="chips">
             {ALL_TYPES.map((t) => (
               <span key={t} className={'chip' + ((filter.types || []).includes(t) ? ' on' : '')} onClick={() => toggleType(t)}>
@@ -41,11 +54,11 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
         <MultiSelect label="宠物盒" opts={boxOpts(options.box)} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
-          <label>捕捉时间</label>
+          <FilterLabel text="捕捉时间" active={!!filter.catchRange} onReset={() => set({ catchRange: '' })} />
           <Dropdown opts={CATCH_RANGES} value={filter.catchRange} onChange={(v) => set({ catchRange: v })} />
         </div>
         <div className="filter-group">
-          <label>性别</label>
+          <FilterLabel text="性别" active={!!filter.gender} onReset={() => set({ gender: '' })} />
           <div className="radios">
             {['', '♂', '♀'].map((v) => (
               <label key={v || 'all'} className="radio">
@@ -56,7 +69,8 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
           </div>
         </div>
         <div className="filter-group">
-          <label>变异</label>
+          <FilterLabel text="变异" active={filter.shiny === '1' || filter.colorful === '1'}
+            onReset={() => set({ shiny: '', colorful: '' })} />
           <div className="checks">
             <label className="check">
               <input type="checkbox" checked={filter.shiny === '1'} onChange={(e) => set({ shiny: e.target.checked ? '1' : '' })} />异色
@@ -80,7 +94,8 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
 function NatureSelect({ filter, set }) {
   return (
     <div className="filter-group">
-      <label>性格</label>
+      <FilterLabel text="性格" active={!!(filter.nature || filter.natureExclude)}
+        onReset={() => set({ nature: '', natureExclude: '' })} />
       <Dropdown
         opts={[['', '全部'], ...HOT_NATURES.map(([n, eff]) => [n, `${n}（${eff}）`]), ['__other__', '其他']]}
         value={filter.natureExclude ? '__other__' : filter.nature}
@@ -100,7 +115,8 @@ function MultiSelect({ label, opts, value, onChange }) {
   const cur = asList(value)
   return (
     <div className="filter-group">
-      <label>{label}{cur.length > 1 && <span className="muted">（任一）</span>}</label>
+      <FilterLabel text={label} active={cur.length > 0} onReset={() => onChange([])}
+        note={cur.length > 1 ? '（任一）' : ''} />
       <MultiDropdown opts={opts} value={cur} onChange={onChange} />
     </div>
   )
@@ -112,7 +128,7 @@ const boxOpts = (boxes) => (boxes || []).map((b) => [b, b.replace(/^\d+-/, '')])
 function Select({ label, opts, value, onChange }) {
   return (
     <div className="filter-group">
-      <label>{label}</label>
+      <FilterLabel text={label} active={!!value} onReset={() => onChange('')} />
       <Dropdown opts={[['', '全部'], ...(opts || [])]} value={value} onChange={onChange} />
     </div>
   )

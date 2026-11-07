@@ -11,6 +11,17 @@
 }
 .filter-group { display: flex; flex-direction: column; gap: 7px; }
 .filter-group > label { font-size: 12px; color: var(--fg-dim); }
+/* 筛选组的标签行:标签与 ↺ 合成一颗按钮,点标签本身即可重置这一项(比点那个小符号容易);
+   该项没有筛选条件时整颗按钮灰掉。负外边距把加宽的可点区域抵消回去,标签位置不偏 */
+.filter-label {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px;
+  margin: -1px -4px; padding: 1px 4px; border: none; background: none; border-radius: 4px;
+  cursor: pointer; font-size: 12px; line-height: 1.4; color: var(--fg-dim);
+}
+.filter-label:disabled { cursor: default; }
+.filter-label:disabled .filter-reset-ic { opacity: .25; }
+.filter-label:not(:disabled):hover { color: var(--fg); background: var(--bg-3); }
+.filter-reset-ic { font-size: 12px; line-height: 1; }
 /* 筛选抽屉的标题栏/底部条/遮罩:仅移动端显示,桌面隐藏 */
 .filters-bar, .filters-foot, .filters-backdrop { display: none; }
 
