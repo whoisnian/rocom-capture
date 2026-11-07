@@ -146,7 +146,20 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 按 user_id 而非客户端 IP 归属(多台设备常经 NAT 共用同一 IP);各账号数据在同库内按 `account` 列隔离,
 见 [architecture.md](architecture.md) 5。
 
-## 6. 待校准
+## 6. 战斗信息(捕获事件页)
 
-- **咕噜球**本地化未梳理(蛋组已接入 `PET_LIKE_ELEMENT_CONF`);
-- **性格** `nature_id` 用 `AUDIO_NATURE_CONF`,个别可能与游戏显示略有偏差。
+事件页右上角的「战斗信息」开关开启后,列表顶部预留一行,展示当前战斗的对手宠物;数据只在
+前端 localStorage,后端只广播 SSE(`type=battle`),不落库。只展示与捕捉后一致的字段:
+
+| 阶段 | 消息 | 内容 |
+| --- | --- | --- |
+| enter | `0x1316` | 普通对战直接取敌方队伍第一只宠物的 `battle_common_pet_info`,性格不能提前确定、显示未知;若敌方是龙棋士(conf 1646/base 9006),`init_info.battle_cfg_id` → `BATTLE_CONF.name`/`npc_battle_list[].pos1_1st[]` 得**种类**,等级/性别/身高/体重/声音/性格取龙棋士的 `battle_common_pet_info`(与最终宠物一致) |
+| reveal | `0x131a` | 龙棋士护盾打破后,`data_update.other.pets` 里 401 号位的 `battle_common_pet_info` 从龙棋士(1646/9006)变成真宠物,带 `conf/base`、`mutation_type`(异色=1/污染=32)、性格等;推送完整 Pet,前端补上血脉徽标与异色/炫彩标记 |
+| end | `0x132c` | 只推 `stage=end`,前端置灰保留,等待下一场;不主动清空 |
+
+页面在事件序号的位置显示等级,并展示种类/性别/体重/声音/性格、名称行的血脉徽标与异色/炫彩
+标记(后三者普通对战 enter 即可见,龙棋士要等 reveal);不展示身高,副行也不显示血脉文字。
+
+注意:棱镜球等特殊球会在**捕捉时**附加炫彩(`mutation_type` bit3/`glass_info`),不能拿结算里的
+`caught_monster` 反推野生状态;异色看 `0x131a` 的 `mutation_type=1`(或 `0x132c` 的
+`dice_monster_info.is_shiny`)。

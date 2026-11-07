@@ -25,6 +25,9 @@ export default function Events() {
   const [onlyHl, setOnlyHl] = useStoredFlag(localStorage, 'onlyHl', false)
   // 屏幕常亮开关(Screen Wake Lock)
   const [keepAwake, setKeepAwake] = useStoredFlag(localStorage, 'keepAwake', false)
+  // 战斗信息开关与最近一场战斗(只存前端 localStorage,后端不持久化)
+  const [showBattle, setShowBattle] = useStoredFlag(localStorage, 'showBattle', false)
+  const [battle, setBattle] = useStoredJSON(localStorage, 'battleInfo', null, sanitizeBattle)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   useWakeLock(keepAwake)
 
@@ -33,6 +36,19 @@ export default function Events() {
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
     getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
     return subscribe((m) => {
+      if (m.type === 'battle') {
+        if (m.account && m.account !== account) return // 只认当前账号的战斗
+        const acc = m.account || ''
+        if (m.data.stage === 'end') {
+          // 结束只带 stage/time:保留上一份宠物数据置灰,不清空。
+          setBattle((prev) => (prev && (!prev.account || prev.account === acc)
+            ? { ...prev, stage: 'end', time: m.data.time, account: acc || prev.account }
+            : null))
+        } else {
+          setBattle({ ...m.data, account: acc }) // 记下账号,切账号时不串用
+        }
+        return
+      }
       if (m.type !== 'event') return
       if (m.account && m.account !== account) return // 只认当前账号的事件
       setEvents((prev) => [m.data, ...prev].slice(0, 300))
@@ -67,7 +83,9 @@ export default function Events() {
           <strong className="event-title">捕获事件</strong>
           <span className="muted">共 {total} 只</span>
           <div className="spacer" />
-          {/* 三个操作统一为单图标,含义见各自 title */}
+          {/* 操作统一为单图标,含义见各自 title */}
+          <button className={'btn btn-icon' + (showBattle ? ' primary' : '')} onClick={() => setShowBattle((v) => !v)}
+            title="在事件列表顶部展示对手信息">⚔</button>
           <button className={'btn btn-icon' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
             title="仅展示命中高亮规则的事件">{onlyHl ? '★' : '☆'}</button>
           {wakeLockSupported
@@ -77,6 +95,8 @@ export default function Events() {
           <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
         </div>
         <div className="event-list">
+          {/* 战斗信息行:开关开启时固定在列表顶部;未对战为空槽,结束后置灰保留 */}
+          {showBattle && <BattleRow battle={battle} account={account} rules={rules} mode={mode} />}
           {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
           {events
             .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, mode) }))
@@ -92,6 +112,58 @@ export default function Events() {
       </section>
 
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
+    </div>
+  )
+}
+
+// 战斗信息的阶段:enter=进战斗,reveal=龙棋士护盾破后宠物现身,end=战斗结束。
+const BATTLE_STAGES = ['enter', 'reveal', 'end']
+
+// sanitizeBattle 读取 localStorage 时丢弃旧的/损坏的数据。
+function sanitizeBattle(v) {
+  if (!v || typeof v !== 'object' || !BATTLE_STAGES.includes(v.stage)) return null
+  return v
+}
+
+// BattleRow 是捕获事件页顶部预留的战斗信息行:
+// enter 展示等级/种类/性别/体重/声音/性格(普通对战推不出性格,显示未知)与已知的异色/炫彩;
+// 名称行按需带血脉徽标(副行不显示血脉文字),龙棋士的血脉/异色/炫彩要等 reveal(enter 的
+// 合成 Pet 已由后端清掉这些)。与事件条目一样按高亮规则点亮。end(或超过 30 分钟没有新
+// 消息)置灰保留,等待下一场。数据只在前端 localStorage。
+function BattleRow({ battle, account, rules, mode }) {
+  // 切账号后不串用上一账号的战斗信息(旧版本存的数据没有 account 字段,照常显示)。
+  if (!battle || (battle.account && account && battle.account !== account)) {
+    return <div className="event battle-event empty"><span className="battle-hint">尚未进行对战</span></div>
+  }
+  const p = battle.pet || {}
+  const revealed = !!battle.revealed
+  const stale = !battle.time || Date.now() / 1000 - battle.time > 1800
+  const done = battle.stage === 'end' || stale
+  // 阶段标签占用原来 event-time 的位置(战斗信息不显示时间)
+  const stage = done ? '已结束' : revealed ? '已打破' : '对战中'
+  const species = battle.species || p.species || ''
+  const hl = isHighlight(p, rules, mode)
+  return (
+    <div className={'event battle-event' + (hl ? ' hl' : '') + (done ? ' done' : '')}>
+      <Avatar p={p} />
+      <div className="event-body">
+        <div className="event-row">
+          {/* 等级放在事件序号的位置 */}
+          <span className="event-seq muted">{'Lv.'}{p.level ?? '-'}</span>
+          <span className="pet-name">
+            {species || '未知'}
+            <Gender g={p.gender} />
+            <Marks p={p} />
+            {NOTABLE_BLOODS.includes(p.blood) && <Blood p={p} iconOnly />}
+          </span>
+          <span className={'battle-stage' + (revealed && !done ? ' reveal' : '')}>{stage}</span>
+        </div>
+        <div className="pet-sub">
+          {p.nature || '未知'}
+          {' · W '}<span className={pctHot(p.weightPct)}>{p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'}</span>
+          {' · V '}<span className={voiceHot(p.voice)}>{p.voice ?? '-'}</span>
+        </div>
+      </div>
     </div>
   )
 }

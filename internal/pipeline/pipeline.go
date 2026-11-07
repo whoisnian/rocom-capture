@@ -62,6 +62,9 @@ type connState struct {
 	visitOwner   uint32
 	visitFlowers map[uint64]store.FlowerRow
 	crackEgg     uint32 // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
+	// battle:当前连接正在进行的战斗(普通对战/龙棋士)。只用于捕获事件页的「战斗信息」行,
+	// 仅内存、不落库;0x132c 结算时清除,下一场 0x1316 直接覆盖(见 battle.go)。
+	battle *battleState
 }
 
 // acctState 是单个账号的消费状态。
@@ -158,6 +161,8 @@ func (p *Pipeline) handle(m capture.Message) {
 	// 精灵蛋与宠物、场景都相关(破壳回包同时带新宠物,收蛋通知也走奖励通道),
 	// 故不参与「消费即返回」的分发,单独过一遍。
 	p.handleEgg(m, acc)
+	// 战斗信息只广播、不消费消息,放在场景/宠物分发之前(0x132c 两处都要看)。
+	p.handleBattleInfo(m, acc)
 
 	if p.handleScene(m, acc) {
 		return

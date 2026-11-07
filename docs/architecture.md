@@ -39,7 +39,7 @@
 | `scene` | 场景移动/切换/区域/星星实体消息解析(实时地图页) |
 | `gamedata` | embed 的 id→中文名 查找库与图片(`make gamedata` 从 rocom-parse 生成 `data/`,不入库) |
 | `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3) |
-| `pipeline` | 消费 `capture.Engine` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
+| `pipeline` | 消费 `capture.Engine` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库、战斗信息(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs/battle 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/map.md 7) |
 
 `cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
@@ -112,7 +112,7 @@ TCP 重组、flush 时钟、会话密钥共享等在 rocom-parse 的 `capture` �
 | `GET /api/config` | 启动参数给的页面配置:`petsURL`(`-pets-url`,本机桌宠 rocom-pets 的本地监听;空则前端不探测,炫彩色卡只跳 rkpet) |
 | `GET /api/name-options` | 全量特长名(gamedata 全表,不按账号),供事件页高亮规则点选 |
 | `GET /api/evolution` | 某 petbase(`?base=`)所属进化链(按阶段升序),静态数据,供详情页 |
-| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|position\|stars\|starzones\|wildpets\|paint\|home\|eggs, account, data}` |
+| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|battle\|position\|stars\|starzones\|wildpets\|paint\|home\|eggs, account, data}` |
 | `GET /img/` | embed 的图片资源(宠物头像/全身图/UI 图标/大地图瓦片) |
 | `GET /*` | 前端 SPA(未匹配路径回退 index.html) |
 

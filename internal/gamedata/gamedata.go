@@ -43,6 +43,7 @@ type DB struct {
 	eggGroup     map[uint32]EggGroup    // 蛋组id(1-15) -> 社区名/描述
 	npcPets      map[uint32]uint32      // 野生宠 NPC_CONF id -> petbase_id(取名称/头像,见 3.5)
 	npcBosses    map[uint32]bool        // 野外首领的 NPC_CONF id(throwing_interact_type=4,见 3.8)
+	battleCfg    map[uint32]BattleCfg   // 赛季奇遇战斗 battle_cfg_id -> 战斗名/敌方宠物 conf_id
 	glass        glassData              // 炫彩外观与色卡素材(见 Glass / GlassDesc)
 	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
 	imgFiles     map[string]bool        // 实际 embed 的图片相对路径(异色图缺失时回退普通)
@@ -96,6 +97,7 @@ func Load() (*DB, error) {
 		EggGroup     map[string]EggGroup          `json:"egg_group"`
 		NpcPets      map[string]uint32            `json:"npc_pets"`
 		NpcBosses    []uint32                     `json:"npc_bosses"`
+		BattleCfg    map[string]BattleCfg         `json:"battle_cfg"`
 		Glass        glassData                    `json:"glass"`
 		Petbase      map[string]struct {
 			N  string   `json:"n"`
@@ -183,6 +185,12 @@ func Load() (*DB, error) {
 	npcBosses := make(map[uint32]bool, len(raw.NpcBosses))
 	for _, id := range raw.NpcBosses {
 		npcBosses[id] = true
+	}
+	battleCfg := make(map[uint32]BattleCfg, len(raw.BattleCfg))
+	for k, v := range raw.BattleCfg {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			battleCfg[uint32(id)] = v
+		}
 	}
 	eggGroup := make(map[uint32]EggGroup, len(raw.EggGroup))
 	for k, v := range raw.EggGroup {
@@ -289,6 +297,7 @@ func Load() (*DB, error) {
 		eggGroup:     eggGroup,
 		npcPets:      npcPets,
 		npcBosses:    npcBosses,
+		battleCfg:    battleCfg,
 		glass:        raw.Glass,
 		evoIndex:     evoIndex,
 		imgFiles:     imgFiles,

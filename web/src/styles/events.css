@@ -44,3 +44,18 @@
   /* 事件页头部:窄屏收紧按钮间距(按钮本身已是图标,标题「共 N 只」不再被挤到两行) */
   .event-head { gap: 8px; }
 }
+
+/* 战斗信息行:事件列表顶部预留的一行;未对战时是空槽,战斗结束后置灰保留,等待下一场。
+   底色比普通事件略深一档,便于与下方事件流区分。 */
+.battle-event { border-style: dashed; background: var(--bg-2); }
+/* 阶段标签(对战中/已打破/已结束),占用原 event-time 的位置 */
+.battle-event .battle-stage {
+  margin-left: auto; font-size: 12px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--line); color: var(--fg-dim);
+}
+.battle-event .battle-stage.reveal { border-color: var(--gold); color: var(--gold); }
+.battle-event.empty {
+  justify-content: center; color: var(--fg-dim); background: transparent; padding: 8px 14px;
+}
+.battle-event .battle-hint { font-size: 13px; }
+.battle-event.done { opacity: .55; filter: grayscale(.75); }
