@@ -1,6 +1,6 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
-import { WILD_LAYERS } from './useWildPets'
+import { WILD_LAYERS, CHESS_LAYER } from './useWildPets'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
@@ -36,6 +36,22 @@ export default function LayerPanel({ pois, wilds, flowers, paint, collapsed, onC
       </button>
     </div>
   ) : null
+  /* 大龙棋士:与稀兽花种一样不是 POI 清单里的固定点,而是连续捕捉在附近刷出的赛季 NPC
+     (数据仍走 wildpets,后端只推带龙龙骰的大个体)。整行始终显示(本场景没有时计数为 0),
+     方便提前打开开关;排在「地图图标」组最后一行(不咕钟零件下面)。 */
+  const chessRow = (
+    <div className="map-layer-row" key="chess">
+      <button className={'map-layer-btn' + (wilds.chessOn ? ' on' : '')}
+        onClick={wilds.toggleChess}
+        title={wilds.numChessStale
+          ? `视野内 ${wilds.numChess - wilds.numChessStale} · 已离开视野 ${wilds.numChessStale}`
+          : undefined}>
+        <img src={imgURL(CHESS_LAYER.icon)} alt="" draggable={false} />
+        <span className="map-layer-name">{CHESS_LAYER.n}</span>
+        <span className="muted">{wilds.numChess}</span>
+      </button>
+    </div>
+  )
   return (
     <>
       <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={onClose} />
@@ -46,8 +62,6 @@ export default function LayerPanel({ pois, wilds, flowers, paint, collapsed, onC
         </div>
         <div className="filter-group">
           <label>地图图标</label>
-          {kinds.length === 0 && flowers.num === 0 &&
-            <span className="muted" style={{ fontSize: 13 }}>该场景暂无可显示的图标</span>}
           {kinds.map((k, i) => (
             <React.Fragment key={k.k}>
               {i === flowerAt && flowerRow}
@@ -68,6 +82,7 @@ export default function LayerPanel({ pois, wilds, flowers, paint, collapsed, onC
             </React.Fragment>
           ))}
           {flowerAt >= kinds.length && flowerRow}
+          {chessRow}
         </div>
         <div className="filter-group">
           <label>野生宠物</label>

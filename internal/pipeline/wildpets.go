@@ -28,6 +28,8 @@ import (
 //   - 污染(mutation_type 的 MDT_CHAOS 家族);这类丢球即进战斗,打完才解除污染。
 //   - 嗓音取到极值(voice == pet.VoiceHigh / pet.VoiceLow):两端各对应「婉转声」/「粗嗓门」奖牌
 //     的百分位边界,且都是随机不出第二次的顶格值,故两端各给一个图层。
+//   - 大龙棋士(NPC_CONF 29401):连续捕捉刷在玩家附近的赛季奇遇 NPC,活 4 小时。它不是
+//     野生宠物实体(没有身高体重,也不能丢球),单独按 npc_cfg_id 认,见下面 chessWorldNpc。
 //
 // 炫彩不另按 mutation 位判:两者严格等价(全部 pcap 363 只变异宠物零反例),
 // 用 glass_info 还能顺带说出是哪一种炫彩。MDT_VACANT(空缺态)客户端自己都不出变异标,忽略。
@@ -40,6 +42,14 @@ const (
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
 	// 多半还在。灰点不会无限堆积——换场景即清空,自己捉走的当场撤。
 	wildStaleTTL = 4 * time.Hour
+
+	// 大龙棋士:世界里的赛季奇遇 NPC(NPC_CONF 29401「棋子-单人」),连续捕捉在玩家附近刷出。
+	// 它不带身高体重(不是野生宠物实体),故按 npc_cfg_id 单独认;刷出它的刷新行
+	// NPC_REFRESH_CONTENT_CONF 2920016 的 survive_time=14400 秒,到点由服务器撤走。
+	// 图标取 WORLD_MAP_CONF 12001300 的 img_longqizi(游戏大地图上的龙棋士贴纸)。
+	chessWorldNpc   = 29401
+	chessMapIcon    = "worldmap/img_longqizi_png.webp"
+	chessSurviveTTL = 4 * time.Hour
 )
 
 // wildPet 是一只被跟踪的野生宠物(当前场景会话内)。
@@ -55,6 +65,8 @@ type wildPet struct {
 	glassValue int32
 	pos        scene.Position
 	seenAt     time.Time // 最近一次确认它还在 AOI 里的时刻
+	bornAt     time.Time // 实体出生时刻(actor born_time);大龙棋士据此算 4 小时存活期,其余不用
+	chess      bool      // 大龙棋士(NPC_CONF 29401 且 chess_drop_dice;见 isBigChess)
 	left       bool      // 已离开 AOI:标记转为「最后所见」,置灰显示,wildStaleTTL 后丢弃
 }
 
@@ -75,11 +87,22 @@ func newWildTracker(res int32) *wildTracker {
 //     (实测家园场景的宠物 NPC——幽星光 710346、鸭吉吉 710012 等——同样带身高体重叫声,
 //     只靠第一道闸会把它们也标出来;它们的 NPC_CONF 没有 throwing_interact_type)。
 func (p *Pipeline) wildMatch(a scene.NpcActor) bool {
+	// 大龙棋士是普通世界 NPC(没有身高体重,也不在可丢球捕捉清单里),单独一类。
+	if isBigChess(a) {
+		return true
+	}
 	if !a.IsWildPet() || len(wildKinds(a)) == 0 {
 		return false
 	}
 	_, catchable := p.db.NpcPetBase(uint32(a.CfgID))
 	return catchable
+}
+
+// isBigChess 报告实体是不是**大**龙棋士:连续捕捉刷出的棋子里,带龙龙骰的(chess_drop_dice)
+// 客户端按 110% 渲染、不带的缩到 80%,玩家据此分大/小(SceneNpc:GetBonusInfoDiceSize,
+// SEASON_GLOBAL_CONFIG 45/46)。地图只标大的,小龙棋士刷得更多且没什么好东西。
+func isBigChess(a scene.NpcActor) bool {
+	return a.CfgID == chessWorldNpc && a.ChessEmotionID != 0 && a.ChessDropDice
 }
 
 // wildKinds 返回该实体命中的类别键;一只可同时命中多类。前端 WILD_LAYERS 的每个开关
@@ -157,14 +180,21 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 		}
 		if old, ok := ts.pets[a.ActorID]; ok { // 重新进入 AOI:复活标记
 			old.pos, old.seenAt, old.left = a.Pos, now, false
+			if old.bornAt.IsZero() && a.BornTime > 0 { // 上一份快照没带出生时刻时补上
+				old.bornAt = time.Unix(a.BornTime, 0)
+			}
 			changed = true
 			continue
+		}
+		var bornAt time.Time
+		if a.BornTime > 0 {
+			bornAt = time.Unix(a.BornTime, 0)
 		}
 		ts.pets[a.ActorID] = &wildPet{
 			actorID: a.ActorID, cfgID: a.CfgID, lv: a.Lv,
 			height: a.Height, weight: a.Weight, voice: a.Voice,
 			mutation: a.Mutation, glassType: a.GlassType, glassValue: a.GlassValue,
-			pos: a.Pos, seenAt: now,
+			pos: a.Pos, seenAt: now, bornAt: bornAt, chess: isBigChess(a),
 		}
 		changed = true
 	}
@@ -207,7 +237,9 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 	}
 	changed := false
 	for _, id := range scene.ParseBattleGoneNpcs(body) {
-		if _, ok := cs.wilds.pets[id]; ok {
+		// 大龙棋士战斗的结算也带它自己的 npc_obj_id(状态同样是 CATCHED,但那是战斗里的棋子,
+		// 被捉的是它身后的宠物),而它可以反复对战、不会因一场战斗从世界上消失,故不能撤。
+		if w, ok := cs.wilds.pets[id]; ok && !w.chess {
 			delete(cs.wilds.pets, id)
 			changed = true
 		}
@@ -224,8 +256,8 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 type wildMark struct {
 	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
 	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
-	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voiceMax / voiceMin
+	Img    string   `json:"img,omitempty"` // 头像相对路径:野生宠 HeadIcon/<n>.webp,大龙棋士用大地图贴纸 worldmap/…
+	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voiceMax / voiceMin / chess
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`
@@ -293,6 +325,17 @@ func (p *Pipeline) refreshWildOwned(conn, acc string, now time.Time) {
 	}
 }
 
+// chessExpired 报告大龙棋士是否已过存活期:刷出它的刷新行(NPC_REFRESH_CONTENT_CONF
+// 2920016)的 survive_time 是 4 小时。服务器到点会撤走并补 actor_leave,这里按出生时刻兜底
+// (重启/漏包时也照样清掉);出生时刻缺失(旧快照没带)时退回首见 +4h。
+func chessExpired(w *wildPet, now time.Time) bool {
+	born := w.bornAt
+	if born.IsZero() {
+		born = w.seenAt
+	}
+	return !now.Before(born.Add(chessSurviveTTL))
+}
+
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
 // 只在成员/状态真的变了时调用:实体进出 AOI 是低频事件,不必节流。
 // now 取**消息时刻**而非 time.Now():离线回放的包时间是几小时前的,用挂钟一比就全过期了。
@@ -306,7 +349,13 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 	p.acct(acc).wildOwnedSig = sig
 	marks := []wildMark{}
 	for id, w := range ts.pets {
-		if w.left && now.Sub(w.seenAt) > wildStaleTTL {
+		chess := w.chess
+		if chess {
+			if chessExpired(w, now) {
+				delete(ts.pets, id)
+				continue
+			}
+		} else if w.left && now.Sub(w.seenAt) > wildStaleTTL {
 			delete(ts.pets, id)
 			continue
 		}
@@ -319,7 +368,14 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			X: w.pos.X, Y: w.pos.Y, Z: w.pos.Z,
 			Lv: w.lv, Voice: w.voice, Height: w.height, Weight: w.weight,
 			Mutation: w.mutation, Stale: w.left,
-			Kinds: wildKinds(scene.NpcActor{Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType}),
+			Kinds: wildKinds(scene.NpcActor{CfgID: w.cfgID, Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType}),
+		}
+		if chess {
+			m.Name = "大龙棋士"
+			m.Img = chessMapIcon
+			m.Kinds = []string{"chess"}
+			marks = append(marks, m)
+			continue
 		}
 		if w.glassType != gamedata.GlassNull {
 			m.Glass = p.db.GlassDesc(w.glassType, w.glassValue)

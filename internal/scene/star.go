@@ -68,6 +68,7 @@ type NpcActor struct {
 	// 以下为**野生宠物**独有的个体属性(静态 NPC 的 npc_base 里根本没有这些字段)。
 	// 捕捉后原样进 PetData,故丢球前就能筛;判据与坑见 docs/map.md 5。
 	Lv         int32 // base.lv
+	BornTime   int64 // base.born_time(秒级时间戳;世界 NPC 的出生时刻,大龙棋士据此算 4 小时存活期)
 	Height     int32 // npc_base.height(÷100=米)
 	Weight     int32 // npc_base.weight(÷1000=千克)
 	Voice      int32 // npc_base.voice(嗓音,-100~100)
@@ -77,6 +78,11 @@ type NpcActor struct {
 	// 以下为**家园**实体独有(见 home.go 与 docs/eggs.md):
 	AttachItem uint64   // attach_item_info.attach_item_id;窝上的蛋即所属小窝的 furniture_guid
 	HomePet    *HomePet // 入住小窝的宠物(home_pet_info);非家园宠物实体为 nil
+	// 以下为赛季奇遇棋子独有(npc_bonus_info):chess_emotion_id 非 0 表示是龙棋士;
+	// chess_drop_dice 为真的是**大**龙棋士(客户端据此放大到 110%,否则缩到 80%,见
+	// SceneNpc:GetBonusInfoDiceSize)。
+	ChessEmotionID int32
+	ChessDropDice  bool
 }
 
 // 变异位标志,取自客户端 Enum.MutationDiffType(npc_base 与 PetData 的 mutation_type 同一套)。
@@ -97,9 +103,13 @@ const (
 // IsShiny 报告该实体是不是异色个体(MDT_SHINING)。
 func (a NpcActor) IsShiny() bool { return a.Mutation&MutationShiny != 0 }
 
+// IsPollutedMutation 报告 mutation_type 是否带 MDT_CHAOS 家族位(野外「污染」状态)。
+// 野生宠实体与战斗里的 PetData 用同一套位标志,故两处共用。
+func IsPollutedMutation(t uint32) bool { return t&uint32(mutationPolluted) != 0 }
+
 // IsPolluted 报告该实体是不是被污染的个体(MDT_CHAOS 家族)。野外实测全是 MDT_CHAOS_TWO(4)。
 // 污染个体**不能直接丢球捉**:丢球即进战斗,打空血量才解除污染,见 docs/map.md 5。
-func (a NpcActor) IsPolluted() bool { return a.Mutation&mutationPolluted != 0 }
+func (a NpcActor) IsPolluted() bool { return IsPollutedMutation(uint32(a.Mutation)) }
 
 // IsStar 报告该实体是不是收集判定关心的可收集物(眠枭之星含光点/石像形态,及不咕钟零件)。
 func (a NpcActor) IsStar() bool { return starNpc[a.CfgID] }
@@ -152,9 +162,10 @@ func ParseActorEnter(body []byte) []NpcActor {
 	return out
 }
 
-// parseActorInfo 解 ActorInfo:npc(11) → {base(1).pt(8).pos(1), npc_base(3), pendant_info(11)}。
-// npc_base:npc_cfg_id(1)、npc_content_cfg_id(10),及野生宠物个体属性 height(11)/weight(12)/
-// mutation_type(14)/glass_info(30)/voice(31);base 另取 lv(11)。非 NPC 实体返回 ok=false。
+// parseActorInfo 解 ActorInfo:npc(11) → {base(1).pt(8).pos(1), npc_base(3), pendant_info(11),
+// npc_bonus_info(27)}。npc_base:npc_cfg_id(1)、npc_content_cfg_id(10),及野生宠物个体属性
+// height(11)/weight(12)/mutation_type(14)/glass_info(30)/voice(31);base 另取 born_time(5)/lv(11);
+// npc_bonus_info 取赛季棋子的大/小判据 chess_emotion_id(2)/chess_drop_dice(3)。非 NPC 实体返回 ok=false。
 // pendant_info(ActorInfo_NpcPendant):pendant_item_infos(3,重复 NpcPendantItemInfo)→ status(4),
 // 即石像上那颗星的状态(见 NpcActor.Pendant;石像只有一个挂件,取「有未收集则未收集」)。
 func parseActorInfo(b []byte) (NpcActor, bool) {
@@ -219,6 +230,19 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 			}
 		})
 	}
+	if bonus := subMsg(npc, 27); bonus != nil { // npc_bonus_info(ActorInfo_NpcBonus)
+		scanFields(bonus, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+			if typ != protowire.VarintType {
+				return
+			}
+			switch num {
+			case 2: // chess_emotion_id:非 0 = 龙棋士
+				a.ChessEmotionID = int32(v)
+			case 3: // chess_drop_dice:true = 大龙棋士
+				a.ChessDropDice = v != 0
+			}
+		})
+	}
 	a.HomePet = parseHomePet(npc)
 	if base := subMsg(npc, 1); base != nil {
 		scanFields(base, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
@@ -228,6 +252,8 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 			switch num {
 			case 2:
 				a.ActorID = v
+			case 5:
+				a.BornTime = int64(v)
 			case 11:
 				a.Lv = int32(v)
 			}

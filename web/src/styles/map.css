@@ -112,6 +112,8 @@
 /* 悬停时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
 .map-wild:hover { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
 .map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 大龙棋士沿用 .map-poi 的 26px 高度与贴纸原图(无圆环);已离开视野的最后所见压暗。 */
+.map-poi.chess-stale { opacity: .45; filter: grayscale(.6) drop-shadow(0 1px 2px rgba(0, 0, 0, .55)); }
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
 /* 收集模式下已收集(盒子里有同进化链的雌性满声音个体):头像淡一些,再从左上到右下划一道红斜线,

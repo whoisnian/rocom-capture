@@ -20,6 +20,10 @@ function wildTitle(p, collected) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(...wildTags(p.kinds))
+  // 大龙棋士没有个体属性(身高/体重/嗓音),只报身份;4 小时存活期由后端兜底清理。
+  if ((p.kinds || []).includes('chess')) {
+    return head.join(' ') + (p.stale ? ' (已离开视野)' : '')
+  }
   const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
@@ -200,6 +204,14 @@ export default function MapPage() {
                 src={imgURL(pois.iconOf[p.k])} title={p.n}
                 style={{ left: p.u * mapPx, top: p.v * mapPx }} />
             ))}
+            {/* 大龙棋士:数据来自 wildpets(不是 POI 清单),但按地图图标的样式直接画游戏贴纸,
+                无圆环,高度与其它地图图标一致;离开视野的最后所见压暗。 */}
+            {wilds.chessMarks.map((p) => (
+              <img key={p.id} alt="" draggable={false}
+                className={'map-poi' + (p.stale ? ' chess-stale' : '')}
+                src={imgURL(p.img)} title={wildTitle(p)}
+                style={{ left: p.u * mapPx, top: p.v * mapPx }} />
+            ))}
             {/* 稀兽花种:按花里那只混血精灵的血脉画大地图图标(与游戏内一致),里面是异色或炫彩个体的
                 描一圈金色——与眠枭之星收集模式里「已确认还在」的点同一个视觉语言;是哪一种写在
                 悬浮说明里,不另加标识。定位方式同 POI。 */}
@@ -229,9 +241,10 @@ export default function MapPage() {
                 收集模式下已收集的加 .collected(头像上一道斜线,见 useWildPets 的 collected)。 */}
             {wilds.marks.map((p) => {
               const got = wilds.collected(p)
+              const chess = (p.kinds || []).includes('chess')
               return (
                 <div key={p.id} title={wildTitle(p, got)}
-                  className={'map-wild' + (p.stale ? ' stale' : '') + (got ? ' collected' : '')}
+                  className={'map-wild' + (p.stale ? ' stale' : '') + (got ? ' collected' : '') + (chess ? ' chess' : '')}
                   style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
                   {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
                 </div>

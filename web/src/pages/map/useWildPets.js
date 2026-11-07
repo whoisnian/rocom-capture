@@ -17,6 +17,11 @@ const COLLECT_LS_KEY = 'map.wildCollect.v1'
 // 按稀有度从高到低排,color 同时用作侧栏色点与地图标记描边(见 wildRing)。
 // collect = 该图层有收集模式:后端在标记的 owned 里列出已收集的类别(盒子里已有同进化链、
 // 雌性、同端满声音的个体,见 internal/pipeline/wildpets.go 的 voiceOwned)。
+// 大龙棋士不是野生宠(没有身高体重),也不走 POI 清单;但它和野生宠一样由流量实时下发,
+// 故数据仍走 wildpets 推送,开关放在图层栏「地图图标」一组(同稀兽花种)。后端只推带龙龙骰的
+// 大个体,小龙棋士不标。存储键仍用这套选择里的 'chess',与其它图层一起记忆。
+export const CHESS_LAYER = { k: 'chess', n: '大龙棋士', icon: 'worldmap/img_longqizi_png.webp' }
+
 export const WILD_LAYERS = [
   { k: 'mutation', n: '异色/炫彩', kinds: ['shiny', 'colorful'], color: '#7ad3ff', on: true },
   { k: 'pollution', n: '污染', kinds: ['pollution'], color: '#c792ea' },
@@ -93,6 +98,9 @@ export function useWildPets(account) {
   // 开着的图层覆盖哪些后端类别;一只宠物命中任一即画(可同时命中多层)。
   const shown = new Set(WILD_LAYERS.filter((l) => on.has(l.k)).flatMap((l) => l.kinds))
   const marks = pets.filter((p) => (p.kinds || []).some((k) => shown.has(k)))
+  // 大龙棋士不参与野生宠的类别过滤:开关在「地图图标」组,数据仍来自同一份 wildpets。
+  const chessAll = pets.filter((p) => (p.kinds || []).includes(CHESS_LAYER.k))
+  const chessMarks = on.has(CHESS_LAYER.k) ? chessAll : []
   // 图层行上的计数与地图上画出的标记一一对应:灰点(已离开视野的最后所见)也画在图上,
   // 故也计入——否则侧栏显示 0 而图上还挂着几个,只会让人以为标记出错了。
   // 另单算其中的灰点数,供侧栏悬浮说明拆开「视野内 / 已离开」(见 LayerPanel)。
@@ -109,5 +117,10 @@ export function useWildPets(account) {
       l.kinds.some((k) => (p.owned || []).includes(k)))
   }
 
-  return { marks, num, numStale, on, toggle, collectOn, toggleCollect, collected }
+  return {
+    marks, num, numStale, on, toggle, collectOn, toggleCollect, collected,
+    chessMarks, numChess: chessAll.length,
+    numChessStale: chessAll.filter((p) => p.stale).length,
+    chessOn: on.has(CHESS_LAYER.k), toggleChess: () => toggle(CHESS_LAYER.k),
+  }
 }

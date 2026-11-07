@@ -34,11 +34,24 @@ func wildNpcBase(cfgID, height, weight, voice, mutation, glassType, glassValue i
 	return b
 }
 
-// npcActorInfo 构造一条 ActorInfo:npc(11) → {base(1){actor_id(2), lv(11), pt(8).pos(1)}, npc_base(3)}。
+// npcActorInfo 构造一条 ActorInfo:npc(11) → {base(1){actor_id(2), born_time(5,可选), lv(11), pt(8).pos(1)},
+// npc_base(3), npc_bonus_info(27,可选)}。
 func npcActorInfo(actorID uint64, lv int32, p Position, nb []byte) []byte {
+	return npcActorInfoFull(actorID, lv, 0, nil, p, nb)
+}
+
+func npcActorInfoBorn(actorID uint64, lv int32, bornTime int64, p Position, nb []byte) []byte {
+	return npcActorInfoFull(actorID, lv, bornTime, nil, p, nb)
+}
+
+func npcActorInfoFull(actorID uint64, lv int32, bornTime int64, bonus []byte, p Position, nb []byte) []byte {
 	var base []byte
 	base = protowire.AppendTag(base, 2, protowire.VarintType)
 	base = protowire.AppendVarint(base, actorID)
+	if bornTime != 0 {
+		base = protowire.AppendTag(base, 5, protowire.VarintType)
+		base = protowire.AppendVarint(base, uint64(bornTime))
+	}
 	base = protowire.AppendTag(base, 11, protowire.VarintType)
 	base = protowire.AppendVarint(base, uint64(lv))
 	var pt []byte
@@ -52,6 +65,10 @@ func npcActorInfo(actorID uint64, lv int32, p Position, nb []byte) []byte {
 	npc = protowire.AppendBytes(npc, base)
 	npc = protowire.AppendTag(npc, 3, protowire.BytesType)
 	npc = protowire.AppendBytes(npc, nb)
+	if bonus != nil {
+		npc = protowire.AppendTag(npc, 27, protowire.BytesType)
+		npc = protowire.AppendBytes(npc, bonus)
+	}
 
 	var actor []byte
 	actor = protowire.AppendTag(actor, 11, protowire.BytesType)
@@ -93,6 +110,36 @@ func TestParseSceneActorsWildPet(t *testing.T) {
 	}
 	if a.Pos != (Position{X: 561976, Y: 508635, Z: 2648}) {
 		t.Errorf("Pos = %+v", a.Pos)
+	}
+}
+
+// TestParseActorBornTime 大龙棋士(NPC_CONF 29401)靠 base.born_time 算 4 小时存活期,
+// 其余字段与野生宠无关(见 pipeline/wildpets.go 的 chessWorldNpc)。
+func TestParseActorBornTime(t *testing.T) {
+	var bonus []byte // npc_bonus_info:chess_emotion_id(2), chess_drop_dice(3)
+	bonus = protowire.AppendTag(bonus, 2, protowire.VarintType)
+	bonus = protowire.AppendVarint(bonus, 105)
+	bonus = protowire.AppendTag(bonus, 3, protowire.VarintType)
+	bonus = protowire.AppendVarint(bonus, 1)
+
+	var body []byte
+	body = protowire.AppendTag(body, 7, protowire.BytesType)
+	body = protowire.AppendBytes(body, npcActorInfoFull(9279722995167919815, 41, 1794054516, bonus,
+		Position{X: 417855, Y: 692317, Z: 56}, wildNpcBase(29401, 0, 0, 0, 0, 0, 0)))
+
+	actors := ParseSceneActors(body)
+	if len(actors) != 1 {
+		t.Fatalf("实体数 = %d, 期望 1", len(actors))
+	}
+	a := actors[0]
+	if a.CfgID != 29401 || a.BornTime != 1794054516 {
+		t.Errorf("cfg/born_time = %d/%d", a.CfgID, a.BornTime)
+	}
+	if a.ChessEmotionID != 105 || !a.ChessDropDice {
+		t.Errorf("棋子 bonus = %d/%v, 期望 105/true", a.ChessEmotionID, a.ChessDropDice)
+	}
+	if a.IsWildPet() {
+		t.Error("大龙棋士没有身高体重,不该判为野生宠")
 	}
 }
 
