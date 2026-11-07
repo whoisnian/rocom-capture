@@ -117,11 +117,11 @@ afpacket/pcap → [rocom-parse capture] TCP 重组 → GCP 分帧 → 0x1002 取
 
 依赖姊妹仓库 [rocom-parse](https://github.com/whoisnian/rocom-parse)(默认克隆在 `../rocom-parse`,
 `ROCOM_PARSE_DIR` 覆盖)及其依赖(dotnet SDK、CUE4Parse 克隆、uv、protoc);游戏 pak 复制到
-`~/Downloads/rocom/Paks/`。名称表、图片与宠物消息的 Go 结构体不在仓库里,构建前先生成:
+`~/Downloads/rocom/Paks/`。名称表、图片与宠物消息的 Go 结构体不在仓库里,首次构建时自动生成:
 
 ```bash
-make gamedata   # 调 rocom-parse 的 gen.sh:增量解包 → internal/gamedata/data + internal/pb(均 gitignore)
-make build      # → ./rocom-capture(含 gamedata)
+make gamedata   # 游戏更新后手动刷新:调 rocom-parse 的 gen.sh(增量解包 → internal/gamedata/data + internal/pb,均 gitignore)
+make build      # → ./rocom-capture(生成物缺失或生成脚本有更新时才先补 gamedata)
 make web        # 改了前端才需要:npm build → internal/server/web(已提交)
 ```
 

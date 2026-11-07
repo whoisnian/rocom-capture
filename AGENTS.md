@@ -18,14 +18,16 @@
 解包与生成脚本也都在那边;本仓库**不含任何解包数据**:
 
 - `internal/gamedata/data/`(names.json + img webp)与 `internal/pb/`(宠物消息 Go 结构体)都是
-  `make gamedata` 调 `$(ROCOM_PARSE_DIR)/scripts/gen.sh` 生成的,gitignore,`go build` 前必须先生成。
+  `make gamedata` 调 `$(ROCOM_PARSE_DIR)/scripts/gen.sh` 生成的,gitignore;直接 `go build` 前
+  必须先有生成物(`make build` 在缺失/脚本更新时自动补)。
 - 更新游戏版本:重新 rsync pak → `make gamedata` → `make build`;字段变动的排查法见 rocom-parse docs/data.md。
 - pcap 分析用 rocom-parse 的 `cmd/pcapdump`;录 pcap 用其 `scripts/capture.sh`。
 - 本机联调 rocom-parse 未 push 的改动:`go work init . ../rocom-parse`(go.work 已 gitignore)。
 
 ## 约定
 
-- Go:`make build`(= `make gamedata` + `go build`);`make release` 用 zig 交叉编译 amd64/arm64 静态二进制。
+- Go:`make build`(生成物缺失或生成脚本有更新时先补 `make gamedata`,再 `go build`);
+  `make release` 用 zig 交叉编译 amd64/arm64 静态二进制。游戏更新后手动跑 `make gamedata` 刷新。
 - 前端:`web/` 下 `npm run build`(`make web`),产物输出到 `internal/server/web/`(已提交,便于 `go build` 开箱即用)。
 - 页面:宠物列表/详情、捕获事件、精灵蛋、实时地图,前端路由与 SSE 类型见 docs/architecture.md 6/7。
 - 文档与注释只描述当前版本的做法,不记录版本变迁;不引用私有仓库。
