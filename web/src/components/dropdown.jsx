@@ -125,12 +125,34 @@ export function Dropdown({ opts, value, onChange, className, title }) {
 // MultiDropdown 多选下拉。选中的多项之间是**或**(妖精+巨灵 = 属于其中任一蛋组的都算),
 // 这正是找配对候选要的语义;若要「同时属于两组」得改成 AND,那是另一回事,现在没有这种需求。
 // 收起态显示 `全部` / `妖精` / `妖精 等 2 项`,完整清单在 title 里。
+//
+// 按住 Shift 点击按区段操作(宠物盒动辄几十个,逐项点太慢):以最近一次普通点击为锚点,
+// 把锚点到本次点击之间整段设成与本次点击相同的状态——点未选的整段选中,点已选的整段取消;
+// 锚点不随区段操作移动,继续 Shift 点别处就是在此前锚点上伸缩这一区段。
 export function MultiDropdown({ opts, value, onChange, className, allLabel = '全部' }) {
   const dd = useDropdown()
   const list = norm(opts)
   const cur = value || []
+  const anchor = useRef(-1) // 区段起点(上次普通点击的下标);面板收起后失效
+  useEffect(() => { if (!dd.rect) anchor.current = -1 }, [dd.rect])
+
   const lbl = (v) => { const o = list.find(([ov]) => same(ov, v)); return o ? o[1] : v }
-  const toggle = (v) => onChange(cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v])
+  const toggle = (v, idx, shift) => {
+    if (shift && anchor.current >= 0 && anchor.current < list.length) {
+      const lo = Math.min(anchor.current, idx)
+      const hi = Math.max(anchor.current, idx)
+      const want = !cur.includes(v) // 本次点击后这一项应有的状态
+      const next = new Set(cur)
+      for (let i = lo; i <= hi; i++) {
+        if (want) next.add(list[i][0])
+        else next.delete(list[i][0])
+      }
+      onChange([...next])
+      return
+    }
+    anchor.current = idx
+    onChange(cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v])
+  }
   const text = cur.length === 0 ? allLabel
     : cur.length === 1 ? lbl(cur[0])
       : `${lbl(cur[0])} 等 ${cur.length} 项`
@@ -140,10 +162,19 @@ export function MultiDropdown({ opts, value, onChange, className, allLabel = '�
       {dd.rect && (
         <Menu dd={dd}>
           <div className={'dd-opt' + (cur.length ? '' : ' on')}
-            onClick={() => { dd.close(); onChange([]) }}>{allLabel}</div>
-          {list.map(([v, l]) => (
-            <label key={'o' + v} className={'dd-opt' + (cur.includes(v) ? ' on' : '')}>
-              <input type="checkbox" checked={cur.includes(v)} onChange={() => toggle(v)} />{l}
+            onClick={() => { dd.close(); anchor.current = -1; onChange([]) }}>{allLabel}</div>
+          {list.map(([v, l], i) => (
+            <label key={'o' + v} className={'dd-opt' + (cur.includes(v) ? ' on' : '')}
+              // 按住 Shift 点文字时浏览器把它当成「扩展选区」,既不选宠物盒还会留下一片高亮文字;
+              // 先在 mousedown 拦掉选字(点勾选框本身不拦),再自己处理整行的点击。
+              onMouseDown={(e) => { if (e.shiftKey && e.target.tagName !== 'INPUT') e.preventDefault() }}
+              onClick={(e) => {
+                if (e.target.tagName === 'INPUT') return // 点勾选框交给它的 onChange,否则一次点击切两下
+                e.preventDefault() // 拦掉 label 转发给 checkbox 的默认动作
+                toggle(v, i, e.shiftKey)
+              }}>
+              <input type="checkbox" checked={cur.includes(v)}
+                onChange={(e) => toggle(v, i, e.nativeEvent.shiftKey)} />{l}
             </label>
           ))}
         </Menu>
