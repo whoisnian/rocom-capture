@@ -34,7 +34,7 @@ const (
 	chessPetBase = 9006 // PETBASE_CONF:龙棋士
 )
 
-// handleBattleInfo 处理 0x1316/0x131a/0x132c,对每场战斗广播 "battle"。
+// handleBattleInfo 处理 0x1316/0x131a/0x132c,对每场战斗广播 "battle";PVP 整场不推。
 func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 	if m.Direction != gcp.S2C {
 		return
@@ -43,7 +43,7 @@ func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 	switch m.Opcode {
 	case scene.OpBattleEnterNotify:
 		be, ok := scene.ParseBattleEnter(m.AppBody)
-		if !ok {
+		if !ok || scene.IsPVP(be.BattleMode) {
 			cs.battle = nil
 			return
 		}

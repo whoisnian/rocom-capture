@@ -149,7 +149,9 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 ## 6. 战斗信息(捕获事件页)
 
 事件页右上角的「战斗信息」开关开启后,列表顶部预留一行,展示当前战斗的对手宠物;数据只在
-前端 localStorage,后端只广播 SSE(`type=battle`),不落库。只展示与捕捉后一致的字段:
+前端 localStorage,后端只广播 SSE(`type=battle`),不落库。订阅挂在 App 层
+(`web/src/battle.jsx`),浏览器停在别的页面时也照常接收并写入 localStorage,故战斗中切到
+捕获事件页仍能看到当前对手。只展示与捕捉后一致的字段:
 
 | 阶段 | 消息 | 内容 |
 | --- | --- | --- |
@@ -160,6 +162,9 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 页面在事件序号的位置显示等级,并展示种类/性别/体重/声音/性格、名称行的血脉徽标与异色/炫彩
 标记;普通对战 enter 即可见(污染战斗的血脉不显示),龙棋士要等 reveal。不展示身高,副行也不
 显示血脉文字。
+
+**PVP 不推送**:`0x1316` 的 `battle_mode` 是 PVP 类型(同客户端 `PetUtils.IsPvp`)时,
+整场战斗信息都不广播。
 
 实测(2026-11-08 的污染小电企鹅):进战斗 `blood_id=23`(污染)/`nature=30`/`height=71`,破污染后
 `mutation_type=0`/`height=51`,捕捉后 `blood_id=9`(电)/`nature=21`/`height=51`。故污染战斗里

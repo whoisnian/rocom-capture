@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
+import { BattleProvider } from './battle'
 import { useStoredFlag } from './hooks/useStoredState'
 import { Dropdown } from './components/dropdown'
 import { dropBoxFilter } from './pages/pet-list/filters'
@@ -85,6 +86,7 @@ export default function App() {
 
   return (
     <AccountContext.Provider value={account}>
+      <BattleProvider account={account}>
       <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar" ref={headRef}>
@@ -113,6 +115,7 @@ export default function App() {
         <nav className="bottomnav">{navLinks('tab')}</nav>
       </div>
       </IconsContext.Provider>
+      </BattleProvider>
     </AccountContext.Provider>
   )
 }

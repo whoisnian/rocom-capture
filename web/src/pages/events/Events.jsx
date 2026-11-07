@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { getEvents, getEventCount, clearEvents, subscribe } from '../../api'
+import { useBattle } from '../../battle'
 import { AccountContext } from '../../context'
 import { useStoredState, useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useWakeLock, wakeLockSupported } from '../../hooks/useWakeLock'
@@ -25,9 +26,9 @@ export default function Events() {
   const [onlyHl, setOnlyHl] = useStoredFlag(localStorage, 'onlyHl', false)
   // 屏幕常亮开关(Screen Wake Lock)
   const [keepAwake, setKeepAwake] = useStoredFlag(localStorage, 'keepAwake', false)
-  // 战斗信息开关与最近一场战斗(只存前端 localStorage,后端不持久化)
+  // 战斗信息开关与最近一场战斗(战斗数据由 App 层常驻订阅,见 battle.jsx)
   const [showBattle, setShowBattle] = useStoredFlag(localStorage, 'showBattle', false)
-  const [battle, setBattle] = useStoredJSON(localStorage, 'battleInfo', null, sanitizeBattle)
+  const battle = useBattle()
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   useWakeLock(keepAwake)
 
@@ -36,19 +37,6 @@ export default function Events() {
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
     getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
     return subscribe((m) => {
-      if (m.type === 'battle') {
-        if (m.account && m.account !== account) return // 只认当前账号的战斗
-        const acc = m.account || ''
-        if (m.data.stage === 'end') {
-          // 结束只带 stage/time:保留上一份宠物数据置灰,不清空。
-          setBattle((prev) => (prev && (!prev.account || prev.account === acc)
-            ? { ...prev, stage: 'end', time: m.data.time, account: acc || prev.account }
-            : null))
-        } else {
-          setBattle({ ...m.data, account: acc }) // 记下账号,切账号时不串用
-        }
-        return
-      }
       if (m.type !== 'event') return
       if (m.account && m.account !== account) return // 只认当前账号的事件
       setEvents((prev) => [m.data, ...prev].slice(0, 300))
@@ -116,20 +104,12 @@ export default function Events() {
   )
 }
 
-// 战斗信息的阶段:enter=进战斗,reveal=龙棋士护盾破后宠物现身,end=战斗结束。
-const BATTLE_STAGES = ['enter', 'reveal', 'end']
-
-// sanitizeBattle 读取 localStorage 时丢弃旧的/损坏的数据。
-function sanitizeBattle(v) {
-  if (!v || typeof v !== 'object' || !BATTLE_STAGES.includes(v.stage)) return null
-  return v
-}
-
 // BattleRow 是捕获事件页顶部预留的战斗信息行:
 // enter 展示等级/种类/性别/体重/声音/性格(普通对战推不出性格,显示未知)与已知的异色/炫彩;
 // 名称行按需带血脉徽标(副行不显示血脉文字),龙棋士的血脉/异色/炫彩要等 reveal(enter 的
 // 合成 Pet 已由后端清掉这些)。与事件条目一样按高亮规则点亮。end(或超过 30 分钟没有新
-// 消息)置灰保留,等待下一场。数据只在前端 localStorage。
+// 消息)置灰保留,等待下一场。数据只在前端 localStorage,由 App 层常驻订阅(见 battle.jsx),
+// 停在别的页面时也照常记录,战斗中切回本页不会漏。
 function BattleRow({ battle, account, rules, mode }) {
   // 切账号后不串用上一账号的战斗信息(旧版本存的数据没有 account 字段,照常显示)。
   if (!battle || (battle.account && account && battle.account !== account)) {

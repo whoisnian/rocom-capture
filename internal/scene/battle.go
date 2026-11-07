@@ -31,15 +31,19 @@ const (
 
 // BattleEnter 是 0x1316 的解析结果。
 type BattleEnter struct {
+	BattleMode  uint32      // battle_mode:战斗类型(pb.BattleType)
 	BattleCfgID uint32      // init_info.battle_cfg_id[0]
 	Enemy       *pb.PetData // 敌方队伍第一个宠物的 battle_common_pet_info
 }
 
-// ParseBattleEnter 解 s2c ZoneBattleEnterNotify(0x1316):
-// init_info(6) → battle_cfg_id(2,重复/packed)、enemy_team(6,重复 BattleRoleInfo) →
-//
-//	pets(2,重复 BattlePetInfo) → battle_common_pet_info(2, PetData)。
+// ParseBattleEnter 解 s2c ZoneBattleEnterNotify(0x1316)的 battle_mode(1)与 init_info(6) →
+// battle_cfg_id(2,重复/packed)、enemy_team(6,重复 BattleRoleInfo) →
+// pets(2,重复 BattlePetInfo) → battle_common_pet_info(2, PetData)。
 func ParseBattleEnter(body []byte) (*BattleEnter, bool) {
+	var mode uint32
+	if v, ok := wire.Varint(body, 1); ok { // battle_mode
+		mode = uint32(v)
+	}
 	init := subMsg(body, 6)
 	if init == nil {
 		return nil, false
@@ -66,11 +70,31 @@ func ParseBattleEnter(body []byte) (*BattleEnter, bool) {
 			}
 			var pd pb.PetData
 			if proto.Unmarshal(common, &pd) == nil && pd.GetBaseConfId() != 0 {
-				return &BattleEnter{BattleCfgID: cfg, Enemy: &pd}, true
+				return &BattleEnter{BattleMode: mode, BattleCfgID: cfg, Enemy: &pd}, true
 			}
 		}
 	}
 	return nil, false
+}
+
+// IsPVP 报告该战斗类型是否为玩家对战(口径同客户端 PetUtils.IsPvp)。
+func IsPVP(mode uint32) bool {
+	switch pb.BattleType(mode) {
+	case pb.BattleType_BT_PVP,
+		pb.BattleType_BT_PVP_SRANDARD,
+		pb.BattleType_BT_PVP_RANDOM,
+		pb.BattleType_BT_PVP_WATER,
+		pb.BattleType_BT_PVP_INSECT,
+		pb.BattleType_BT_PVP_RANK,
+		pb.BattleType_BT_PVP_THREE,
+		pb.BattleType_BT_PVP_SCARE,
+		pb.BattleType_BT_PVP_GAME1,
+		pb.BattleType_BT_PVP_GAME2,
+		pb.BattleType_BT_PVP_GAME3,
+		pb.BattleType_BT_PVP_GAME4:
+		return true
+	}
+	return false
 }
 
 // ParseBattleRoundReveal 从 s2c ZoneBattleRoundStartNotify(0x131a)取敌方 401 号位已经现身的宠物:

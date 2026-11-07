@@ -27,7 +27,8 @@ func petData(conf, base, lv, nature, gender, height, weight, mutation, blood uin
 	return b
 }
 
-// BattleInitInfo: battle_cfg_id(2) + enemy_team(6) → pets(2) → battle_common_pet_info(2)。
+// BattleInitInfo: battle_mode(1) + battle_cfg_id(2) + enemy_team(6) → pets(2) →
+// battle_common_pet_info(2)。
 func TestParseBattleEnter(t *testing.T) {
 	var pet []byte
 	pet = protowire.AppendTag(pet, 2, protowire.BytesType)
@@ -44,6 +45,8 @@ func TestParseBattleEnter(t *testing.T) {
 	init = protowire.AppendBytes(init, team)
 
 	var body []byte
+	body = protowire.AppendTag(body, 1, protowire.VarintType) // battle_mode = BT_PVE
+	body = protowire.AppendVarint(body, 1)
 	body = protowire.AppendTag(body, 6, protowire.BytesType)
 	body = protowire.AppendBytes(body, init)
 
@@ -54,10 +57,27 @@ func TestParseBattleEnter(t *testing.T) {
 	if be.BattleCfgID != 250355 {
 		t.Errorf("battle_cfg_id = %d, 期望 250355", be.BattleCfgID)
 	}
+	if be.BattleMode != 1 || IsPVP(be.BattleMode) {
+		t.Errorf("battle_mode = %d, 期望 PVE(1)", be.BattleMode)
+	}
 	if e := be.Enemy; e.GetConfId() != 1646 || e.GetBaseConfId() != 9006 ||
 		e.GetLevel() != 42 || e.GetGender() != 1 || e.GetHeight() != 210 ||
 		e.GetWeight() != 653123 || e.GetVoice() != 45 {
 		t.Errorf("敌方 PetData 不符: %+v", e)
+	}
+}
+
+// TestIsPVP 覆盖 PVP 类型与常见非 PVP 类型。
+func TestIsPVP(t *testing.T) {
+	for _, mode := range []uint32{2, 15, 16, 17, 18, 22, 25, 35, 39, 40, 44, 45} {
+		if !IsPVP(mode) {
+			t.Errorf("battle_mode=%d 应判为 PVP", mode)
+		}
+	}
+	for _, mode := range []uint32{0, 1, 9, 11, 12, 13, 36} {
+		if IsPVP(mode) {
+			t.Errorf("battle_mode=%d 不应判为 PVP", mode)
+		}
 	}
 }
 
