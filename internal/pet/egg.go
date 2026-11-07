@@ -349,6 +349,7 @@ type EggView struct {
 	ObtainedAt int64  `json:"obtainedAt"`        // 获得时间(unix 秒)
 
 	Hatching    bool  `json:"hatching"`              // 在孵蛋器里
+	HatchSlot   int   `json:"hatchSlot,omitempty"`   // 孵蛋器槽位(1 起,来自 egg_gid[] 的数组下标)
 	HatchedSecs int32 `json:"hatchedSecs,omitempty"` // 已孵秒数(HatchUpdate 时刻的快照)
 	MaxSecs     int32 `json:"maxSecs,omitempty"`     // 孵满所需秒数
 	HatchUpdate int64 `json:"hatchUpdate,omitempty"` // 上面那个数的计算时刻(前端据此外推)
@@ -593,7 +594,8 @@ func eggFromView(v *EggView) Egg {
 func RefreshEggView(v *EggView, db *gamedata.DB) *EggView {
 	out := ToEggView(eggFromView(v), db)
 	out.Parents = v.Parents
-	out.Hatching = v.Hatching // 在孵与否以库里那列为准(权威列表订正过,别按 start_hatch_time 重推)
+	out.Hatching = v.Hatching   // 在孵与否以库里那列为准(权威列表订正过,别按 start_hatch_time 重推)
+	out.HatchSlot = v.HatchSlot // 槽位顺序同理,来自权威 egg_gid[] 的数组下标
 	FillEggDerived(out, db)
 	return out
 }
@@ -635,21 +637,29 @@ func SortEggs(eggs []*EggView, by string, asc bool) {
 	})
 }
 
-// SortHatchingEggs 把孵蛋器里的蛋排成游戏内的槽位顺序:**按入孵时刻升序**
-// (先放进去的占 1 号槽)。复刻客户端 UMG_PetHatching_C:UpdatePanel:
+// SortHatchingEggs 把孵蛋器里的蛋排成游戏内的槽位顺序。
 //
-//	table.sort(backpackEggList, function(a, b)
-//	  return a.eggData.start_hatch_time < b.eggData.start_hatch_time end)
-//	for i = 1, 3 do ... positionIndex = i ... end
-//
-// 槽位顺序与背包次序无关(实测三颗在孵的蛋,背包次序恰好是入孵次序的倒序,页面就整个反了)。
-// 客户端喂给 table.sort 的是 PetBackpackInfo.egg_gid 的顺序,本工具手头只有背包次序,
-// 两颗蛋同秒入孵时落位可能与游戏不同(实测未见);排序仍走 luaSort,见 SortEggs 的说明。
+// 槽位顺序就是服务器下发的 **`egg_gid[]` 数组次序**(登录数据 PetBackpackInfo.egg_gid 与
+// 0x0312 各一份,见 docs/eggs.md):客户端
+// UMG_PetHatching_C:UpdatePanel 取 PlayerDataModel:GetPlayerBackpackEggInfo()
+// (逐项按 egg_gid 取背包物品)后**直接**填 1..9 号槽,不按 start_hatch_time 排序;
+// 同秒入孵的几颗因此也是列表里的先后。StartHatch 只在权威快照还没到(抓包从半途开始,
+// 没有登录数据也没开过孵蛋器)时兜底,那时只能按入孵时刻猜。
 func SortHatchingEggs(eggs []*EggView) {
-	luaSort(len(eggs), func(i, j int) bool {
-		return eggs[i-1].StartHatch < eggs[j-1].StartHatch
-	}, func(i, j int) {
-		eggs[i-1], eggs[j-1] = eggs[j-1], eggs[i-1]
+	slices.SortStableFunc(eggs, func(a, b *EggView) int {
+		switch {
+		case a.HatchSlot > 0 && b.HatchSlot > 0:
+			return a.HatchSlot - b.HatchSlot
+		case a.HatchSlot > 0:
+			return -1
+		case b.HatchSlot > 0:
+			return 1
+		case a.StartHatch < b.StartHatch:
+			return -1
+		case a.StartHatch > b.StartHatch:
+			return 1
+		}
+		return 0
 	})
 }
 

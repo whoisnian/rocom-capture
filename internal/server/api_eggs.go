@@ -30,7 +30,7 @@ func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 		eggs[i] = pet.RefreshEggView(e, s.db)
 	}
 	// 排序键来自上面的重算,故排在其后。在孵的蛋留在最前且不参与背包排序(它们属于孵蛋器),
-	// 但自己按槽位顺序排一遍——槽位是入孵时刻升序,与背包次序无关(见 pet.SortHatchingEggs)。
+	// 但自己按槽位顺序排一遍——槽位是 egg_gid[] 的数组次序,与背包次序无关,见 pet.SortHatchingEggs。
 	hatching, bag := []*pet.EggView{}, []*pet.EggView{}
 	for _, e := range eggs {
 		if e.Hatching {

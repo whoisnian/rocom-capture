@@ -95,7 +95,8 @@ func (p *Pipeline) removeEggs(sc *store.Scoped, acc string, gids []uint32) {
 	p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 }
 
-// applyHatchSlots 用权威的孵蛋器占用列表订正在孵标记并通知前端。
+// applyHatchSlots 用权威的孵蛋器占用列表订正在孵标记与槽位顺序(数组下标即槽位),
+// 并通知前端。
 func (p *Pipeline) applyHatchSlots(sc *store.Scoped, acc string, gids []uint32) {
 	if err := sc.SetHatchingEggs(gids); err == nil {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})

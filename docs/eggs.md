@@ -82,9 +82,9 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 
 (时刻均省去前缀 1787;三颗在孵的 `last_hatch_update_sec` 相同 —— 进度是**查询时才算**的。)
 
-权威口径是 **`PetBackpackInfo.egg_gid`**:客户端孵蛋器面板就是拿这串填的
+权威口径是 **`PetBackpackInfo.egg_gid`**:客户端孵蛋器面板就是照这串、**连顺序一起**填的
 (`PlayerDataModel:GetPlayerBackpackEggInfo`),它有两个下发点,本项目两个都收
-(`pet.BackpackHatchSlots` / `pet.HatchSlots` → `store.SetHatchingEggs` 整体订正):
+(`pet.BackpackHatchSlots` / `pet.HatchSlots` → `store.SetHatchingEggs` 整体订正在孵标记与槽位顺序):
 
 - `0x0102 ZoneLoginRsp` → `player_info.pet_info.backpack_info.egg_gid`:**登录就有**,
   上面那份 pcap 里正是 `3259/3262/3264` 三个,不必等玩家打开孵蛋器;
@@ -96,9 +96,13 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 唯一含糊的是「刚放进去、进度还是 0」的那一刻 —— 客户端放完蛋会紧跟一次 `0x0311/0x0312`
 刷新面板,权威快照随即到货,故只差这一瞬。
 
-蛋的显示名不在配置里成品供着,要拼:物品 `BAG_ITEM_CONF[bag_item.id]` 的 `known_name`
-是模板 `"{0}的蛋"`,`{0}` 填**种类名**;随机蛋(`conf_id=0`)没得填,直接用物品 `name`
-(如 `310049` = 神奇的蛋)。
+蛋的显示名不在配置里成品供着,要拼:物种蛋用物品 `BAG_ITEM_CONF[bag_item.id]` 的 `known_name`
+模板 `"{0}的蛋"`,`{0}` 填**种类名**。随机蛋/自选炫彩蛋(`conf_id=0`)**不走这条路**——
+客户端 `UMG_PetHatchingItem_C:OnItemUpdate` 只在 `conf_id != 0` 时查图鉴填 `known_name`,
+否则直接显示物品 `name`:如 `310049` = 神奇的蛋,`600044` = **紫色炫彩蛋**(它的
+`known_name` 是「浅红紫炫彩蛋」,那是另一档颜色已知的展示名,别拿错),`600047` 的
+`known_name` 甚至带一个多余的制表符。本工具没有图鉴收录状态,物种蛋因此一律按已知名显示
+(客户端只在图鉴已收录时才用 `known_name`,否则也退回物品 `name`)。
 
 ### 物种名怎么来
 
@@ -249,11 +253,12 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
   更新后的 `bag_item` 搭 `goods_change_info` 的便车)。取出**不清** `start_hatch_time`,
   只清进度,故「在孵与否」得另有口径,见 1 的「谁在孵蛋器里」。
 - **孵满**后 `hatched_secs` 停在上限(`28800/28800`;实测有一例 `57620/57600` 溢出 20 秒)。
-- **槽位按入孵时刻升序**,与背包次序无关。客户端
+- **槽位顺序就是 `egg_gid[]` 的数组次序**,与背包次序、入孵时刻都无关。客户端
   `UMG_PetHatching_C:UpdatePanel` 取 `PlayerDataModel:GetPlayerBackpackEggInfo()`
-  (即 `PetBackpackInfo.egg_gid` 那串)后先 `table.sort(…, a.start_hatch_time < b.start_hatch_time)`,
-  再依次填 1..9 号槽。实测本机三颗在孵的蛋(3104/3109/3110)背包次序恰是入孵次序的**倒序**,
-  页面早先照背包顺序摆,看上去就与游戏内整个反了;后端 `pet.SortHatchingEggs` 照客户端重排。
+  (逐项按 `PetBackpackInfo.egg_gid` 的顺序取背包物品,保持原序)后按这个次序填 1..9 号槽;
+  同秒入孵的几颗也按列表里的先后落位。后端把这串下标存进
+  `egg_hatch_slot`(`store.SetHatchingEggs`),页面按槽位排;两份权威快照都没有时
+  (抓包从半途开始)才退回按 `start_hatch_time` 升序。
 - **破壳**:`0x030b ZoneCrackEggReq{egg_gid, select_ball_gid}`(要选一个精灵球道具的 gid)
   → `0x030c RSP` 里 `ret_info.goods_reward.rewards{type: GT_PET, first_get, pet_data{…}}`
   是**完整 PetData**,末尾 `hatched_pet_gid` 给出新宠物 gid。新宠物 `catch_way: 3`(孵化)、
@@ -346,7 +351,7 @@ gid 单独返回,交给 `pipeline.removeEggs` 当场删行。三个条件一起�
 | 蛋图 | `gen_icons.py` 的 **egg 组**:`BAG_ITEM_CONF` 里 `type==8` 的 `icon`(整张贴图)→ `img/egg/<原名>.webp`,326 个唯一图标转出 307(19 个未上线物种的贴图没随包解出,Go 侧回退 `egg_tongyong`) |
 | 索引 | `gen_gamedata.py` 五张表:`egg_conf`(物种蛋区间 + 孵化秒数 + 蛋品类)、`egg_items`(蛋物品 → 显示名/物种/图标/窝上 NPC id/品质/排序号)、`egg_types`(蛋品类 → 名称/排序号/角标)、`size_medals`(按百分位自动授予的四枚奖牌)、`nest_furniture`(小窝家具,按 `interact_type==3` 取,当前两件:精灵小窝 1001071、学院小窝 1001072,后者按 `ACADEMY_PRIVILEGE_CONF` 标 `academy`) |
 | 解析 | `internal/pet/egg.go`(BagItem+PetEggBrief、孵蛋器占用列表、破壳请求/回包、flow_reason、离包判定)、`internal/scene/home.go`(home_info 的家具与配对、home_pet 实体、蛋 NPC 的 attach_item) |
-| 入库 | `internal/store/egg.go` 的 `eggs` 表 = **背包现状**:蛋一行,`parents` 单列存**收蛋那一刻**的双亲快照(亲本被放生也不受影响);破壳/送人/背包对账不到的直接删行(页面只看背包,不留历史) |
+| 入库 | `internal/store/egg.go` 的 `eggs` 表 = **背包现状**:蛋一行,`parents` 单列存**收蛋那一刻**的双亲快照(亲本被放生也不受影响);破壳/送人/背包对账不到的直接删行(页面只看背包,不留历史)。`egg_hatch_slot` 另存孵蛋器槽位(权威 `egg_gid[]` 的数组下标,每次快照整表替换) |
 | 管线 | `internal/pipeline/eggs.go`(背包分页对账 + 收蛋/买蛋入库 + 孵蛋器占用订正 + 认领双亲 + 破壳/送人删行)、`internal/pipeline/home.go`(小窝图层的实时状态与推送) |
 | 页面 | 精灵蛋页(`web/src/pages/eggs/`)与实时地图的小窝图层(`web/src/pages/map/useHomeNests.js`) |
 
@@ -384,7 +389,8 @@ gid 单独返回,交给 `pipeline.removeEggs` 当场删行。三个条件一起�
 **在孵的蛋不出现在背包格子里**:客户端 `IsRemoveEggItem` 把孵蛋器里的蛋从背包列表里摘掉,
 本页照此分两栏(左孵蛋器九宫格、右背包),因而不需要「背包中/孵化中」这类过滤。
 分栏依据是 `eggs.hatching` 那一列(权威列表订正过它,见 1 的「谁在孵蛋器里」),
-`ListEggs` 单取该列覆盖 `data` 里写入当时的判断,`RefreshEggView` 也不再照 `start_hatch_time` 重推。
+`ListEggs` 单取该列覆盖 `data` 里写入当时的判断,并 join `egg_hatch_slot` 取槽位;
+`RefreshEggView` 也不再照 `start_hatch_time` 重推。
 破壳后的蛋也不留:`0x030b` 记下 egg_gid、`0x030c` 一到就删行(库里只有背包现状)。
 
 ### 破壳前就能算出的奖牌

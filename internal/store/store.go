@@ -171,6 +171,13 @@ CREATE TABLE IF NOT EXISTS eggs (
   seq INTEGER, parents TEXT, first_seen INTEGER, updated_at INTEGER, data TEXT,
   PRIMARY KEY(account, gid)
 );
+-- 孵蛋器槽位:权威顺序来自 PetBackpackInfo.egg_gid / 0x0312 的 egg_gid[],数组下标即槽位(1 起)。
+-- 客户端 GetPlayerBackpackEggInfo 保持原序、UMG_PetHatching 直接按下标填九宫格,蛋自己的
+-- start_hatch_time 排不出这个顺序(同秒入孵的几颗尤其,见 docs/eggs.md)。每份权威快照整表替换。
+CREATE TABLE IF NOT EXISTS egg_hatch_slot (
+  account TEXT NOT NULL, gid INTEGER, slot INTEGER,
+  PRIMARY KEY(account, gid)
+);
 
 -- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
 -- 没有实体——已收集的星星服务器不刷,见 docs/map.md 4)。没有行 = 尚未确认(前端照常显示)。

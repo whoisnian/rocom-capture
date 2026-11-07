@@ -190,7 +190,33 @@ func TestSortEggs(t *testing.T) {
 }
 
 func TestSortHatchingEggs(t *testing.T) {
-	// 孵蛋器槽位按入孵时刻升序,与传入的背包次序无关(实测那三颗:背包次序恰是入孵次序的倒序)。
+	// 槽位顺序就是 egg_gid[] 的数组次序:同秒入孵的几颗也有固定先后,start_hatch_time 排不出来。
+	// 取自 2026-11-08 pcap 的现场:4057/4056 同秒、4171/4175/4174 同秒,游戏内仍是列表次序。
+	gids := []uint32{4057, 4056, 3990, 4171, 4175, 4174, 4179, 3999, 4181}
+	start := map[uint32]int64{
+		4057: 1793941050, 4056: 1793941050, 3990: 1793941255,
+		4171: 1794035423, 4175: 1794035423, 4174: 1794035423,
+		4179: 1794081674, 3999: 1794081686, 4181: 1794081716,
+	}
+	eggs := make([]*EggView, 0, len(gids))
+	for i, gid := range gids {
+		eggs = append(eggs, &EggView{Gid: gid, HatchSlot: i + 1, StartHatch: start[gid]})
+	}
+	slices.Reverse(eggs) // 页面从库里按背包次序取,传入次序与槽位无关
+	SortHatchingEggs(eggs)
+	for i, gid := range gids {
+		if eggs[i].Gid != gid {
+			got := make([]uint32, len(eggs))
+			for j, e := range eggs {
+				got[j] = e.Gid
+			}
+			t.Fatalf("槽位顺序 = %v, want %v", got, gids)
+		}
+	}
+}
+
+func TestSortHatchingEggsFallback(t *testing.T) {
+	// 权威快照还没到(抓包从半途开始,没有登录数据也没开过孵蛋器)时,退回按入孵时刻升序。
 	eggs := []*EggView{
 		{Gid: 3104, StartHatch: 1786858404},
 		{Gid: 3109, StartHatch: 1786858369},
@@ -200,7 +226,7 @@ func TestSortHatchingEggs(t *testing.T) {
 	want := []uint32{3110, 3109, 3104}
 	for i := range want {
 		if eggs[i].Gid != want[i] {
-			t.Fatalf("槽位顺序 = %d,%d,%d, want %v", eggs[0].Gid, eggs[1].Gid, eggs[2].Gid, want)
+			t.Fatalf("兜底顺序 = %d,%d,%d, want %v", eggs[0].Gid, eggs[1].Gid, eggs[2].Gid, want)
 		}
 	}
 }
