@@ -17,12 +17,15 @@ import (
 //	               (1646/9006),用 battle_cfg_id 查 BATTLE_CONF 得到真正的宠物种类,
 //	               等级/性别/身高/体重/声音/性格取自龙棋士的 battle_common_pet_info,
 //	               这几项与最终捕捉一致(见 docs/parsing.md),拼一只合成 Pet 推给前端。
-//	               普通对战的性格不能提前确定,清掉由前端显示未知。
+//	               普通对战的性格不能提前确定,清掉由前端显示未知;处于污染状态的血脉也是
+//	               临时的(捕捉后变回种族血脉),同样不展示。
 //	reveal 0x131a:龙棋士的护盾打破,敌方 401 号位从龙棋士变成真宠物;推完整 Pet(种类/
-//	               性格/血脉/异色/污染/奇异),这些字段也已经与最终捕捉一致。
+//	               性格/血脉/异色/污染/奇异),这些字段也已经与最终捕捉一致。普通对战若是
+//	               污染个体,污染位清零时也推一次(阶段变已打破),但血脉仍不展示。
 //	end    0x132c:战斗结束,只推 stage=end,前端置灰并保留上一份数据。
 type battleState struct {
-	chess    bool // 赛季奇遇龙棋士战斗(才有 battle_cfg 与 reveal 阶段)
+	chess    bool // 赛季奇遇龙棋士战斗(才有 battle_cfg)
+	polluted bool // 普通对战且进战斗时处于污染状态:等 0x131a 的污染位清零
 	revealed bool
 }
 
@@ -50,6 +53,7 @@ func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 		cfg, hasCfg := p.db.BattleCfg(be.BattleCfgID)
 		chess = chess && hasCfg && cfg.PetConf != 0
 		var pp *pet.Pet
+		var polluted bool
 		if chess {
 			pp = p.battleEnterPet(be.Enemy, cfg.PetConf)
 		} else {
@@ -57,27 +61,40 @@ func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 			if pd == nil {
 				pd = &pb.PetData{}
 			}
-			pd.Nature = nil // 普通对战性格未知
-			pp = pet.ToPet(pd, p.db)
+			polluted = scene.IsPollutedMutation(pd.GetMutationType())
+			pp = p.normalBattlePet(pd, polluted)
 		}
 		pet.FillDerived(p.db, pp)
-		cs.battle = &battleState{chess: chess}
+		cs.battle = &battleState{chess: chess, polluted: polluted}
 		p.srv.Hub().Broadcast("battle", acc, map[string]any{
 			"stage": "enter", "revealed": false,
 			"time": m.Time.Unix(), "species": pp.Species, "pet": pp,
 		})
 	case scene.OpBattleRoundStartNotify:
-		// 只有龙棋士战斗有「护盾破→宠物现身」;普通对战在 enter 阶段已经给出宠物。
-		// 护盾破后的每一回合都会带同一只宠物;只推第一次 reveal,避免重复刷新前端。
-		if cs.battle == nil || !cs.battle.chess || cs.battle.revealed {
+		// reveal 只在两种情况下需要:龙棋士护盾破后宠物现身;普通污染对战把污染打掉。
+		// 之后的回合都会带同一只宠物,只推第一次,避免重复刷新前端。
+		if cs.battle == nil || cs.battle.revealed {
 			return
 		}
-		pd := scene.ParseBattleRoundReveal(m.AppBody)
-		if pd == nil {
+		var pp *pet.Pet
+		switch {
+		case cs.battle.chess:
+			pd := scene.ParseBattleRoundReveal(m.AppBody)
+			if pd == nil {
+				return
+			}
+			pp = pet.ToPet(pd, p.db)
+		case cs.battle.polluted:
+			pd := scene.ParseBattleRoundReveal(m.AppBody)
+			if pd == nil || scene.IsPollutedMutation(pd.GetMutationType()) {
+				return // 污染还没打破,等下一回合
+			}
+			// 破污染后血脉字段仍是污染血脉(实测 23),捕捉时才知道种族血脉(实测 9),先不展示。
+			pp = p.normalBattlePet(pd, true)
+		default:
 			return
 		}
 		cs.battle.revealed = true
-		pp := pet.ToPet(pd, p.db)
 		pet.FillDerived(p.db, pp)
 		p.srv.Hub().Broadcast("battle", acc, map[string]any{
 			"stage": "reveal", "revealed": true,
@@ -103,6 +120,17 @@ func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 		p.srv.Hub().Broadcast("battle", acc, map[string]any{"stage": "end", "time": m.Time.Unix()})
 		cs.battle = nil
 	}
+}
+
+// normalBattlePet 把普通对战的敌方 PetData 转成展示用 Pet:性格不能提前确定,一律清空;
+// hideBlood 时连血脉也清空——处于污染状态(MDT_CHAOS)的敌方,血脉是临时的污染血脉,
+// 捕捉后会变回种族血脉(实测污染小电企鹅:23→电 9),不能提前展示。
+func (p *Pipeline) normalBattlePet(pd *pb.PetData, hideBlood bool) *pet.Pet {
+	pd.Nature = nil
+	if hideBlood {
+		pd.BloodId = nil
+	}
+	return pet.ToPet(pd, p.db)
 }
 
 // battleEnterPet 用 battle_cfg 的真宠物 conf/base 拼一只合成 Pet:

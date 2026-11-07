@@ -39,3 +39,40 @@ func TestBattleEnterPet(t *testing.T) {
 			pp.Blood, pp.Shiny, pp.Colorful)
 	}
 }
+
+// normalBattlePet 处理普通对战:性格一律不展示;污染战斗连血脉也不展示——那条血脉是临时的,
+// 捕捉后会变回种族血脉(2026-11-08 污染小电企鹅:23→电 9)。
+func TestNormalBattlePet(t *testing.T) {
+	db, err := gamedata.Load()
+	if err != nil {
+		t.Skipf("名称库未生成(先跑 make gamedata): %v", err)
+	}
+	conf, base := uint32(410430), uint32(3434)
+	lv, gender, height, weight := uint32(37), uint32(1), uint32(71), uint32(4761)
+	voice := int32(27)
+	nature, blood, mutation := uint32(30), uint32(23), uint32(4)
+	enemy := func() *pb.PetData {
+		return &pb.PetData{
+			ConfId: &conf, BaseConfId: &base, Level: &lv, Gender: &gender,
+			Height: &height, Weight: &weight, Voice: &voice,
+			Nature: &nature, BloodId: &blood, MutationType: &mutation,
+		}
+	}
+
+	pp := (&Pipeline{db: db}).normalBattlePet(enemy(), true)
+	if pp.Species != "小电企鹅" || pp.Level != 37 || pp.Gender != "♂" ||
+		pp.WeightKg != 4.761 || pp.Voice != 27 {
+		t.Errorf("个体字段不符: %+v", pp)
+	}
+	if pp.Nature != "" || pp.Blood != "" {
+		t.Errorf("污染战斗不应展示性格/血脉: nature=%q blood=%q", pp.Nature, pp.Blood)
+	}
+
+	// 非污染:只清性格,血脉保留。
+	pd := enemy()
+	pd.MutationType = nil
+	pp = (&Pipeline{db: db}).normalBattlePet(pd, false)
+	if pp.Nature != "" || pp.Blood != "污染" {
+		t.Errorf("非污染战斗应只清性格: nature=%q blood=%q", pp.Nature, pp.Blood)
+	}
+}
