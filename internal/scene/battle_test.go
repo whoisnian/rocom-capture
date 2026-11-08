@@ -27,10 +27,23 @@ func petData(conf, base, lv, nature, gender, height, weight, mutation, blood uin
 	return b
 }
 
+// battleInside 构造 battle_inside_pet_info 的 battle_attr(6,重复 int32):
+// 索引 1 为最大生命,末项为最大护盾,其余值此处不关心。
+func battleInside(attrs ...uint64) []byte {
+	var b []byte
+	for _, v := range attrs {
+		b = protowire.AppendTag(b, 6, protowire.VarintType)
+		b = protowire.AppendVarint(b, v)
+	}
+	return b
+}
+
 // BattleInitInfo: battle_mode(1) + battle_cfg_id(2) + enemy_team(6) → pets(2) →
-// battle_common_pet_info(2)。
+// battle_inside_pet_info(1) + battle_common_pet_info(2)。
 func TestParseBattleEnter(t *testing.T) {
 	var pet []byte
+	pet = protowire.AppendTag(pet, 1, protowire.BytesType)
+	pet = protowire.AppendBytes(pet, battleInside(0, 258, 0, 774, 774)) // 异色:护盾 3×生命
 	pet = protowire.AppendTag(pet, 2, protowire.BytesType)
 	pet = protowire.AppendBytes(pet, petData(1646, 9006, 42, 16, 1, 210, 653123, 0, 4, 45))
 
@@ -64,6 +77,46 @@ func TestParseBattleEnter(t *testing.T) {
 		e.GetLevel() != 42 || e.GetGender() != 1 || e.GetHeight() != 210 ||
 		e.GetWeight() != 653123 || e.GetVoice() != 45 {
 		t.Errorf("敌方 PetData 不符: %+v", e)
+	}
+	if len(be.EnemyBattleAttr) != 5 || be.EnemyBattleAttr[1] != 258 || be.EnemyBattleAttr[4] != 774 {
+		t.Errorf("敌方 battle_attr 不符: %v", be.EnemyBattleAttr)
+	}
+	if !BattleShieldShiny(be.EnemyBattleAttr) {
+		t.Error("护盾 774 = 3×258,应判为异色")
+	}
+}
+
+// 异色判据:最大护盾 = 最大生命 × 3;× 2 普通,护盾缺失(0)不适用。
+func TestBattleShieldShiny(t *testing.T) {
+	cases := []struct {
+		name  string
+		attrs []int32
+		want  bool
+	}{
+		{"异色", []int32{0, 258, 0, 0, 774, 774}, true},
+		{"普通", []int32{0, 258, 0, 0, 516, 516}, false},
+		{"非龙棋士护盾为 0", []int32{0, 188, 0, 0, 0}, false},
+		{"无 battle_attr", nil, false},
+		{"只有生命", []int32{0, 258}, false},
+	}
+	for _, c := range cases {
+		if got := BattleShieldShiny(c.attrs); got != c.want {
+			t.Errorf("%s: BattleShieldShiny(%v) = %v, 期望 %v", c.name, c.attrs, got, c.want)
+		}
+	}
+}
+
+// battle_attr 也可能按 packed 下发,两种编码都要能解。
+func TestBattleAttrsPacked(t *testing.T) {
+	var packed []byte
+	for _, v := range []uint64{0, 258, 0, 774, 774} {
+		packed = protowire.AppendVarint(packed, v)
+	}
+	inside := protowire.AppendTag(nil, 6, protowire.BytesType)
+	inside = protowire.AppendBytes(inside, packed)
+	attrs := battleAttrs(inside)
+	if len(attrs) != 5 || !BattleShieldShiny(attrs) {
+		t.Errorf("packed battle_attr 解出 %v,期望 5 项且判为异色", attrs)
 	}
 }
 

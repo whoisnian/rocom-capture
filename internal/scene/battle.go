@@ -13,7 +13,9 @@ import (
 //	0x1316 战斗进入:敌方队伍第一个宠物的 battle_common_pet_info 即对手宠物;若敌方是
 //	        龙棋士(conf 1646/base 9006),common 里是等级/性别/身高/体重/声音/性格,
 //	        种类由 init_info.battle_cfg_id 查 BATTLE_CONF 得到(names.json 的 battle_cfg),
-//	        这是唯一在进战斗时就与最终宠物一致的种类来源。
+//	        这是唯一在进战斗时就与最终宠物一致的种类来源。敌方 battle_inside_pet_info
+//	        的 battle_attr 末两项为当前/最大护盾,[1] 为最大生命;最大护盾 = 生命 × 3
+//	        即身后隐藏的宠物为异色(× 2 为普通),进战斗即可预判。
 //	0x131a 回合开始:龙棋士护盾打破后,敌方(401 号位)的 common 从龙棋士变成真正的宠物,
 //	        带 conf/base、mutation_type(异色=1/污染=32)、blood_id(奇异=24)、性格等。
 //	0x132c 战斗结束:只用于让前端置灰;龙棋士没收到 reveal 时可从这里补一次。
@@ -31,14 +33,16 @@ const (
 
 // BattleEnter 是 0x1316 的解析结果。
 type BattleEnter struct {
-	BattleMode  uint32      // battle_mode:战斗类型(pb.BattleType)
-	BattleCfgID uint32      // init_info.battle_cfg_id[0]
-	Enemy       *pb.PetData // 敌方队伍第一个宠物的 battle_common_pet_info
+	BattleMode      uint32      // battle_mode:战斗类型(pb.BattleType)
+	BattleCfgID     uint32      // init_info.battle_cfg_id[0]
+	Enemy           *pb.PetData // 敌方队伍第一个宠物的 battle_common_pet_info
+	EnemyBattleAttr []int32     // 同一只宠物的 battle_inside_pet_info.battle_attr
 }
 
 // ParseBattleEnter 解 s2c ZoneBattleEnterNotify(0x1316)的 battle_mode(1)与 init_info(6) →
 // battle_cfg_id(2,重复/packed)、enemy_team(6,重复 BattleRoleInfo) →
-// pets(2,重复 BattlePetInfo) → battle_common_pet_info(2, PetData)。
+// pets(2,重复 BattlePetInfo) → battle_inside_pet_info(1, battle_attr) +
+// battle_common_pet_info(2, PetData)。
 func ParseBattleEnter(body []byte) (*BattleEnter, bool) {
 	var mode uint32
 	if v, ok := wire.Varint(body, 1); ok { // battle_mode
@@ -70,11 +74,45 @@ func ParseBattleEnter(body []byte) (*BattleEnter, bool) {
 			}
 			var pd pb.PetData
 			if proto.Unmarshal(common, &pd) == nil && pd.GetBaseConfId() != 0 {
-				return &BattleEnter{BattleMode: mode, BattleCfgID: cfg, Enemy: &pd}, true
+				return &BattleEnter{
+					BattleMode: mode, BattleCfgID: cfg, Enemy: &pd,
+					EnemyBattleAttr: battleAttrs(subMsg(pet, 1)),
+				}, true
 			}
 		}
 	}
 	return nil, false
+}
+
+// battleAttrs 取 battle_inside_pet_info.battle_attr(6,重复 int32)。
+// 本协议按非 packed 下发,这里同时兼容 packed 编码。
+func battleAttrs(inside []byte) []int32 {
+	var out []int32
+	scanFields(inside, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
+		if num != 6 {
+			return
+		}
+		switch typ {
+		case protowire.VarintType:
+			out = append(out, int32(v))
+		case protowire.BytesType:
+			for _, pv := range wire.PackedVarints(val) {
+				out = append(out, int32(pv))
+			}
+		}
+	})
+	return out
+}
+
+// BattleShieldShiny 判断龙棋士身后隐藏的宠物是否为异色:敌方 battle_attr[1] 是最大生命,
+// 末项是最大护盾,护盾 = 生命 × 2 为普通,× 3 为异色,进战斗时即与最终捕捉一致。
+// 其它战斗的护盾为 0,不适用(调用方只在龙棋士分支使用)。
+func BattleShieldShiny(attrs []int32) bool {
+	if len(attrs) < 2 {
+		return false
+	}
+	hp, shield := attrs[1], attrs[len(attrs)-1]
+	return hp > 0 && int64(shield) == int64(hp)*3
 }
 
 // IsPVP 报告该战斗类型是否为玩家对战(口径同客户端 PetUtils.IsPvp)。

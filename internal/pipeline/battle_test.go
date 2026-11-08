@@ -8,8 +8,8 @@ import (
 )
 
 // battleEnterPet 用 battle_cfg 的真宠物 conf/base 拼合成 Pet:
-// 种类/属性取真宠物,等级/性别/身高/体重/声音/性格取龙棋士;血脉/变异必须清掉,
-// 否则前端在 enter 阶段会显示与最终捕捉不一致的值。
+// 种类/属性取真宠物,等级/性别/身高/体重/声音/性格取龙棋士;异色由护盾倍率预判,
+// 血脉/炫彩/污染等其余字段清掉,否则前端在 enter 阶段会显示与最终捕捉不一致的值。
 func TestBattleEnterPet(t *testing.T) {
 	db, err := gamedata.Load()
 	if err != nil {
@@ -24,7 +24,7 @@ func TestBattleEnterPet(t *testing.T) {
 		Height: &height, Weight: &weight, Voice: &voice,
 		Nature: &nature, BloodId: &blood, MutationType: &mutation,
 	}
-	pp := (&Pipeline{db: db}).battleEnterPet(enemy, 300355)
+	pp := (&Pipeline{db: db}).battleEnterPet(enemy, 300355, false)
 	if pp.Species != "深蓝鲸" || pp.BaseConfID != 3381 {
 		t.Errorf("种类 = %q/%d, 期望 深蓝鲸/3381", pp.Species, pp.BaseConfID)
 	}
@@ -35,8 +35,15 @@ func TestBattleEnterPet(t *testing.T) {
 		t.Errorf("性格 = %q, 期望 警惕(龙棋士身上就是最终宠物的性格)", pp.Nature)
 	}
 	if pp.Blood != "" || pp.Shiny || pp.Colorful {
-		t.Errorf("enter 阶段不应带血脉/变异: blood=%q shiny=%v colorful=%v",
+		t.Errorf("普通 enter 阶段不应带血脉/变异: blood=%q shiny=%v colorful=%v",
 			pp.Blood, pp.Shiny, pp.Colorful)
+	}
+
+	// 护盾 3×生命:进战斗即判为异色,但血脉/炫彩仍不可知。
+	pp = (&Pipeline{db: db}).battleEnterPet(enemy, 300355, true)
+	if !pp.Shiny || pp.Colorful || pp.Blood != "" {
+		t.Errorf("异色 enter 阶段: shiny=%v colorful=%v blood=%q, 期望仅异色",
+			pp.Shiny, pp.Colorful, pp.Blood)
 	}
 }
 

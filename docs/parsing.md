@@ -155,16 +155,19 @@ gamedata 现算(`pet.FillDerived`),配置里查不到的款退回通用炫彩图
 
 | 阶段 | 消息 | 内容 |
 | --- | --- | --- |
-| enter | `0x1316` | 普通对战直接取敌方队伍第一只宠物的 `battle_common_pet_info`,性格不能提前确定、显示未知;处于污染状态(`mutation_type` 的 MDT_CHAOS 位)时血脉也是临时的(捕捉后变回种族血脉),不展示;若敌方是龙棋士(conf 1646/base 9006),`init_info.battle_cfg_id` → `BATTLE_CONF.name`/`npc_battle_list[].pos1_1st[]` 得**种类**,等级/性别/身高/体重/声音/性格取龙棋士的 `battle_common_pet_info`(与最终宠物一致) |
+| enter | `0x1316` | 普通对战直接取敌方队伍第一只宠物的 `battle_common_pet_info`,性格不能提前确定、显示未知;处于污染状态(`mutation_type` 的 MDT_CHAOS 位)时血脉也是临时的(捕捉后变回种族血脉),不展示;若敌方是龙棋士(conf 1646/base 9006),`init_info.battle_cfg_id` → `BATTLE_CONF.name`/`npc_battle_list[].pos1_1st[]` 得**种类**,等级/性别/身高/体重/声音/性格取龙棋士的 `battle_common_pet_info`(与最终宠物一致);敌方 `battle_inside_pet_info.battle_attr` 的 `[1]` 为最大生命、末项为最大护盾,最大护盾 = 生命 × 3 即身后隐藏的宠物为异色(× 2 普通),异色头像与标记进战斗即可见 |
 | reveal | `0x131a` | 龙棋士护盾打破后,`data_update.other.pets` 里 401 号位的 `battle_common_pet_info` 从龙棋士(1646/9006)变成真宠物,带 `conf/base`、`mutation_type`(异色=1/污染=32)、性格等;推送完整 Pet,前端补上血脉徽标与异色/炫彩标记。普通污染对战在污染位清零时也推一次(阶段变已打破),但血脉仍不展示——结算里才知道种族血脉 |
 | end | `0x132c` | 只推 `stage=end`,前端置灰保留,等待下一场;不主动清空 |
 
 页面在事件序号的位置显示等级,并展示种类/性别/体重/声音/性格、名称行的血脉徽标与异色/炫彩
-标记;普通对战 enter 即可见(污染战斗的血脉不显示),龙棋士要等 reveal。不展示身高,副行也不
-显示血脉文字。
+标记;普通对战 enter 即可见(污染战斗的血脉不显示),龙棋士的异色在 enter 按护盾倍率预判,
+血脉/炫彩要等 reveal。不展示身高,副行也不显示血脉文字。
 
 **PVP 不推送**:`0x1316` 的 `battle_mode` 是 PVP 类型(同客户端 `PetUtils.IsPvp`)时,
 整场战斗信息都不广播。
+
+龙棋士的护盾倍率与最终异色一致:实测异色深蓝鲸为 774 = 3×258,普通/污染/混乱/奇异个体均为
+2×,进战斗时即可确定。
 
 实测(2026-11-08 的污染小电企鹅):进战斗 `blood_id=23`(污染)/`nature=30`/`height=71`,破污染后
 `mutation_type=0`/`height=51`,捕捉后 `blood_id=9`(电)/`nature=21`/`height=51`。故污染战斗里

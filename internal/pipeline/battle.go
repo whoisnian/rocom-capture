@@ -17,8 +17,9 @@ import (
 //	               (1646/9006),用 battle_cfg_id 查 BATTLE_CONF 得到真正的宠物种类,
 //	               等级/性别/身高/体重/声音/性格取自龙棋士的 battle_common_pet_info,
 //	               这几项与最终捕捉一致(见 docs/parsing.md),拼一只合成 Pet 推给前端。
-//	               普通对战的性格不能提前确定,清掉由前端显示未知;处于污染状态的血脉也是
-//	               临时的(捕捉后变回种族血脉),同样不展示。
+//	               异色按敌方护盾预判:最大护盾 = 最大生命 × 3 即异色(× 2 普通),
+//	               进战斗就展示异色头像与标记;普通对战的性格不能提前确定,清掉由前端
+//	               显示未知;处于污染状态的血脉也是临时的(捕捉后变回种族血脉),同样不展示。
 //	reveal 0x131a:龙棋士的护盾打破,敌方 401 号位从龙棋士变成真宠物;推完整 Pet(种类/
 //	               性格/血脉/异色/污染/奇异),这些字段也已经与最终捕捉一致。普通对战若是
 //	               污染个体,污染位清零时也推一次(阶段变已打破),但血脉仍不展示。
@@ -55,7 +56,7 @@ func (p *Pipeline) handleBattleInfo(m capture.Message, acc string) {
 		var pp *pet.Pet
 		var polluted bool
 		if chess {
-			pp = p.battleEnterPet(be.Enemy, cfg.PetConf)
+			pp = p.battleEnterPet(be.Enemy, cfg.PetConf, scene.BattleShieldShiny(be.EnemyBattleAttr))
 		} else {
 			pd, _ := proto.Clone(be.Enemy).(*pb.PetData)
 			if pd == nil {
@@ -135,8 +136,9 @@ func (p *Pipeline) normalBattlePet(pd *pb.PetData, hideBlood bool) *pet.Pet {
 
 // battleEnterPet 用 battle_cfg 的真宠物 conf/base 拼一只合成 Pet:
 // 种类/头像/属性取真宠物,等级/性别/身高/体重/声音/性格取龙棋士(逐字段与最终捕捉一致),
-// 血脉/变异/奖牌等清掉——它们在 enter 阶段还不是最终宠物的值。
-func (p *Pipeline) battleEnterPet(enemy *pb.PetData, petConf uint32) *pet.Pet {
+// 异色由护盾倍率预判(shiny),用于异色头像与标记;血脉/炫彩/污染等其余字段清掉——
+// 它们在 enter 阶段还不是最终宠物的值。
+func (p *Pipeline) battleEnterPet(enemy *pb.PetData, petConf uint32, shiny bool) *pet.Pet {
 	pd, ok := proto.Clone(enemy).(*pb.PetData)
 	if !ok {
 		pd = &pb.PetData{}
@@ -151,6 +153,10 @@ func (p *Pipeline) battleEnterPet(enemy *pb.PetData, petConf uint32) *pet.Pet {
 	// 性格保留:龙棋士战斗里的 nature 就是最终宠物的性格(实测一致);普通对战在别处清掉。
 	pd.BloodId = nil
 	pd.MutationType = nil
+	if shiny {
+		mutation := uint32(1) // MDT_SHINING
+		pd.MutationType = &mutation
+	}
 	pd.GlassInfo = nil
 	pd.TalentRank = nil
 	pd.SpecialityId = nil
