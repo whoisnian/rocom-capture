@@ -66,9 +66,10 @@
   **点色卡**可跳到姊妹项目 [rkpet.whoisnian.com](https://rkpet.whoisnian.com) 看这只这个形态、
   这套炫彩的 3D 效果(走它的 `GET /api/link?petbase=<形态编号>&shiny=1&glass=<type>:<value>`,污染卡送 `pollution=1`,
   送的全是游戏自己的编号,换算由那边负责;只是个链接,不点不发任何外部请求)。
-  启动时加 `-pets-url http://127.0.0.1:47831` 后,本机开着 [rocom-pets](https://github.com/whoisnian/rocom-pets)
-  桌宠客户端时点色卡改为直接唤起它的预览窗口:桌宠隐藏设置里「本地监听」填同一地址、「允许跨域」填本页地址
-  (如 `http://192.168.1.1:4939`)。这个地址由看页面的浏览器去连,`127.0.0.1` 指浏览器所在的电脑而不是网关。
+  启动时加 `-pets-url http://127.0.0.1:47831 -pets-token <令牌>` 后,本机开着 [rocom-pets](https://github.com/whoisnian/rocom-pets)
+  桌宠客户端时点色卡改为直接唤起它的预览窗口:桌宠「常用配置 › 本地接口」里「本地监听」填同一地址、
+  「允许跨域」填本页地址(如 `http://192.168.1.1:4939`),「鉴权令牌」复制给 `-pets-token`。
+  这个地址由看页面的浏览器去连,`127.0.0.1` 指浏览器所在的电脑而不是网关;令牌也下发给页面,能打开本页的人都看得到。
   页面打开时探一次(未设 `-pets-url` 或在手机上不探),探不通照旧跳 rkpet;
   浏览器若询问是否允许访问本机/本地网络上的应用,选允许。
 
@@ -158,7 +159,7 @@ sudo ./rocom-capture -iface <网卡> -port 8195 -addr :4939
 sudo ./rocom-capture -iface <网卡> -tls
 
 # 炫彩色卡唤起看页面那台电脑上的桌宠预览(不设则只跳 rkpet,见页面五)
-sudo ./rocom-capture -iface <网卡> -pets-url http://127.0.0.1:47831
+sudo ./rocom-capture -iface <网卡> -pets-url http://127.0.0.1:47831 -pets-token rkp_…
 ```
 
 浏览器打开 `http://localhost:4939`。

@@ -45,6 +45,10 @@ type Options struct {
 	// PetsURL 是本机桌宠 rocom-pets 的本地监听(如 http://127.0.0.1:47831)。由**看页面的那台浏览器**
 	// 去连,127.0.0.1 指的是浏览器所在的机器而不是网关。空 = 前端不探测,炫彩色卡只跳 rkpet。
 	PetsURL string `json:"petsURL,omitempty"`
+	// PetsToken 是 rocom-pets 本地接口的鉴权令牌,浏览器调它时放进 `Authorization: Bearer`。
+	// 只能下发给页面(调用方是浏览器),所以能打开本页的人都看得到它;桌宠监听在 127.0.0.1 时,
+	// 令牌只对那台电脑自己的浏览器有用。
+	PetsToken string `json:"petsToken,omitempty"`
 }
 
 // iconMeta 是全局固定图标(每只宠物都一样,不随宠物下发):六维属性小图 + 异色/炫彩/污染标记图。

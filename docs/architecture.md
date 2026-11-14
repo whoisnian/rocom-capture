@@ -109,7 +109,7 @@ TCP 重组、flush 时钟、会话密钥共享等在 rocom-parse 的 `capture` �
 | `GET /api/pet-page` | 某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页 |
 | `GET /api/medals` | 全部奖牌(id/name/desc/icon),静态数据,供详情页奖牌墙 |
 | `GET /api/icons` | 全局固定图标(六维属性小图 + 异色/炫彩/污染标记图),静态数据,前端一次性缓存 |
-| `GET /api/config` | 启动参数给的页面配置:`petsURL`(`-pets-url`,本机桌宠 rocom-pets 的本地监听;空则前端不探测,炫彩色卡只跳 rkpet) |
+| `GET /api/config` | 启动参数给的页面配置:`petsURL`(`-pets-url`,本机桌宠 rocom-pets 的本地监听;空则前端不探测,炫彩色卡只跳 rkpet)与 `petsToken`(`-pets-token`,它的鉴权令牌,浏览器调桌宠时带上) |
 | `GET /api/name-options` | 全量特长名(gamedata 全表,不按账号),供事件页高亮规则点选 |
 | `GET /api/evolution` | 某 petbase(`?base=`)所属进化链(按阶段升序),静态数据,供详情页 |
 | `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|battle\|position\|stars\|starzones\|wildpets\|paint\|home\|eggs, account, data}` |
